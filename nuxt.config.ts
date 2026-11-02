@@ -11,6 +11,15 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
   },
 
+  routeRules: {
+    // Fictional posts and matches are public: keep the site out of search results for now.
+    '/**': { headers: { 'x-robots-tag': 'noindex, nofollow' } },
+    // On Netlify, `isr` becomes durable CDN caching (stale-while-revalidate),
+    // so publishers are fetched at most every few minutes, not per visit.
+    '/': { isr: 300 },
+    '/api/**': { isr: 600 },
+  },
+
   fonts: {
     defaults: {
       weights: [400, 500, 600, 700, 800, 900],
@@ -27,6 +36,7 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { name: 'description', content: 'Ett digitalt hem för Djurgårdare – fotboll och hockey, nyheter, snack, poddar och klipp.' },
         { name: 'theme-color', content: '#061229' },
+        { name: 'robots', content: 'noindex, nofollow' },
       ],
       link: [{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
     },

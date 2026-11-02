@@ -6,16 +6,13 @@ const props = defineProps<{ story: Story, lead?: boolean }>()
 const { spotlight } = useStorySpotlight()
 const { countForStory, filter } = useSnacket()
 
-const selected = ref<string | null>(null)
-const active = computed(() => props.story.sources.find(s => s.id === selected.value))
+const leadSource = computed(() => leadOf(props.story))
+const others = computed(() => props.story.sources.filter(s => s.id !== props.story.leadId))
 const talk = computed(() => countForStory(props.story.id))
+const outlets = computed(() => [...new Set(props.story.sources.map(s => s.outlet))])
 
-const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey', klubben: 'Klubben' } as const
-const sportDot = { fotboll: 'bg-himmel', hockey: 'bg-himmel-200', klubben: 'bg-guld' } as const
-
-function toggle(id: string) {
-  selected.value = selected.value === id ? null : id
-}
+const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
+const sportDot = { fotboll: 'bg-himmel', hockey: 'bg-himmel-200' } as const
 
 function openTalk() {
   filter.value = { storyId: props.story.id }
@@ -25,7 +22,7 @@ function openTalk() {
 
 <template>
   <article
-    :id="`story-${story.id}`"
+    :id="story.id"
     class="card group relative flex scroll-mt-28 flex-col overflow-hidden transition duration-500 hover:border-himmel/30"
     :class="[lead ? 'p-6 sm:p-9' : 'p-6', spotlight === story.id && 'animate-spotlight']"
   >
@@ -33,63 +30,60 @@ function openTalk() {
     <div v-if="lead" aria-hidden="true" class="stripes pointer-events-none absolute -right-10 -top-10 h-56 w-56 rotate-12 rounded-[2.5rem] opacity-[0.08] [--stripe:18px] transition duration-700 group-hover:rotate-6 group-hover:opacity-15" />
 
     <div class="relative flex items-center gap-2 text-krita-dim">
-      <span class="size-2 rounded-full" :class="sportDot[story.sport]" />
-      <span class="kicker">{{ sportLabel[story.sport] }} · {{ story.kicker }}</span>
-      <span class="kicker ml-auto"><TimeAgo :at="story.updatedAt" /></span>
+      <span class="size-2 shrink-0 rounded-full" :class="sportDot[story.sport]" />
+      <span class="kicker truncate">{{ sportLabel[story.sport] }} · {{ leadSource.outlet }}</span>
+      <span class="kicker ml-auto shrink-0"><TimeAgo :at="leadSource.publishedAt" /></span>
     </div>
 
-    <h3 class="relative mt-4 font-display font-semibold leading-[1.02] tracking-tight" :class="lead ? 'text-4xl sm:text-6xl' : 'text-2xl'">
-      {{ story.title }}
+    <!-- The headline is always the lead source's own, linking to its article -->
+    <h3 class="relative mt-4 font-display font-semibold leading-[1.05] tracking-tight" :class="lead ? 'text-3xl sm:text-5xl' : 'text-xl sm:text-2xl'">
+      <a :href="leadSource.url" target="_blank" rel="noopener" class="decoration-himmel/60 decoration-2 underline-offset-[6px] hover:underline">
+        {{ leadSource.headline }}
+      </a>
     </h3>
-    <p class="relative mt-3 leading-relaxed text-krita-dim" :class="lead ? 'max-w-xl text-lg' : 'text-sm'">
-      {{ story.about }}
+    <p v-if="leadSource.excerpt" class="relative mt-3 leading-relaxed text-krita-dim" :class="lead ? 'max-w-xl text-lg' : 'line-clamp-3 text-sm'">
+      {{ leadSource.excerpt }}
     </p>
 
-    <!-- Lead: every source's own headline, side by side -->
-    <div v-if="lead" class="relative mt-8">
-      <p class="kicker text-krita-dim">Så rubricerar källorna</p>
-      <ul class="mt-3 divide-y divide-white/8 border-y border-white/8">
-        <li v-for="src in story.sources" :key="src.id">
-          <a :href="src.url" target="_blank" rel="noopener" class="group/src flex flex-col gap-1 py-4 sm:flex-row sm:items-start sm:gap-4 transition hover:bg-white/[0.03]">
-            <span class="shrink-0 text-sm font-bold text-himmel sm:mt-1 sm:w-28">{{ src.outlet }}</span>
+    <!-- Other sources on the same event, each with its own headline -->
+    <div v-if="others.length" class="relative mt-6">
+      <p class="kicker text-krita-dim">Fler källor om samma händelse</p>
+      <ul class="mt-2 divide-y divide-white/8 border-y border-white/8">
+        <li v-for="src in (lead ? others : others.slice(0, 2))" :key="src.id">
+          <a :href="src.url" target="_blank" rel="noopener" class="group/src flex flex-col gap-1 py-3 transition hover:bg-white/[0.03] sm:flex-row sm:items-baseline sm:gap-4">
+            <span class="shrink-0 text-sm font-bold text-himmel sm:w-28">{{ src.outlet }}</span>
             <span class="min-w-0 flex-1">
-              <span class="block font-display text-xl leading-snug group-hover/src:underline decoration-himmel/60 underline-offset-4">{{ src.headline }}</span>
-              <span class="kicker mt-1.5 block text-krita-dim">{{ src.format }} · <TimeAgo :at="src.publishedAt" /> · demolänk ↗</span>
+              <span class="block font-display leading-snug decoration-himmel/60 underline-offset-4 group-hover/src:underline" :class="lead ? 'text-xl' : 'text-base'">{{ src.headline }}</span>
+              <span class="kicker mt-1 block text-krita-dim"><TimeAgo :at="src.publishedAt" /> · läs hos {{ src.outlet }} ↗</span>
             </span>
           </a>
         </li>
       </ul>
+      <p v-if="!lead && others.length > 2" class="mt-2 text-xs text-krita-dim">+ {{ others.length - 2 }} till</p>
+      <p v-if="story.sharedNames.length" class="mt-3 text-xs leading-relaxed text-krita-dim">
+        Samlade automatiskt: källorna nämner <span class="text-krita">{{ story.sharedNames.join(', ') }}</span> inom samma dygn.
+      </p>
     </div>
 
-    <!-- Regular: source pills reveal each original headline -->
-    <div v-else class="relative mt-5">
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-for="src in story.sources"
-          :key="src.id"
-          class="chip"
-          :class="selected === src.id ? 'border-himmel bg-himmel text-navy-950' : 'border-white/12 text-krita hover:border-himmel/60'"
-          :aria-expanded="selected === src.id"
-          @click="toggle(src.id)"
-        >
-          {{ src.outlet }}
-          <span class="font-normal opacity-60">{{ src.format }}</span>
-        </button>
-      </div>
-      <Transition enter-from-class="opacity-0 -translate-y-1" leave-to-class="opacity-0" enter-active-class="transition duration-300" leave-active-class="transition duration-150">
-        <a v-if="active" :key="active.id" :href="active.url" target="_blank" rel="noopener" class="mt-3 block rounded-2xl border border-himmel/25 bg-navy-950/60 p-4 transition hover:border-himmel/60">
-          <span class="kicker text-himmel">{{ active.outlet }} skriver</span>
-          <span class="mt-1 block font-display text-lg leading-snug">{{ active.headline }}</span>
-          <span class="kicker mt-2 block text-krita-dim"><TimeAgo :at="active.publishedAt" /> · Öppna källan (demolänk) ↗</span>
-        </a>
-      </Transition>
-    </div>
-
-    <div class="relative mt-auto flex items-center justify-between gap-3 pt-6 text-xs text-krita-dim">
-      <span>{{ story.sources.length }} {{ story.sources.length === 1 ? 'källa' : 'källor' }}</span>
-      <button v-if="talk" class="font-semibold text-krita transition hover:text-guld" @click="openTalk">
-        Snackas om i {{ talk }} inlägg →
-      </button>
+    <!-- Source pills: straight to each original article -->
+    <div class="relative mt-auto flex flex-wrap items-center gap-2 pt-6">
+      <a
+        v-for="src in story.sources"
+        :key="src.id"
+        :href="src.url"
+        target="_blank"
+        rel="noopener"
+        class="chip border-white/12 text-krita hover:border-himmel hover:bg-himmel hover:text-navy-950"
+        :title="`${src.publisher}: ${src.headline}`"
+      >
+        {{ src.outlet }}
+        <span v-if="story.sources.length > 1" class="font-normal opacity-60"><TimeAgo :at="src.publishedAt" /></span>
+        <span aria-hidden="true">↗</span>
+      </a>
+      <span class="ml-auto text-xs text-krita-dim">
+        <button v-if="talk" class="font-semibold text-krita transition hover:text-guld" @click="openTalk">Snackas om i {{ talk }} inlägg →</button>
+        <template v-else>{{ story.sources.length }} {{ story.sources.length === 1 ? 'källa' : `källor · ${outlets.length === 1 ? outlets[0] : `${outlets.length} redaktioner`}` }}</template>
+      </span>
     </div>
   </article>
 </template>

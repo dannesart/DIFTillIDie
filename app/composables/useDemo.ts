@@ -1,5 +1,4 @@
-import type { Sport, StorySport } from '#shared/types/domain'
-import { buildDemoStories } from '~/data/stories'
+import type { Sport } from '#shared/types/domain'
 import { buildDemoFixtures } from '~/data/fixtures'
 
 /**
@@ -26,13 +25,8 @@ export type SportFilter = 'alla' | Sport
 
 export function useSport() {
   const sport = useState<SportFilter>('sport', () => 'alla')
-  const matches = (s?: StorySport) => sport.value === 'alla' || !s || s === 'klubben' || s === sport.value
+  const matches = (s?: Sport) => sport.value === 'alla' || !s || s === sport.value
   return { sport, matches }
-}
-
-export function useStories() {
-  const now = useDemoNow()
-  return useState('stories', () => buildDemoStories(now.value))
 }
 
 export function useFixtures() {
@@ -45,7 +39,7 @@ export function useStorySpotlight() {
   const spotlight = useState<string | null>('story-spotlight', () => null)
   let timer: ReturnType<typeof setTimeout> | undefined
   function show(id: string) {
-    document.getElementById(`story-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     spotlight.value = id
     clearTimeout(timer)
     timer = setTimeout(() => (spotlight.value = null), 2400)

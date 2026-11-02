@@ -2,7 +2,7 @@
 import type { FeedMode } from '~/composables/useSnacket'
 
 const { feed, all, mode, filter, me, setName } = useSnacket()
-const stories = useStories()
+const { stories } = useNews()
 
 const modes: { value: FeedMode, label: string, hint: string }[] = [
   { value: 'hetast', label: 'Hetast på stan', hint: 'Mest kärlek, svalnar med tiden' },
@@ -42,7 +42,7 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
     <div class="mx-auto max-w-7xl px-4 sm:px-6">
       <div class="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <p class="kicker text-guld">Community</p>
+          <p class="kicker flex items-center gap-2 text-guld">Community <span class="rounded-full border border-guld/40 px-2 py-0.5">Demo · påhittade inlägg</span></p>
           <h2 class="section-title mt-3">Snacket <span class="italic font-normal text-himmel">på stan</span></h2>
         </div>
 
@@ -75,7 +75,7 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
             <span class="text-krita-dim">Visar</span>
             <button class="chip border-guld/50 bg-guld/10 text-guld hover:bg-guld/20" @click="filter = {}">
               <template v-if="filter.tag">#{{ filter.tag }}</template>
-              <template v-else-if="filterStory">Story: {{ filterStory.title }}</template>
+              <template v-else-if="filterStory">Story: {{ leadOf(filterStory).headline }}</template>
               <span aria-hidden="true" class="ml-1">✕</span>
               <span class="sr-only">Rensa filter</span>
             </button>

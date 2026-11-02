@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:googleplay="http://www.google.com/schemas/play-podcasts/1.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <atom:link href="https://feed.pod.space/djurgarnbynight" rel="self" type="application/rss+xml"/>
+    <atom:link href="https://pubsubhubbub.appspot.com" rel="hub"/>
+    <title>Djurgårn by night</title>
+    <link>https://pod.space/djurgarnbynight</link>
+    <description>Djurgårn by night är ramsan som blev ett fenomen som mynnade ut i en livsstil som behövde en podcast för att samla tankarna. Den andas fotboll och supporterskap genom två killar i sina sinnens tomma bruk. En vacker dag har vi sjukt vassa spaningar.&amp;nbsp;</description>
+    <content:encoded>
+      <![CDATA[<div>Djurgårn by night är ramsan som blev ett fenomen som mynnade ut i en livsstil som behövde en podcast för att samla tankarna. Den andas fotboll och supporterskap genom två killar i sina sinnens tomma bruk. En vacker dag har vi sjukt vassa spaningar.&nbsp;</div>]]>
+    </content:encoded>
+    <language>sv</language>
+    <copyright>Splitstone productions AB</copyright>
+    <generator>Podspace.com</generator>
+    <pubDate>Wed, 28 Oct 2026 21:02:26 +0000</pubDate>
+    <lastBuildDate>Wed, 28 Oct 2026 21:03:38 +0000</lastBuildDate>
+    <itunes:author>Oskar Sellström &amp; Hugo Klofsten</itunes:author>
+    <itunes:summary>
+      <![CDATA[<div>Djurgårn by night är ramsan som blev ett fenomen som mynnade ut i en livsstil som behövde en podcast för att samla tankarna. Den andas fotboll och supporterskap genom två killar i sina sinnens tomma bruk. En vacker dag har vi sjukt vassa spaningar.&nbsp;</div>]]>
+    </itunes:summary>
+    <itunes:subtitle>Djurgårn by night är podden om djurgårn och djurgårn och allt däremellan.</itunes:subtitle>
+    <itunes:explicit>clean</itunes:explicit>
+    <itunes:image href="https://assets.pod.space/system/shows/images/b41/271/73-/large/Stefan_20Bergtoft_20KLIBBA.png"/>
+    <itunes:owner>
+      <itunes:name>Splitstone productions AB</itunes:name>
+      <itunes:email>oskar.sellstrom@gmail.com</itunes:email>
+    </itunes:owner>
+    <itunes:type>episodic</itunes:type>
+    <image>
+      <url>https://assets.pod.space/system/shows/images/b41/271/73-/large/Stefan_20Bergtoft_20KLIBBA.png</url>
+      <title>Djurgårn by night</title>
+      <link>https://pod.space/djurgarnbynight</link>
+    </image>
+    <itunes:category text="Sports">
+      <itunes:category text="Soccer"/>
+    </itunes:category>
+    <itunes:applepodcastsverify>f39d11a0-fc38-11ef-b386-9f94944cc7f2</itunes:applepodcastsverify>
+    <item>
+      <title>Avskedsansökan</title>
+      <pubDate>Wed, 28 Oct 2026 21:02:26 +0000</pubDate>
+      <guid isPermaLink="false">e5a2a033-b39a-455f-b9c0-8e10bfe49704</guid>
+      <link>https://pod.space/djurgarnbynight/avskedsansokan</link>
+      <itunes:image href="https://assets.pod.space/system/shows/images/b41/271/73-/large/Stefan_20Bergtoft_20KLIBBA.png"/>
+      <description>
+        <![CDATA[<p>Det ville sig inte när Djurgårn bara ville stundtals. Matchplanen, Ninos utskjutning,&nbsp;&nbsp;puls och historiska icke-mål. </p><p></p><p><a target="_blank" rel="noopener noreferrer nofollow" classname="text-underline" href="https://patreon.com/Djurgarnbynight?utm_medium=unknown&amp;utm_source=join_link&amp;utm_campaign=creatorshare_creator&amp;utm_content=copyLink">Patreon</a></p><p></p><p>Stöd podden på Patreon och få tillgång till varje veckas eftersnack. I detta snackar vi spelschemat, Janis framtid, Alex Thorp och KoT-derbyt. </p><p></p><p>Signa upp på ett år så får du den ack så eftertraktade by-night-kepsen i brevlådan.</p><p></p><p>Medverkande: Oskar Sellström &amp; Hugo Klofsten </p><p></p><p>Gör som alla andra — följ oss på Spotify och i sociala medier: </p><p><a target="_blank" rel="noopener noreferrer nofollow" classname="text-underline" href="https://www.instagram.com/difbynight?utm_source=qr">Instagram</a></p><p></p><p><a target="_blank" rel="noopener noreferrer nofollow" classname="text-underline" href="https://x.com/djubynight?s=21&amp;t=8zdI6xyGeY5pf2txaiQTig">X</a>&nbsp;</p>]]>
+      </description>
+      <enclosure url="https://media.pod.space/djurgarnbynight/recording-16_261028.mp3" length="34083735" type="audio/mpeg"/>
+      <itunes:duration>00:35:30</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:subtitle>Det ville sig inte när Djurgårn bara ville stundtals. Matchplanen, Ninos utskjutning,&amp;amp;nbsp;&amp;amp;nbsp;puls och historiska icke-mål. PatreonStöd podden p...</itunes:subtitle>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+<item>
+      <title>Kämpa i 85:e</title>
+      <pubDate>Mon, 26 Oct 2026 22:04:56 +0000</pubDate>
+      <guid isPermaLink="false">e5a128b6-ac0b-43f4-87c6-a0614556b2df</guid>
+      <link>https://pod.space/djurgarnbynight/kampa-i-85e</link>
+      <itunes:image href="https://assets.pod.space/system/shows/images/b41/271/73-/large/Stefan_20Bergtoft_20KLIBBA.png"/>
+      <description>
+        <![CDATA[<p>Racet, vittring, coachning, halvtidscoachning, matchcoachning och ridå. Krossa Blåvitt! </p><p></p><p><a target="_blank" rel="noopener noreferrer nofollow" classname="text-underline" href="https://patreon.com/Djurgarnbynight?utm_medium=unknown&amp;utm_source=join_link&amp;utm_campaign=creatorshare_creator&amp;utm_content=copyLink">Patreon</a></p><p>Stöd podden på Patreon och få tillgång till varje veckas eftersnack. I detta snackar vi spelschemat, Janis framtid, Alex Thorp och KoT-derbyt. <br>
+<br>
+Signa upp på ett år så får du den ack så eftertraktade by-night-kepsen i brevlådan.<br>
+</p><p>Medverkande: Oskar Sellström &amp; Hugo Klofsten <br>
+</p><p>Gör som alla andra — följ oss på Spotify och i sociala medier: </p><p><a target="_blank" rel="noopener noreferrer nofollow" classname="text-underline" href="https://www.instagram.com/difbynight?utm_source=qr">Instagram</a></p><p></p><p><a target="_blank" rel="noopener noreferrer nofollow" classname="text-underline" href="https://x.com/djubynight?s=21&amp;t=8zdI6xyGeY5pf2txaiQTig">X</a></p>]]>
+      </description>
+      <enclosure url="https://media.pod.space/djurgarnbynight/recording-14_261026.mp3" length="55051493" type="audio/mpeg"/>
+      <itunes:duration>00:57:20</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:subtitle>Racet, vittring, coachning, halvtidscoachning, matchcoachning och ridå. Krossa Blåvitt! PatreonStöd podden på Patreon och få tillgång till varje ve...</itunes:subtitle>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+  </channel>
+</rss>

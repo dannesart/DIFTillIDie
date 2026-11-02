@@ -21,7 +21,7 @@ const paused = ref(false)
     <div class="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-gradient-to-r from-navy-950 via-navy-950 to-transparent pl-4 pr-10 sm:pl-6">
       <span class="kicker flex items-center gap-2 text-guld">
         <span class="relative flex size-2"><span class="absolute inline-flex size-full animate-ping rounded-full bg-rod opacity-75" /><span class="relative inline-flex size-2 rounded-full bg-rod" /></span>
-        Snacket just nu
+        Snacket just nu <span class="text-guld/60">(demo)</span>
       </span>
     </div>
     <div class="flex w-max" :style="{ animation: 'marquee 60s linear infinite', animationPlayState: paused ? 'paused' : 'running' }">

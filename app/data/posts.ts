@@ -22,7 +22,7 @@ type Seed = Omit<Post, 'createdAt' | 'comments' | 'demo' | 'reactions'> & {
 
 const seeds: Seed[] = [
   {
-    id: 'p1', author: people.kaminen, minutesAgo: 22, sport: 'fotboll', storyId: 'derbybiljetterna',
+    id: 'p1', author: people.kaminen, minutesAgo: 22, sport: 'fotboll',
     body: 'Satt med tre flikar uppe och ändå kön på 14 000. Men jag är med! Vem mer står på Sofialäktaren? @tifotobbe säg att ni behöver folk på fredag #derby',
     reactions: { hjarta: 84, eld: 41, stjarna: 6, tarar: 3 },
     comments: [
@@ -31,7 +31,7 @@ const seeds: Seed[] = [
     ],
   },
   {
-    id: 'p2', author: people.hovet, minutesAgo: 95, sport: 'hockey', storyId: 'hovet-comeback',
+    id: 'p2', author: people.hovet, minutesAgo: 95, sport: 'hockey',
     body: 'Jag har gått på Hovet i trettio år och har aldrig hört det så högt som när trean satt. Taket lyfte. Jag lovar. #hovet',
     reactions: { hjarta: 132, eld: 98, stjarna: 21, tarar: 2 },
     comments: [
@@ -47,13 +47,13 @@ const seeds: Seed[] = [
     ],
   },
   {
-    id: 'p4', author: people.stats, minutesAgo: 210, sport: 'fotboll', storyId: 'nordqvist-a-truppen',
+    id: 'p4', author: people.stats, minutesAgo: 210, sport: 'fotboll',
     body: 'Nordqvist har flest progressiva passningar i hela J-allsvenskan i år (påhittad siffra, men känslan är äkta). Ge honom minuter! #akademin',
     reactions: { hjarta: 56, eld: 33, stjarna: 12, tarar: 0 },
     comments: [],
   },
   {
-    id: 'p5', author: people.tifo, minutesAgo: 380, storyId: 'tifo-volontarer',
+    id: 'p5', author: people.tifo, minutesAgo: 380,
     body: 'Status från verkstaden: 212 av 400 meter klart. Vi behöver fler som kan hålla en pensel rakt. Fika bjuder vi på. #tifo',
     reactions: { hjarta: 77, eld: 12, stjarna: 30, tarar: 0 },
     comments: [
@@ -76,7 +76,7 @@ const seeds: Seed[] = [
     ],
   },
   {
-    id: 'p8', author: people.hovet, minutesAgo: 600, sport: 'hockey', storyId: 'hockey-trojan',
+    id: 'p8', author: people.hovet, minutesAgo: 600, sport: 'hockey',
     body: 'Fick tag på den sista XL:en på Hovet. Den sitter som en dröm. @kaminen81 du får låna den till derbyt (nej).',
     reactions: { hjarta: 38, eld: 15, stjarna: 2, tarar: 6 },
     comments: [],

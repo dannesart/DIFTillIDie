@@ -8,7 +8,7 @@ const emit = defineEmits<{ mention: [handle: string] }>()
 
 const { toggleReaction, addComment, remove, filter } = useSnacket()
 const { show } = useStorySpotlight()
-const stories = useStories()
+const { stories } = useNews()
 
 const story = computed(() => stories.value.find(s => s.id === props.post.storyId))
 const tokens = computed(() => tokenize(props.post.body))
@@ -58,7 +58,7 @@ function sendComment() {
       <span class="h-10 w-1.5 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 5px, var(--color-navy-700) 5px 10px)" />
       <span class="min-w-0 flex-1">
         <span class="kicker block text-krita-dim">Story · {{ story.sources.length }} källor</span>
-        <span class="block truncate font-display text-base font-semibold">{{ story.title }}</span>
+        <span class="block truncate font-display text-base font-semibold">{{ leadOf(story).headline }}</span>
       </span>
       <span class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel">→</span>
     </button>

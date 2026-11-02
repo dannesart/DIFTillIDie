@@ -5,10 +5,11 @@ const demoNow = useDemoNow()
 const now = useNow(60_000)
 const night = computed(() => dayPart(now.value ?? demoNow.value) === 'natt')
 
-const pods = computed(() => {
-  const list = media.filter(m => m.kind === 'podd')
-  return night.value ? [...list].sort((a, b) => Number(!!b.nocturnal) - Number(!!a.nocturnal)) : list
-})
+const { data: podcast } = usePodcast()
+// Real episodes when the feed works; otherwise the old card with search links.
+const live = computed(() => !!podcast.value?.episodes.length)
+
+const fallbackPods = computed(() => media.filter(m => m.kind === 'podd' && (!live.value || m.id !== 'by-night')))
 const videos = media.filter(m => m.kind === 'video')
 </script>
 
@@ -20,13 +21,16 @@ const videos = media.filter(m => m.kind === 'video')
         <h2 class="section-title mt-3">Lyssna <span class="italic font-normal text-krita-dim">&</span> titta</h2>
       </div>
       <p class="max-w-sm text-sm leading-relaxed text-krita-dim">
-        Vi har inte kopplat in några officiella flöden än. Länkarna öppnar riktiga sökningar hos Spotify, Apple Podcasts och YouTube.
-        Ingen falsk play-knapp här.
+        <template v-if="live">Djurgårn by night spelas direkt här, från poddens eget flöde.</template>
+        <template v-else>Vi når inte poddflödet just nu.</template>
+        Övriga poddar och kanaler länkar till riktiga sökningar hos Spotify, Apple Podcasts och YouTube – ingen falsk play-knapp.
       </p>
     </div>
 
-    <div class="mt-10 grid gap-5 md:grid-cols-2">
-      <MediaCard v-for="m in pods" :key="m.id" :item="m" :highlight="night && m.nocturnal" large />
+    <PodcastShow v-if="live && podcast" :podcast="podcast" :highlight="night" class="mt-10" />
+
+    <div class="mt-5 grid gap-5" :class="live ? 'md:grid-cols-1' : 'md:grid-cols-2'">
+      <MediaCard v-for="m in fallbackPods" :key="m.id" :item="m" :highlight="night && m.nocturnal" :large="!live" />
     </div>
 
     <h3 class="kicker mt-14 text-krita-dim">Videokanaler</h3>

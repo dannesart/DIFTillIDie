@@ -1,2 +1,5 @@
+# The site is temporarily kept out of search results with `noindex`
+# (meta tag + X-Robots-Tag) while fictional demo posts are visible.
+# Crawling is allowed so crawlers can see that noindex.
 User-agent: *
 Allow: /

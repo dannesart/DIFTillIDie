@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest'
+import { NEWS_SOURCES, toSourceArticles } from '../server/lib/news'
+import { PODCAST_SOURCE, toEpisodes } from '../server/lib/podcast'
+import { fetchFeed } from '../server/lib/rss'
+
+/*
+ * Talks to the real publishers. Run with `npm run test:live`.
+ * Skipped in `npm test` so the unit suite never depends on the network.
+ */
+const live = process.env.npm_lifecycle_event === 'test:live' || !!process.env.LIVE
+const FOURTEEN_DAYS = 14 * 24 * 3_600_000
+
+describe.runIf(live)('live feeds', () => {
+  for (const source of NEWS_SOURCES) {
+    it(`${source.id} is reachable and current`, async () => {
+      const channel = await fetchFeed(source.feedUrl, { timeoutMs: 15_000 })
+      expect(channel.items.length).toBeGreaterThan(0)
+      const newest = Math.max(...channel.items.map(i => Date.parse(i.pubDate ?? '')).filter(Number.isFinite))
+      expect(Date.now() - newest).toBeLessThan(FOURTEEN_DAYS)
+      const { articles } = toSourceArticles(source, channel)
+      // Broad feeds may legitimately have no Djurgården item right now; report it rather than fail.
+      console.info(`${source.id}: ${channel.items.length} items, ${articles.length} about Djurgården`)
+      for (const a of articles) expect(a.url).toMatch(/^https:\/\//)
+    }, 20_000)
+  }
+
+  it('the podcast has a recent episode with playable audio', async () => {
+    const { episodes } = toEpisodes(await fetchFeed(PODCAST_SOURCE.feedUrl, { timeoutMs: 15_000 }))
+    const latest = episodes[0]!
+    expect(latest.audioUrl).toBeTruthy()
+    const res = await fetch(latest.audioUrl!, { headers: { range: 'bytes=0-1023' }, signal: AbortSignal.timeout(15_000) })
+    expect([200, 206]).toContain(res.status)
+    expect(res.headers.get('content-type')).toMatch(/^audio\//)
+    await res.body?.cancel()
+  }, 30_000)
+})

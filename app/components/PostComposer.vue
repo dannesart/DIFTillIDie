@@ -2,7 +2,7 @@
 import type { Sport } from '#shared/types/domain'
 
 const { me, publish } = useSnacket()
-const stories = useStories()
+const { stories } = useNews()
 const { sport: sportFilter } = useSport()
 
 const MAX = 280
@@ -73,7 +73,7 @@ defineExpose({ mention })
       </button>
       <select v-model="storyId" class="chip max-w-[14rem] cursor-pointer border-white/12 bg-navy-900 text-krita-dim focus:outline-none" aria-label="Koppla till en Story" @mousedown.stop>
         <option value="">Koppla till en Story…</option>
-        <option v-for="s in stories" :key="s.id" :value="s.id">{{ s.title }}</option>
+        <option v-for="s in stories" :key="s.id" :value="s.id">{{ leadOf(s).outlet }}: {{ leadOf(s).headline.slice(0, 60) }}</option>
       </select>
       <span class="ml-auto text-xs tabular-nums" :class="left < 0 ? 'text-rod font-bold' : left < 40 ? 'text-guld' : 'text-krita-dim'">{{ left }}</span>
       <button
