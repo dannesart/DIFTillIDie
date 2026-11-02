@@ -4,7 +4,8 @@ import type { Story } from '#shared/types/domain'
 const props = defineProps<{ story: Story, lead?: boolean }>()
 
 const { spotlight } = useStorySpotlight()
-const { countForStory } = useSnacket()
+const { countForStory, filter } = useSnacket()
+const compose = useStoryCompose()
 
 const leadSource = computed(() => leadOf(props.story))
 const others = computed(() => props.story.sources.filter(s => s.id !== props.story.leadId))
@@ -22,12 +23,22 @@ const sourceSummary = computed(() => {
 const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
 const sportDot = { fotboll: 'bg-himmel', hockey: 'bg-himmel-200' } as const
 
-// One conversation drawer open at a time, across all Story cards.
-const openTalk = useState<string | null>('story-talk-open', () => null)
-const talking = computed(() => openTalk.value === props.story.id)
-function toggleTalk() {
-  openTalk.value = talking.value ? null : props.story.id
+// Writing and reading are two intents: the button writes (in a dialog),
+// the count reads (in Snacket på stan). Neither changes this card's size.
+const hasDraft = computed(() => !!compose.draftFor(props.story.id))
+function readTalk() {
+  filter.value = { storyId: props.story.id }
+  document.getElementById('snacket')?.scrollIntoView({ behavior: 'smooth' })
 }
+
+// A little pop when a new post about this Story arrives.
+const popped = ref(false)
+watch(talk, (n, old) => {
+  if (n > old) {
+    popped.value = false
+    requestAnimationFrame(() => (popped.value = true))
+  }
+})
 </script>
 
 <template>
@@ -94,13 +105,11 @@ function toggleTalk() {
     </div>
 
     <!-- Every Story invites a conversation -->
-    <div class="relative mt-4 flex items-center gap-3">
+    <div class="relative mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
       <button
-        class="talk-button group/talk inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition duration-300"
-        :class="talking ? 'border-guld bg-guld text-navy-950' : 'border-guld/40 text-guld hover:border-guld hover:bg-guld/10'"
-        :aria-expanded="talking"
-        :aria-controls="`talk-${story.id}`"
-        @click="toggleTalk"
+        class="talk-button inline-flex items-center gap-2 rounded-full border border-guld/40 px-4 py-2 text-sm font-bold text-guld transition duration-300 hover:border-guld hover:bg-guld/10"
+        aria-haspopup="dialog"
+        @click="compose.open(story.id)"
       >
         <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 5h16v11H9l-5 4z" />
@@ -108,13 +117,19 @@ function toggleTalk() {
           <circle class="dot" cx="12" cy="10.5" r="1" fill="currentColor" stroke="none" />
           <circle class="dot" cx="15" cy="10.5" r="1" fill="currentColor" stroke="none" />
         </svg>
-        {{ talking ? 'Stäng snacket' : 'Snacka om detta' }}
-        <span v-if="talk && !talking" class="rounded-full bg-guld/20 px-1.5 text-xs tabular-nums">{{ talk }}</span>
+        {{ hasDraft ? 'Fortsätt ditt utkast' : 'Snacka om detta' }}
       </button>
-    </div>
-
-    <div :id="`talk-${story.id}`">
-      <StoryTalk v-if="talking" :story="story" />
+      <button
+        v-if="talk"
+        class="inline-flex items-center gap-1.5 text-sm font-semibold text-krita-dim transition hover:text-krita"
+        :title="'Läs i Snacket på stan (sparat i den här webbläsaren)'"
+        @click="readTalk"
+      >
+        <span aria-hidden="true">💬</span>
+        <span class="inline-block tabular-nums" :class="popped && 'animate-pop'" @animationend="popped = false">{{ talk }}</span>
+        inlägg
+        <span aria-hidden="true">→</span>
+      </button>
     </div>
   </article>
 </template>

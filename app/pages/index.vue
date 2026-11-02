@@ -1,6 +1,10 @@
 <script setup lang="ts">
 const { load } = useSnacket()
-onMounted(load)
+const { load: loadDrafts } = useStoryCompose()
+onMounted(() => {
+  load()
+  loadDrafts()
+})
 
 // Fetch real content during SSR; sections read the same data by key.
 await Promise.all([useNews(), usePodcast(), useFixtures()])
@@ -12,13 +16,13 @@ await Promise.all([useNews(), usePodcast(), useFixtures()])
     <AppHeader />
     <main>
       <HeroMatchday />
-      <SnackTicker />
       <StorySection />
       <SnacketSection />
       <MediaSection />
     </main>
     <AppFooter />
     <MiniPlayer />
+    <StoryComposeDialog />
     <StripeBurst />
   </div>
 </template>

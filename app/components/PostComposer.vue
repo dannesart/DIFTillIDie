@@ -2,18 +2,19 @@
 import type { Sport, Story } from '#shared/types/domain'
 
 /*
- * One composer, two homes: at the top of Snacket på stan, and inside a
- * Story card ("Snacka om detta"), where `story` locks the attachment.
+ * One composer, two homes: at the top of Snacket på stan, and in the
+ * "Snacka om detta" dialog, where `story` locks the attachment and the
+ * text is bound to that Story's draft via v-model:body.
  */
 const props = defineProps<{ story?: Story, autofocus?: boolean }>()
-const emit = defineEmits<{ published: [postId: string] }>()
+const body = defineModel<string>('body', { default: '' })
+const emit = defineEmits<{ published: [postId: string, text: string] }>()
 
 const { me, publish, filter } = useSnacket()
 const { stories } = useNews()
 const { sport: sportFilter } = useSport()
 
 const MAX = 280
-const body = ref('')
 const sport = ref<Sport | undefined>()
 const storyId = ref('')
 const focused = ref(false)
@@ -46,14 +47,15 @@ const expanded = computed(() => inline.value || focused.value || body.value.leng
 
 function submit() {
   if (!body.value.trim() || left.value < 0) return
-  const id = publish(body.value, {
+  const text = body.value.trim()
+  const id = publish(text, {
     sport: sport.value,
     storyId: props.story?.id ?? (storyId.value || undefined),
     keepView: inline.value,
   })
   body.value = ''
   if (inline.value) {
-    if (id) emit('published', id)
+    if (id) emit('published', id, text)
     return
   }
   storyId.value = ''
@@ -118,9 +120,6 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
           <option v-for="s in stories" :key="s.id" :value="s.id">{{ leadOf(s).outlet }}: {{ leadOf(s).headline.slice(0, 60) }}</option>
         </select>
       </template>
-      <span v-else class="text-xs text-krita-dim">
-        <span aria-hidden="true">🔒</span> Sparas bara i din webbläsare
-      </span>
       <span class="ml-auto text-xs tabular-nums" :class="left < 0 ? 'text-rod font-bold' : left < 40 ? 'text-guld' : 'text-krita-dim'">{{ left }}</span>
       <button
         type="submit"

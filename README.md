@@ -44,7 +44,7 @@ Demo content (the posts) lives in [`app/data/`](app/data/). The timestamps are r
 - **Source pills** link straight to each original article.
 - **"Snackas om i N inlägg"** on a Story filters the feed to posts about it. An attached Story inside a post scrolls back to that Story and highlights it.
 - **Hetast / Nyast på stan.** "Hetast" is engagement cooled by age, so the order changes as you react.
-- **"Snacka om detta"** on any Story opens a conversation drawer in the card, with the Story already attached. It shows what's been said about it in this browser, and links to the filtered Snacket feed. Posts land in Snacket på stan too, but are stored only locally.
+- **"Snacka om detta"** on any Story opens a dialog (a bottom sheet on phones) for writing about it, with the Story attached. Drafts survive closing it by accident. The post lands in Snacket på stan, stored only in this browser. The small "💬 N inlägg" link next to the button takes you to what's already been said.
 - **The source badge on the match card** ("dif.se" / "Verifierad …") opens details on team coverage and where the fixtures come from.
 - **Click an @handle** to mention that person in the composer. **Click a #tag** to filter the feed.
 - **"Lägg i kalendern"** downloads an `.ics` file for the real next match.

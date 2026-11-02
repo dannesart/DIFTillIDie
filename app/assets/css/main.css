@@ -27,6 +27,8 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    /* Reserve the scrollbar's space, so locking scroll under a dialog never shifts the page. */
+    scrollbar-gutter: stable;
     -webkit-tap-highlight-color: transparent;
   }
   body {
@@ -36,6 +38,9 @@
       radial-gradient(1200px 600px at 85% -10%, rgb(95 176 236 / 0.10), transparent 60%),
       radial-gradient(900px 500px at -10% 30%, rgb(42 85 163 / 0.18), transparent 60%);
     background-attachment: fixed;
+  }
+  html.dialog-open {
+    overflow: hidden;
   }
   ::selection {
     background: var(--color-guld);
