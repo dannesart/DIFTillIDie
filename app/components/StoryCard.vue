@@ -4,7 +4,7 @@ import type { Story } from '#shared/types/domain'
 const props = defineProps<{ story: Story, lead?: boolean }>()
 
 const { spotlight } = useStorySpotlight()
-const { countForStory, filter } = useSnacket()
+const { countForStory } = useSnacket()
 
 const leadSource = computed(() => leadOf(props.story))
 const others = computed(() => props.story.sources.filter(s => s.id !== props.story.leadId))
@@ -22,9 +22,11 @@ const sourceSummary = computed(() => {
 const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
 const sportDot = { fotboll: 'bg-himmel', hockey: 'bg-himmel-200' } as const
 
-function openTalk() {
-  filter.value = { storyId: props.story.id }
-  document.getElementById('snacket')?.scrollIntoView({ behavior: 'smooth' })
+// One conversation drawer open at a time, across all Story cards.
+const openTalk = useState<string | null>('story-talk-open', () => null)
+const talking = computed(() => openTalk.value === props.story.id)
+function toggleTalk() {
+  openTalk.value = talking.value ? null : props.story.id
 }
 </script>
 
@@ -88,10 +90,45 @@ function openTalk() {
         <span v-if="story.sources.length > 1" class="font-normal opacity-60"><TimeAgo :at="src.publishedAt" /></span>
         <span aria-hidden="true">↗</span>
       </a>
-      <span class="ml-auto text-xs text-krita-dim">
-        <button v-if="talk" class="font-semibold text-krita transition hover:text-guld" @click="openTalk">Snackas om i {{ talk }} inlägg →</button>
-        <template v-else>{{ story.sources.length === 1 ? '1 källa' : sourceSummary }}</template>
-      </span>
+      <span class="ml-auto text-xs text-krita-dim">{{ story.sources.length === 1 ? '1 källa' : sourceSummary }}</span>
+    </div>
+
+    <!-- Every Story invites a conversation -->
+    <div class="relative mt-4 flex items-center gap-3">
+      <button
+        class="talk-button group/talk inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition duration-300"
+        :class="talking ? 'border-guld bg-guld text-navy-950' : 'border-guld/40 text-guld hover:border-guld hover:bg-guld/10'"
+        :aria-expanded="talking"
+        :aria-controls="`talk-${story.id}`"
+        @click="toggleTalk"
+      >
+        <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 5h16v11H9l-5 4z" />
+          <circle class="dot" cx="9" cy="10.5" r="1" fill="currentColor" stroke="none" />
+          <circle class="dot" cx="12" cy="10.5" r="1" fill="currentColor" stroke="none" />
+          <circle class="dot" cx="15" cy="10.5" r="1" fill="currentColor" stroke="none" />
+        </svg>
+        {{ talking ? 'Stäng snacket' : 'Snacka om detta' }}
+        <span v-if="talk && !talking" class="rounded-full bg-guld/20 px-1.5 text-xs tabular-nums">{{ talk }}</span>
+      </button>
+    </div>
+
+    <div :id="`talk-${story.id}`">
+      <StoryTalk v-if="talking" :story="story" />
     </div>
   </article>
 </template>
+
+<style scoped>
+/* The three dots "type" while you hover, as if someone's about to speak. */
+.dot { transform-box: fill-box; }
+@media (prefers-reduced-motion: no-preference) {
+  .talk-button:hover .dot { animation: typing 1s ease-in-out infinite; }
+  .talk-button:hover .dot:nth-child(3) { animation-delay: 0.15s; }
+  .talk-button:hover .dot:nth-child(4) { animation-delay: 0.3s; }
+}
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-1.5px); }
+}
+</style>

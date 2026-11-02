@@ -95,7 +95,11 @@ export function useSnacket() {
       : list.sort((a, b) => heat(b, now) - heat(a, now))
   })
 
-  const countForStory = (story: Story) => all.value.filter(p => storyAnswersTo(story, p.storyId)).length
+  /** Posts about a Story, newest first. */
+  const postsForStory = (story: Story) => all.value
+    .filter(p => storyAnswersTo(story, p.storyId))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const countForStory = (story: Story) => postsForStory(story).length
 
   function toggleReaction(postId: string, key: ReactionKey) {
     const mine = local.value.reactions[postId] ?? []
@@ -109,21 +113,31 @@ export function useSnacket() {
     local.value.comments[postId] = [...list, { id: uid(), author: { ...local.value.me }, body: text, createdAt: new Date().toISOString() }]
   }
 
-  function publish(body: string, opts: { sport?: Sport, storyId?: string } = {}) {
+  /**
+   * Publish a post (only to this browser). By default the feed jumps to
+   * "Nyast" so you see it; `keepView` leaves the feed as it is, for
+   * posting from somewhere else on the page, like a Story.
+   */
+  function publish(body: string, opts: { sport?: Sport, storyId?: string, keepView?: boolean } = {}): string | undefined {
     const text = body.trim()
     if (!text) return
+    const { keepView, ...attach } = opts
+    const id = `mine-${uid()}`
     local.value.posts.unshift({
-      id: `mine-${uid()}`,
+      id,
       author: { ...local.value.me },
       body: text,
       createdAt: new Date().toISOString(),
-      ...opts,
+      ...attach,
       reactions: { hjarta: 0, eld: 0, stjarna: 0, tarar: 0 },
       comments: [],
       demo: false,
     })
-    mode.value = 'nyast'
-    filter.value = {}
+    if (!keepView) {
+      mode.value = 'nyast'
+      filter.value = {}
+    }
+    return id
   }
 
   function remove(postId: string) {
@@ -140,5 +154,5 @@ export function useSnacket() {
     }
   }
 
-  return { all, feed, mode, filter, sport, me: computed(() => local.value.me), load, toggleReaction, addComment, publish, remove, setName, countForStory }
+  return { all, feed, mode, filter, sport, me: computed(() => local.value.me), load, toggleReaction, addComment, publish, remove, setName, countForStory, postsForStory }
 }

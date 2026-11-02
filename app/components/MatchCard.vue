@@ -21,10 +21,33 @@ const units = computed(() => [
 const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
 const isDif = (name: string) => /^djurg[aå]rden/i.test(name)
 
-// What we follow, said out loud — nothing silently left out.
+// What we follow, said out loud — nothing silently left out, but behind a tap.
 const scope = computed(() => data.value?.scope ?? [])
-const covered = computed(() => scope.value.filter(s => s.coverage !== 'none' && (sport.value === 'alla' || s.sport === sport.value)))
-const uncovered = computed(() => scope.value.filter(s => s.coverage === 'none' && (sport.value === 'alla' || s.sport === sport.value)))
+const coverageText = { automatic: 'Automatiskt från dif.se:s matchkalender', manual: 'Manuellt verifierat mot difhockey.se', none: 'Inget verifierat schema ännu' } as const
+const coverageDot = { automatic: 'bg-himmel', manual: 'bg-guld', none: 'bg-white/25' } as const
+
+const infoOpen = ref(false)
+const infoPanel = useTemplateRef<HTMLElement>('infoPanel')
+let infoTrigger: HTMLElement | null = null
+
+function toggleInfo(e: MouseEvent) {
+  infoTrigger = e.currentTarget as HTMLElement
+  infoOpen.value = !infoOpen.value
+  if (infoOpen.value) nextTick(() => infoPanel.value?.focus())
+}
+function closeInfo(returnFocus = true) {
+  if (!infoOpen.value) return
+  infoOpen.value = false
+  if (returnFocus) infoTrigger?.focus()
+}
+function onDocPointer(e: PointerEvent) {
+  if (!infoOpen.value) return
+  const t = e.target as Node
+  if (infoPanel.value?.contains(t) || infoTrigger?.contains(t)) return
+  closeInfo(false)
+}
+onMounted(() => document.addEventListener('pointerdown', onDocPointer))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer))
 
 function verifiedLabel(f: Fixture) {
   if (!f.verifiedAt) return 'Manuellt verifierad'
@@ -54,16 +77,19 @@ function downloadIcs() {
       <div v-if="fixture" :key="fixture.id">
         <div class="flex items-center justify-between gap-3">
           <p class="kicker truncate text-krita-dim">Nästa match<span class="hidden sm:inline"> · {{ sportLabel[fixture.sport] }}</span></p>
-          <span
-            v-if="fixture.source === 'manual'"
-            class="kicker shrink-0 rounded-full border border-guld/40 px-2 py-0.5 text-guld"
-            title="Inmatad för hand efter kontroll mot klubbens officiella spelschema – inte automatiskt synkad."
-          >{{ verifiedLabel(fixture) }}</span>
-          <span
-            v-else
-            class="kicker flex shrink-0 items-center gap-1.5 rounded-full border border-himmel/40 px-2 py-0.5 text-himmel"
-            title="Hämtad automatiskt från Djurgårdens officiella matchkalender på dif.se."
-          ><span class="size-1.5 rounded-full bg-himmel" />dif.se</span>
+          <!-- Source stays visible; the badge opens the details -->
+          <button
+            class="kicker flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 transition"
+            :class="fixture.source === 'manual' ? 'border-guld/40 text-guld hover:bg-guld/10' : 'border-himmel/40 text-himmel hover:bg-himmel/10'"
+            :aria-expanded="infoOpen"
+            aria-controls="match-info"
+            :aria-label="fixture.source === 'manual' ? `${verifiedLabel(fixture)} – om matchdatan` : 'Från dif.se – om matchdatan'"
+            @click="toggleInfo"
+          >
+            <span v-if="fixture.source !== 'manual'" class="size-1.5 rounded-full bg-himmel" />
+            {{ fixture.source === 'manual' ? verifiedLabel(fixture) : 'dif.se' }}
+            <span aria-hidden="true" class="grid size-3.5 place-items-center rounded-full border border-current text-[0.55rem] leading-none">i</span>
+          </button>
         </div>
 
         <p class="kicker mt-5 text-krita-dim">{{ fixture.competition }} · {{ teamLabel(fixture) }}</p>
@@ -111,7 +137,12 @@ function downloadIcs() {
 
       <!-- Nothing verified to count down to: say so, beautifully, instead of guessing -->
       <div v-else :key="`tom-${sport}`" class="py-2">
-        <p class="kicker text-krita-dim">Nästa match<template v-if="sport !== 'alla'"> · {{ sportLabel[sport] }}</template></p>
+        <div class="flex items-center justify-between gap-3">
+          <p class="kicker text-krita-dim">Nästa match<template v-if="sport !== 'alla'"> · {{ sportLabel[sport] }}</template></p>
+          <button class="kicker flex items-center gap-1.5 rounded-full border border-white/15 px-2 py-0.5 text-krita-dim transition hover:text-krita" :aria-expanded="infoOpen" aria-controls="match-info" @click="toggleInfo">
+            Om matchdatan <span aria-hidden="true" class="grid size-3.5 place-items-center rounded-full border border-current text-[0.55rem] leading-none">i</span>
+          </button>
+        </div>
         <p class="mt-5 font-display text-3xl font-bold leading-tight sm:text-4xl">
           Ingen verifierad match <span class="font-normal italic text-krita-dim">i sikte</span>
         </p>
@@ -125,18 +156,38 @@ function downloadIcs() {
       </div>
     </Transition>
 
-    <!-- Team scope, stated plainly -->
-    <p v-if="scope.length" class="mt-5 border-t border-white/8 pt-4 text-xs leading-relaxed text-krita-dim">
-      Bevakar seniorlagen:
-      <template v-for="(s, i) in covered" :key="s.label">
-        <span class="text-krita">{{ s.label }}</span><span v-if="s.coverage === 'manual'"> (manuellt verifierat)</span><template v-if="i < covered.length - 1">, </template>
-      </template>.
-      <template v-if="uncovered.length">
-        Inget verifierat schema ännu för {{ uncovered.map(s => s.label).join(', ') }}.
-      </template>
-      <template v-if="data?.status && !data.status.ok">
-        Klubbens kalender nås inte just nu<template v-if="data.status.stale"> – visar senast hämtade</template>.
-      </template>
+    <!-- Essential, so always visible: when the club's calendar can't be reached -->
+    <p v-if="data?.status && !data.status.ok" class="mt-4 text-xs text-guld">
+      Klubbens kalender nås inte just nu<template v-if="data.status.stale"> – visar senast hämtade matcher</template>.
     </p>
+
+    <!-- Coverage & sources, on demand -->
+    <Transition enter-from-class="opacity-0 motion-safe:-translate-y-1" leave-to-class="opacity-0" enter-active-class="transition duration-200" leave-active-class="transition duration-150">
+      <section
+        v-if="infoOpen"
+        id="match-info"
+        ref="infoPanel"
+        tabindex="-1"
+        aria-labelledby="match-info-title"
+        class="absolute inset-x-3 top-12 z-20 max-h-[calc(100%-4rem)] overflow-y-auto rounded-2xl border border-white/12 bg-navy-950/95 p-5 shadow-[0_24px_60px_-20px_rgb(3_9_21/0.95)] backdrop-blur-xl focus:outline-none"
+        @keydown.esc="closeInfo()"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <h3 id="match-info-title" class="font-display text-xl font-semibold">Om matchdatan</h3>
+          <button class="grid size-7 shrink-0 place-items-center rounded-full text-krita-dim hover:bg-white/10 hover:text-krita" aria-label="Stäng" @click="closeInfo()">✕</button>
+        </div>
+        <p class="mt-1 text-xs leading-relaxed text-krita-dim">Vi räknar bara ner till A-lagens matcher som vi kan bekräfta hos klubben. Akademilag ingår inte.</p>
+        <ul class="mt-4 space-y-2.5">
+          <li v-for="s in scope" :key="s.label" class="flex items-start gap-2.5 text-sm">
+            <span class="mt-1.5 size-2 shrink-0 rounded-full" :class="coverageDot[s.coverage]" />
+            <span><span class="font-semibold" :class="s.coverage === 'none' && 'text-krita-dim'">{{ s.label }}</span><span class="block text-xs text-krita-dim">{{ coverageText[s.coverage] }}</span></span>
+          </li>
+        </ul>
+        <p class="mt-4 border-t border-white/8 pt-3 text-xs leading-relaxed text-krita-dim">
+          Fotbollen hämtas från Djurgårdens officiella kalender och uppdateras löpande.
+          Hockeyn finns inte som öppen kalender, så vi för in matcherna för hand efter att ha kontrollerat dem – de är aldrig automatiskt synkade.
+        </p>
+      </section>
+    </Transition>
   </div>
 </template>
