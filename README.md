@@ -134,6 +134,13 @@ Rules:
 - **If a show's feed can't be reached,** its tab says so and offers direct listening links.
 - **Adding a show** means adding an entry to `PODCAST_SHOWS` in [`server/lib/podcast.ts`](server/lib/podcast.ts).
 
+**DIFpodden** now lives on [Patreon](https://www.patreon.com/cw/difpodden). Its Acast feed stopped in March 2023. What we found on 2026-11-02:
+
+- **The Patreon page** shows the campaign has Patreon's *public RSS* switched on (`has_public_rss`), as well as a member feed and a Spotify integration ("DIFpodden Patreons").
+- **The public feed's address isn't published anywhere we could verify.** Patreon creators copy it from their own settings, `patreon.com/rss/difpodden` returns 404, and Apple Podcasts and Poddtoppen still list only the archived Acast feed. We don't guess feed URLs, use Patreon's internal API, or touch member feeds.
+
+So DIFpodden gets a static discovery card with "Lyssna hos Patreon", the Spotify show, the archive up to March 2023 and an honest "why no play button". If the podcast shares its public RSS address, it can become a third entry in `PODCAST_SHOWS`.
+
 `app/data/media.ts` links the remaining shows and channels (DIFpodden, YouTube) to real search pages on Spotify, Apple Podcasts and YouTube, because we haven't verified their official IDs yet. Once you have a verified ID, add `embed` to the item:
 
 - Spotify: `https://open.spotify.com/embed/show/<id>`

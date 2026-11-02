@@ -25,7 +25,6 @@ const active = computed({
 const activeShow = computed(() => shows.value.find(s => s.id === active.value))
 const liveCount = computed(() => shows.value.filter(s => s.episodes.length).length)
 
-const pods = media.filter(m => m.kind === 'podd')
 const videos = media.filter(m => m.kind === 'video')
 </script>
 
@@ -39,7 +38,7 @@ const videos = media.filter(m => m.kind === 'video')
       <p class="max-w-sm text-sm leading-relaxed text-krita-dim">
         <template v-if="liveCount">Blårandiga poddar som spelas direkt här, från sina egna flöden.</template>
         <template v-else>Vi når inte poddarnas flöden just nu – men länkarna nedan fungerar.</template>
-        Övriga poddar och kanaler länkar till riktiga sökningar hos Spotify, Apple Podcasts och YouTube – ingen falsk play-knapp.
+        DIFpodden lyssnar du på hos Patreon. Ingen falsk play-knapp.
       </p>
     </div>
 
@@ -59,9 +58,7 @@ const videos = media.filter(m => m.kind === 'video')
       </Transition>
     </template>
 
-    <div class="mt-5 grid gap-5">
-      <MediaCard v-for="m in pods" :key="m.id" :item="m" />
-    </div>
+    <DifpoddenCard class="mt-5" />
 
     <h3 class="kicker mt-14 text-krita-dim">Videokanaler</h3>
     <div class="mt-4 grid gap-5 sm:grid-cols-2">
