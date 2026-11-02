@@ -1,5 +1,5 @@
 import type { SourceArticle, Story } from '../../shared/types/domain'
-import { fold, slugWords } from './news'
+import { canonicalUrl, fold, slugWords } from './news'
 
 /*
  * Grouping SourceArticles into Stories — deliberately conservative.
@@ -13,7 +13,11 @@ import { fold, slugWords } from './news'
  *
  * Linked articles form a Story (single-linkage). Anything we can't link
  * stays its own Story — a Story with one source is perfectly valid.
- * We never write a headline: the earliest source's own headline leads.
+ * We never write a headline: a source's own headline leads, preferring
+ * original reporting over outlets that compile others' reporting.
+ *
+ * Story ids come from the earliest article, not the lead, and any of a
+ * Story's article ids can be used to find it again (see storyAnswersTo).
  */
 
 export const WINDOW_HOURS = 24
@@ -103,18 +107,6 @@ function displayName(stemmed: string, articles: SourceArticle[]): string {
   return spellings[0] ?? stemmed
 }
 
-/** URL identity without tracking parameters (but keeping e.g. Bollsvenskan's `?post_id=`). */
-export function canonicalUrl(url: string): string {
-  try {
-    const u = new URL(url)
-    for (const key of [...u.searchParams.keys()]) if (key.startsWith('utm_')) u.searchParams.delete(key)
-    return u.toString()
-  }
-  catch {
-    return url
-  }
-}
-
 /** "Patrik", "Werner" → "Patrik Werner" when a source writes them side by side. */
 function joinFullNames(names: string[], articles: SourceArticle[]): string[] {
   const text = articles.map(a => `${a.headline} ${a.excerpt ?? ''}`).join(' ')
@@ -153,15 +145,16 @@ export function groupIntoStories(articles: SourceArticle[]): Story[] {
   profiles.forEach((_, i) => clusters.set(find(i), [...(clusters.get(find(i)) ?? []), i]))
 
   const stories: Story[] = [...clusters.values()].map((members) => {
-    const sources = members.map(i => profiles[i]!.article).sort((a, b) => a.publishedAt.localeCompare(b.publishedAt))
-    const lead = sources[0]!
+    const sources = members.map(i => profiles[i]!.article).sort((a, b) => a.publishedAt.localeCompare(b.publishedAt) || a.id.localeCompare(b.id))
+    const earliest = sources[0]!
+    const lead = sources.find(s => s.reporting === 'original') ?? earliest
     // The names that linked the sources — the honest "why" behind the grouping, most-mentioned first.
     const linkNames = members.length > 1 ? [...new Set(members.flatMap(i => [...(edges.get(i) ?? [])]))] : []
     const mentions = (n: string) => members.filter(i => profiles[i]!.tokens.has(n)).length
     linkNames.sort((x, y) => mentions(y) - mentions(x))
     return {
-      id: `story-${lead.id}`,
-      sport: lead.sport,
+      id: `story-${earliest.id}`,
+      sport: earliest.sport,
       sources,
       leadId: lead.id,
       sharedNames: joinFullNames(linkNames.map(n => displayName(n, sources)), sources),

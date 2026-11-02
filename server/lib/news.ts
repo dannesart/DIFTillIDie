@@ -14,6 +14,12 @@ export interface NewsSource {
    * `broad`: a general sports section — keep only items that clearly mention Djurgården.
    */
   scope: 'team-feed' | 'broad'
+  /**
+   * `original`: the outlet's own reporting.
+   * `compiled`: the outlet summarises other media's reporting, so it is
+   * never counted as independent confirmation.
+   */
+  reporting: SourceArticle['reporting']
 }
 
 export const NEWS_SOURCES: NewsSource[] = [
@@ -25,6 +31,10 @@ export const NEWS_SOURCES: NewsSource[] = [
     feedUrl: 'https://bollsvenskan.se/feed/djurgardens-if',
     sport: 'fotboll',
     scope: 'team-feed',
+    // Its articles end with "Läs hela artiklarna hos …" and a list of
+    // the outlets they summarise (checked 2026-11-02). The feed itself
+    // doesn't name them, so we label the source rather than guess.
+    reporting: 'compiled',
   },
   {
     id: 'sportbladet-fotboll',
@@ -34,6 +44,7 @@ export const NEWS_SOURCES: NewsSource[] = [
     feedUrl: 'https://rss.aftonbladet.se/rss2/small/pages/sections/sportbladet/fotboll/',
     sport: 'fotboll',
     scope: 'broad',
+    reporting: 'original',
   },
   {
     id: 'sportbladet-hockey',
@@ -43,6 +54,7 @@ export const NEWS_SOURCES: NewsSource[] = [
     feedUrl: 'https://rss.aftonbladet.se/rss2/small/pages/sections/sportbladet/hockey/',
     sport: 'hockey',
     scope: 'broad',
+    reporting: 'original',
   },
 ]
 
@@ -81,6 +93,26 @@ function parseDate(s?: string): string | null {
   return Number.isFinite(t) ? new Date(t).toISOString() : null
 }
 
+/** URL identity without tracking parameters (but keeping e.g. Bollsvenskan's `?post_id=`). */
+export function canonicalUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    for (const key of [...u.searchParams.keys()]) if (key.startsWith('utm_')) u.searchParams.delete(key)
+    return u.toString()
+  }
+  catch {
+    return url
+  }
+}
+
+/**
+ * Stable article id: publisher + canonical URL. The same article reached
+ * through two feeds (or with new tracking params) keeps the same id.
+ */
+export function articleId(publisher: string, url: string): string {
+  return `${fold(publisher).replace(/[^a-z0-9]+/g, '')}-${hashId(canonicalUrl(url))}`
+}
+
 function hashId(s: string): string {
   let h = 2166136261
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
@@ -103,7 +135,7 @@ export function toSourceArticles(source: NewsSource, channel: RssChannel): { art
     const publishedAt = parseDate(item.pubDate)
     if (!publishedAt) continue
     articles.push({
-      id: `${source.id}-${hashId(item.guid || item.link)}`,
+      id: articleId(source.publisher, item.link),
       sourceId: source.id,
       outlet: source.outlet,
       publisher: source.publisher,
@@ -112,6 +144,7 @@ export function toSourceArticles(source: NewsSource, channel: RssChannel): { art
       url: item.link,
       publishedAt,
       sport: source.sport,
+      reporting: source.reporting,
     })
   }
   return { articles, itemCount: channel.items.length }

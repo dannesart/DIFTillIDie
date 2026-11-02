@@ -10,7 +10,7 @@ export const PODCAST_SOURCE = {
   publisher: 'Splitstone productions AB',
   homepage: 'https://pod.space/djurgarnbynight',
   feedUrl: 'https://feed.pod.space/djurgarnbynight',
-} as const satisfies Omit<NewsSource, 'sport' | 'scope'>
+} as const satisfies Omit<NewsSource, 'sport' | 'scope' | 'reporting'>
 
 export const EPISODE_LIMIT = 8
 

@@ -8,8 +8,16 @@ const { countForStory, filter } = useSnacket()
 
 const leadSource = computed(() => leadOf(props.story))
 const others = computed(() => props.story.sources.filter(s => s.id !== props.story.leadId))
-const talk = computed(() => countForStory(props.story.id))
-const outlets = computed(() => [...new Set(props.story.sources.map(s => s.outlet))])
+const talk = computed(() => countForStory(props.story))
+// Compiled articles summarise others' reporting: never count them as extra confirmation.
+const counts = computed(() => reportingCounts(props.story))
+const sourceSummary = computed(() => {
+  const { original, compiled, originalOutlets } = counts.value
+  const parts: string[] = []
+  if (original) parts.push(original === 1 ? `1 egen rapport (${originalOutlets[0]})` : `${original} egna rapporter · ${originalOutlets.join(', ')}`)
+  if (compiled) parts.push(compiled === 1 ? '1 sammanställning' : `${compiled} sammanställningar`)
+  return parts.join(' · ')
+})
 
 const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
 const sportDot = { fotboll: 'bg-himmel', hockey: 'bg-himmel-200' } as const
@@ -31,7 +39,7 @@ function openTalk() {
 
     <div class="relative flex items-center gap-2 text-krita-dim">
       <span class="size-2 shrink-0 rounded-full" :class="sportDot[story.sport]" />
-      <span class="kicker truncate">{{ sportLabel[story.sport] }} · {{ leadSource.outlet }}</span>
+      <span class="kicker truncate">{{ sportLabel[story.sport] }} · {{ leadSource.outlet }}<template v-if="leadSource.reporting === 'compiled'"> · sammanställning</template></span>
       <span class="kicker ml-auto shrink-0"><TimeAgo :at="leadSource.publishedAt" /></span>
     </div>
 
@@ -54,7 +62,7 @@ function openTalk() {
             <span class="shrink-0 text-sm font-bold text-himmel sm:w-28">{{ src.outlet }}</span>
             <span class="min-w-0 flex-1">
               <span class="block font-display leading-snug decoration-himmel/60 underline-offset-4 group-hover/src:underline" :class="lead ? 'text-xl' : 'text-base'">{{ src.headline }}</span>
-              <span class="kicker mt-1 block text-krita-dim"><TimeAgo :at="src.publishedAt" /> · läs hos {{ src.outlet }} ↗</span>
+              <span class="kicker mt-1 block text-krita-dim"><TimeAgo :at="src.publishedAt" /><template v-if="src.reporting === 'compiled'"> · sammanställer andra medier</template> · läs hos {{ src.outlet }} ↗</span>
             </span>
           </a>
         </li>
@@ -74,7 +82,7 @@ function openTalk() {
         target="_blank"
         rel="noopener"
         class="chip border-white/12 text-krita hover:border-himmel hover:bg-himmel hover:text-navy-950"
-        :title="`${src.publisher}: ${src.headline}`"
+        :title="`${src.publisher}${src.reporting === 'compiled' ? ' (sammanställer andra medier)' : ''}: ${src.headline}`"
       >
         {{ src.outlet }}
         <span v-if="story.sources.length > 1" class="font-normal opacity-60"><TimeAgo :at="src.publishedAt" /></span>
@@ -82,7 +90,7 @@ function openTalk() {
       </a>
       <span class="ml-auto text-xs text-krita-dim">
         <button v-if="talk" class="font-semibold text-krita transition hover:text-guld" @click="openTalk">Snackas om i {{ talk }} inlägg →</button>
-        <template v-else>{{ story.sources.length }} {{ story.sources.length === 1 ? 'källa' : `källor · ${outlets.length === 1 ? outlets[0] : `${outlets.length} redaktioner`}` }}</template>
+        <template v-else>{{ story.sources.length === 1 ? '1 källa' : sourceSummary }}</template>
       </span>
     </div>
   </article>

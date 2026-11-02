@@ -8,13 +8,14 @@ const expanded = ref(false)
 
 const visible = computed(() => stories.value.filter(s => matches(s.sport)))
 
-// Lead: the most-covered Story among the freshest day of news, else the newest.
+// Lead: the most independently covered Story among the freshest news.
 const lead = computed(() => {
   const list = visible.value
   if (!list.length) return undefined
   const newest = Date.parse(list[0]!.updatedAt)
   const fresh = list.filter(s => newest - Date.parse(s.updatedAt) < 36 * 3_600_000)
-  return [...fresh].sort((a, b) => b.sources.length - a.sources.length || b.updatedAt.localeCompare(a.updatedAt))[0]
+  // Original reporting counts first: compilations of others' reporting are not extra coverage.
+  return [...fresh].sort((a, b) => reportingCounts(b).original - reportingCounts(a).original || b.sources.length - a.sources.length || b.updatedAt.localeCompare(a.updatedAt))[0]
 })
 const rest = computed(() => visible.value.filter(s => s.id !== lead.value?.id))
 const shown = computed(() => (expanded.value ? rest.value : rest.value.slice(0, INITIAL - 1)))

@@ -9,7 +9,7 @@ const modes: { value: FeedMode, label: string, hint: string }[] = [
   { value: 'nyast', label: 'Nyast på stan', hint: 'Senaste först' },
 ]
 
-const filterStory = computed(() => stories.value.find(s => s.id === filter.value.storyId))
+const filterStory = computed(() => stories.value.find(s => storyAnswersTo(s, filter.value.storyId)))
 const hasFilter = computed(() => !!(filter.value.tag || filter.value.storyId))
 
 const tags = computed(() => {

@@ -25,9 +25,18 @@ export interface SourceArticle {
   url: string
   publishedAt: string
   sport: Sport
+  /**
+   * `original`: the outlet's own reporting. `compiled`: a summary of other
+   * media's reporting — never counted as independent confirmation.
+   */
+  reporting: 'original' | 'compiled'
 }
 
 export interface Story {
+  /**
+   * `story-<id of the earliest article>`. It changes if that article
+   * leaves every feed, so use storyAnswersTo() to look a Story up.
+   */
   id: string
   sport: Sport
   /** Oldest first. */

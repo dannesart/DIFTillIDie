@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { canonicalUrl, groupIntoStories, namesIn } from '../server/lib/grouping'
+import { groupIntoStories, namesIn } from '../server/lib/grouping'
+import { canonicalUrl } from '../server/lib/news'
 import { article, fixtureArticles } from './helpers'
 
 describe('groupIntoStories on real feed data', () => {

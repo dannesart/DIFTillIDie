@@ -29,6 +29,7 @@ export function article(over: Partial<SourceArticle> & Pick<SourceArticle, 'head
     url: `https://example.com/a/${n}`,
     publishedAt: '2026-11-01T12:00:00.000Z',
     sport: 'fotboll',
+    reporting: 'original',
     ...over,
   }
 }

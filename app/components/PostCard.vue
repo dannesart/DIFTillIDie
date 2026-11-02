@@ -10,7 +10,7 @@ const { toggleReaction, addComment, remove, filter } = useSnacket()
 const { show } = useStorySpotlight()
 const { stories } = useNews()
 
-const story = computed(() => stories.value.find(s => s.id === props.post.storyId))
+const story = computed(() => stories.value.find(s => storyAnswersTo(s, props.post.storyId)))
 const tokens = computed(() => tokenize(props.post.body))
 
 const popped = ref<ReactionKey | null>(null)

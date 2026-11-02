@@ -17,7 +17,8 @@ export default defineNuxtConfig({
     // On Netlify, `isr` becomes durable CDN caching (stale-while-revalidate),
     // so publishers are fetched at most every few minutes, not per visit.
     '/': { isr: 300 },
-    '/api/**': { isr: 600 },
+    '/api/news': { isr: 600 },
+    '/api/podcast': { isr: 600 },
   },
 
   fonts: {

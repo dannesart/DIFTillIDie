@@ -1,4 +1,4 @@
-import type { Post, PostAuthor, PostComment, ReactionKey, Sport } from '#shared/types/domain'
+import type { NewsResponse, Post, PostAuthor, PostComment, ReactionKey, Sport, Story } from '#shared/types/domain'
 import { buildDemoPosts } from '~/data/posts'
 
 export const REACTIONS: { key: ReactionKey, emoji: string, label: string }[] = [
@@ -54,6 +54,8 @@ export function useSnacket() {
   const mode = useState<FeedMode>('snacket-mode', () => 'hetast')
   const filter = useState<FeedFilter>('snacket-filter', () => ({}))
   const { sport, matches } = useSport()
+  // Read the news already fetched for the page; never triggers a fetch itself.
+  const { data: news } = useNuxtData<NewsResponse>('news')
 
   function load() {
     if (loaded.value || !import.meta.client) return
@@ -82,9 +84,10 @@ export function useSnacket() {
   const feed = computed(() => {
     const now = loaded.value ? Date.now() : demoNow.value
     const { tag, storyId } = filter.value
+    const story = storyId ? news.value?.stories.find(s => storyAnswersTo(s, storyId)) : undefined
     const list = all.value.filter(p =>
       matches(p.sport)
-      && (!storyId || p.storyId === storyId)
+      && (!storyId || (story ? storyAnswersTo(story, p.storyId) : p.storyId === storyId))
       && (!tag || p.body.toLowerCase().includes(`#${tag.toLowerCase()}`)),
     )
     return mode.value === 'nyast'
@@ -92,7 +95,7 @@ export function useSnacket() {
       : list.sort((a, b) => heat(b, now) - heat(a, now))
   })
 
-  const countForStory = (storyId: string) => all.value.filter(p => p.storyId === storyId).length
+  const countForStory = (story: Story) => all.value.filter(p => storyAnswersTo(story, p.storyId)).length
 
   function toggleReaction(postId: string, key: ReactionKey) {
     const mine = local.value.reactions[postId] ?? []

@@ -52,10 +52,31 @@ Demo content (posts, the match) lives in [`app/data/`](app/data/). The timestamp
 
 | Feed | Scope | Status (2026-11-02) |
 |---|---|---|
-| [Bollsvenskan, DIF](https://bollsvenskan.se/feed/djurgardens-if) | Team feed, every item kept | ✅ 20 items, all about DIF |
+| [Bollsvenskan, DIF](https://bollsvenskan.se/feed/djurgardens-if) | Team feed, every item kept; **compiled** (see below) | ✅ 20 items, all about DIF |
 | [Sportbladet, fotboll](https://rss.aftonbladet.se/rss2/small/pages/sections/sportbladet/fotboll/) | Broad, filtered | ✅ 39 items, 3 about DIF |
 | [Sportbladet, hockey](https://rss.aftonbladet.se/rss2/small/pages/sections/sportbladet/hockey/) | Broad, filtered | ✅ 39 items, 1 about DIF |
 | [Djurgårn by night](https://feed.pod.space/djurgarnbynight) | Podcast | ✅ 99 episodes, playable MP3s |
+
+Sources investigated but **not integrated**:
+
+| Source | Finding |
+|---|---|
+| [SvenskaFans](https://www.svenskafans.com/svenskafans/rss) | Every URL returns `403` from CloudFront, including the RSS index, the homepage and `robots.txt`. We could not find a documented team feed URL, and we don't work around blocks, for example by spoofing a browser. Worth asking SvenskaFans for feed access: Bollsvenskan cites them. |
+| [TV4](https://www.tv4.se/rss) | Only a general news feed (48 items over about 3 days, 1 tagged Sport). Sport paths return `404`, and `?category=`/`?tag=` are ignored. Its one Djurgården mention was a TT wire piece about Hammarby that names DIF in passing. The feed also carries full article text in `<description>`. No usable DIF coverage. |
+
+### Compiled reporting
+
+Bollsvenskan summarises other outlets' reporting: its articles end with "Läs hela artiklarna hos …" and list their sources. The feed doesn't carry those sources, and we don't scrape article pages, so the whole source is configured as `reporting: 'compiled'`. As a result:
+
+- A Story leads with a headline from **original** reporting when it has one.
+- Counts never treat a compilation as independent confirmation: "2 egna rapporter · Sportbladet · 2 sammanställningar".
+- Compiled articles are labelled "sammanställer andra medier".
+
+### Story ids
+
+A Story's id is `story-<id of its earliest article>`. Article ids come from the publisher plus the canonical URL (tracking parameters removed), so they don't change when an article reaches us through another feed. A Story also answers to the id of **any** of its articles (`storyAnswersTo` in [`shared/utils/story.ts`](shared/utils/story.ts)), so a post's reference survives when Stories merge or when a newer article takes the lead.
+
+**Known limitation:** feeds only hold their latest 20–40 items. Once the referenced article has left every feed, the reference can't be resolved. Stories can also split again when the article that linked them drops out. If supporter posts are ever stored permanently, store the referenced **SourceArticle** (URL, headline, outlet, date) with the post, rather than only a Story id.
 
 How it works, in [`server/lib/`](server/lib/) (plain, testable functions) and [`server/utils/feeds.ts`](server/utils/feeds.ts) (caching):
 
