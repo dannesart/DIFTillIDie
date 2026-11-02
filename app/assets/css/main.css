@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Djurgården: deep navy identity, sky-blue stripes, restrained red & gold. */
+  --color-natt: #030915;
+  --color-navy-950: #061229;
+  --color-navy-900: #0a1b3d;
+  --color-navy-800: #10295a;
+  --color-navy-700: #1b3c7c;
+  --color-navy-600: #2a55a3;
+  --color-himmel: #5fb0ec;
+  --color-himmel-200: #bfe2fa;
+  --color-himmel-300: #9bd0f5;
+  --color-krita: #f3eee3;
+  --color-krita-dim: #b9bfcc;
+  --color-guld: #f4c430;
+  --color-rod: #e03a3e;
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-navy-950 text-krita font-sans antialiased;
+    font-feature-settings: "ss01", "cv11";
+    background-image:
+      radial-gradient(1200px 600px at 85% -10%, rgb(95 176 236 / 0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 30%, rgb(42 85 163 / 0.18), transparent 60%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: var(--color-guld);
+    color: var(--color-navy-950);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-guld);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+}
+
+@layer components {
+  /* The blue stripes. Our signature. */
+  .stripes {
+    background: repeating-linear-gradient(90deg,
+        var(--color-himmel) 0 var(--stripe, 14px),
+        var(--color-navy-800) var(--stripe, 14px) calc(var(--stripe, 14px) * 2));
+  }
+
+  .stripe-text {
+    background-image: repeating-linear-gradient(100deg,
+        var(--color-himmel-300) 0 0.16em,
+        var(--color-himmel) 0.16em 0.32em);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: stripe-drift 14s linear infinite;
+  }
+
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.07;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  .kicker {
+    @apply font-mono text-[0.68rem] font-medium uppercase tracking-[0.18em];
+  }
+
+  .section-title {
+    @apply font-display text-4xl font-semibold leading-[0.95] tracking-tight sm:text-5xl;
+    font-variation-settings: "SOFT" 50, "WONK" 1;
+  }
+
+  .card {
+    @apply rounded-3xl border border-white/8 bg-navy-900/70 backdrop-blur-sm;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition duration-200;
+  }
+}
+
+@keyframes stripe-drift {
+  to { background-position: -200% 0; }
+}
+
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+
+@keyframes spotlight {
+  0% { box-shadow: 0 0 0 0 rgb(244 196 48 / 0.0); }
+  20% { box-shadow: 0 0 0 4px rgb(244 196 48 / 0.85), 0 0 60px 10px rgb(244 196 48 / 0.25); }
+  100% { box-shadow: 0 0 0 0 rgb(244 196 48 / 0.0); }
+}
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.45) rotate(-8deg); }
+  100% { transform: scale(1); }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+.animate-spotlight { animation: spotlight 2.4s var(--ease-out-expo); }
+.animate-pop { animation: pop 0.45s var(--ease-spring); }
+.animate-rise { animation: rise 0.8s var(--ease-out-expo) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

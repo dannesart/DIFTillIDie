@@ -1,0 +1,9 @@
+# Nuxt 4 / Nitro detects Netlify automatically (NETLIFY=true) and builds with
+# the `netlify` preset: static assets go to `dist/`, the SSR handler goes to
+# `.netlify/functions-internal/server`. See README.md.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
