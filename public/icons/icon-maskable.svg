@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Djurgår'n tills jag dör — app icon (maskable: motif inside the 80% safe zone). Source for the PNGs next to it. -->
+  <defs>
+    <clipPath id="heart"><path d="M32 56 8.6 33.2A13.5 13.5 0 0 1 32 15.6a13.5 13.5 0 0 1 23.4 17.6Z"/></clipPath>
+    <radialGradient id="glow" cx="78%" cy="18%" r="75%">
+      <stop offset="0" stop-color="#2a55a3" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#061229" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="#061229"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <g transform="translate(256 278) scale(5.4) translate(-32 -35.8)">
+    <g clip-path="url(#heart)">
+      <rect x="0" y="0" width="64" height="64" fill="#10295a"/>
+      <rect x="8" y="0" width="8" height="64" fill="#5fb0ec"/>
+      <rect x="24" y="0" width="8" height="64" fill="#5fb0ec"/>
+      <rect x="40" y="0" width="8" height="64" fill="#5fb0ec"/>
+    </g>
+    <circle cx="51" cy="14" r="3.6" fill="#f4c430"/>
+  </g>
+</svg>

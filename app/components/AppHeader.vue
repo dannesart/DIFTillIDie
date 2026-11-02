@@ -25,7 +25,7 @@ const nav = [
 
 <template>
   <header
-    class="sticky top-0 z-40 transition-[background-color,border-color,backdrop-filter] duration-300"
+    class="sticky top-[env(safe-area-inset-top)] z-40 transition-[background-color,border-color,backdrop-filter] duration-300"
     :class="scrolled ? 'border-b border-white/8 bg-navy-950/85 backdrop-blur-xl' : 'border-b border-transparent'"
   >
     <div class="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">

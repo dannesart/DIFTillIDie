@@ -20,6 +20,9 @@ export default defineNuxtConfig({
     '/api/news': { isr: 600 },
     '/api/podcast': { isr: 600 },
     '/api/fixtures': { isr: 900 },
+    // The service worker must always be re-checked, or updates would never land.
+    '/sw.js': { headers: { 'cache-control': 'no-cache' } },
+    '/manifest.webmanifest': { headers: { 'cache-control': 'public, max-age=3600' } },
   },
 
   fonts: {
@@ -38,9 +41,19 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { name: 'description', content: 'Ett digitalt hem för Djurgårdare – fotboll och hockey, nyheter, snack, poddar och klipp.' },
         { name: 'theme-color', content: '#061229' },
+        // Installable on the home screen (see public/manifest.webmanifest).
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-title', content: 'Djurgår’n' },
+        // Navy all the way up: the page draws under the iOS status bar (safe-area padded).
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
         { name: 'robots', content: 'noindex, nofollow' },
       ],
-      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      ],
     },
   },
 })

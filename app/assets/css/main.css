@@ -46,11 +46,22 @@
   }
   body {
     @apply bg-navy-950 text-krita font-sans antialiased;
+    /* Installed on iOS the page draws under the status bar; keep content below it. */
+    padding-top: env(safe-area-inset-top);
     font-feature-settings: "ss01", "cv11";
     background-image:
       radial-gradient(1200px 600px at 85% -10%, rgb(95 176 236 / 0.10), transparent 60%),
       radial-gradient(900px 500px at -10% 30%, rgb(42 85 163 / 0.18), transparent 60%);
     background-attachment: fixed;
+  }
+  /* A navy strip behind the iOS status bar, so scrolled content never shows through. */
+  .status-bar-backdrop {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: env(safe-area-inset-top);
+    background: var(--color-navy-950);
+    z-index: 45;
+    pointer-events: none;
   }
   html.dialog-open {
     overflow: hidden;

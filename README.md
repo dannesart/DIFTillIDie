@@ -149,6 +149,28 @@ So DIFpodden gets a static discovery card with "Lyssna hos Patreon", the Spotify
 
 The card then shows a click-to-load player. Nothing is loaded from Spotify or YouTube until the visitor asks for it.
 
+## Installable app (PWA)
+
+Supporters can put Djurgår’n on their home screen. It opens full-screen into the same mobile experience: bottom nav, mini-player, dialogs.
+
+- **Manifest:** [`public/manifest.webmanifest`](public/manifest.webmanifest) sets standalone display and navy theme and background colours. Long-pressing the icon gives shortcuts to Lyssna, Stories and Snacket.
+- **Icons:**
+  - The striped DIF heart, with source files [`public/icons/icon.svg`](public/icons/icon.svg) and [`icon-maskable.svg`](public/icons/icon-maskable.svg). The maskable one keeps the motif inside the 80% safe zone.
+  - The PNGs are rendered from those (192, 512, maskable 512, and `apple-touch-icon.png` at 180). Re-render them with any SVG→PNG tool if the SVGs change.
+- **iOS:** `apple-mobile-web-app-*` meta tags. The status bar is `black-translucent`, so the page draws under it. `body` and the sticky header are padded by `env(safe-area-inset-top)`, with a navy strip behind the status bar.
+- **Service worker** ([`public/sw.js`](public/sw.js)) is deliberately tiny and honest:
+  - Page navigations always go to the network.
+  - Only when that fails does it show [`offline.html`](public/offline.html), which says plainly that news, matches and podcasts need a connection.
+  - It caches nothing else. API calls, audio streams and assets bypass it entirely, so stale news can never look current.
+  - It's registered in production only. `/sw.js` is served `no-cache`, so updates land.
+- **Install discovery:**
+  - A quiet "Djurgår’n i fickan" card in the footer.
+  - A single one-time hint on phones from the third visit. It's never shown again once it has appeared, and never while a podcast is playing.
+  - An install guide with the browser's own dialog where available (Chrome, Edge, Samsung Internet), accurate Safari Share → *Lägg till på hemskärmen* steps on iPhone and iPad, and "open in Safari" for in-app browsers.
+  - All of it is hidden once the app is installed.
+
+We looked at `@vite-pwa/nuxt` (1.1.1). It still depends on `@nuxt/kit` 3 and needs vite-plugin-pwa 1.3+ for Vite 8. Its default Workbox precaching and navigation fallback would serve cached SSR pages, which is the stale-content risk we wanted to avoid. A manifest plus a ~40-line network-first worker does the job with nothing to de-configure.
+
 ## Deploying to Netlify
 
 The repo is ready as is, through [`netlify.toml`](netlify.toml):

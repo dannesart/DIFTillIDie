@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#061229">
+  <meta name="robots" content="noindex">
+  <title>Ingen uppkoppling – Djurgår’n tills jag dör</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: calc(2rem + env(safe-area-inset-top)) 1.5rem calc(2rem + env(safe-area-inset-bottom));
+      background: radial-gradient(900px 500px at 85% -10%, rgb(95 176 236 / .12), transparent 60%), #061229;
+      color: #f3eee3;
+      font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+      text-align: center;
+    }
+    main { max-width: 26rem; }
+    .stripes { width: 3.5rem; height: 4.5rem; margin: 0 auto 1.75rem; border-radius: .75rem;
+      background: repeating-linear-gradient(90deg, #5fb0ec 0 .7rem, #10295a .7rem 1.4rem); }
+    h1 { margin: 0; font: 700 2.1rem/1.05 Georgia, "Times New Roman", serif; letter-spacing: -.02em; }
+    h1 em { color: #9bd0f5; font-weight: 400; }
+    p { margin: 1rem 0 0; color: #b9bfcc; }
+    button { margin-top: 1.75rem; border: 0; border-radius: 999px; padding: .8rem 1.6rem;
+      background: #f4c430; color: #061229; font: 700 .95rem system-ui, sans-serif; cursor: pointer; }
+    button:focus-visible { outline: 2px solid #9bd0f5; outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="stripes" aria-hidden="true"></div>
+    <h1>Ingen uppkoppling <em>just&nbsp;nu</em></h1>
+    <p>Nyheter, matcher och poddar hämtas live. Hellre den här sidan än gamla nyheter som ser nya ut.</p>
+    <p>Djurgår’n finns kvar när nätet kommer tillbaka.</p>
+    <button type="button" onclick="location.reload()">Försök igen</button>
+  </main>
+</body>
+</html>
