@@ -1,8 +1,9 @@
-import type { NewsResponse, PodcastResponse } from '#shared/types/domain'
+import type { NewsResponse, PodcastResponse, PodcastsResponse } from '#shared/types/domain'
 import type { NewsSource, SourceResult } from '../lib/news'
 import { NEWS_SOURCES, loadSource } from '../lib/news'
 import { groupIntoStories } from '../lib/grouping'
-import { loadPodcast } from '../lib/podcast'
+import type { PodcastShowConfig } from '../lib/podcast'
+import { loadPodcast, loadPodcasts } from '../lib/podcast'
 import type { FixturesState } from '../lib/fixtures'
 import { loadFixtures } from '../lib/fixtures'
 
@@ -18,7 +19,7 @@ import { loadFixtures } from '../lib/fixtures'
 
 const FEED_MAX_AGE = 10 * 60
 const lastGood = new Map<string, SourceResult>()
-const lastGoodPodcast: { value?: PodcastResponse } = {}
+const lastGoodPodcasts = new Map<string, PodcastResponse>()
 
 const cachedSource = defineCachedFunction(
   async (source: NewsSource) => {
@@ -44,20 +45,25 @@ export async function getNews(): Promise<NewsResponse> {
   }
 }
 
-export const getPodcast = defineCachedFunction(
-  async () => {
-    const result = await loadPodcast({ lastGood: lastGoodPodcast })
-    if (!result.status.ok) console.warn(`[feeds] podcast: ${result.status.error}`)
+// One cache entry per show, so one slow or failing feed never holds up the other.
+const cachedShow = defineCachedFunction(
+  async (show: PodcastShowConfig) => {
+    const result = await loadPodcast(show, { lastGood: lastGoodPodcasts })
+    if (!result.status.ok) console.warn(`[feeds] podcast ${show.id}: ${result.status.error}`)
     return result
   },
   {
     name: 'podcast',
     maxAge: FEED_MAX_AGE,
     swr: true,
-    getKey: () => 'djurgarnbynight',
+    getKey: (show: PodcastShowConfig) => show.id,
     validate: entry => entry.value?.status.ok === true,
   },
 )
+
+export function getPodcasts(): Promise<PodcastsResponse> {
+  return loadPodcasts({ lastGood: lastGoodPodcasts }, show => cachedShow(show))
+}
 
 const lastGoodFixtures: FixturesState = {}
 

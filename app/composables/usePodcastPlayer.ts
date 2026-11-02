@@ -1,36 +1,45 @@
 import type { PodcastEpisode } from '#shared/types/domain'
 
 /*
- * One player, many controls. The single <audio> element lives in
- * PodcastShow; it registers itself here, and both the main player and the
- * mini-player read and drive the same state. Playback only ever starts
- * from a click — nothing here autoplays.
+ * One player, many controls, any show. The single <audio> element lives in
+ * PodcastAudio (mounted once for the whole page) and registers itself here;
+ * the show cards and the mini-player all read and drive the same state, so
+ * only one stream can ever play. Playback only starts from a click.
  */
+
+export interface PlayingShow {
+  id: string
+  title: string
+}
 
 // The element itself is browser-only, so it lives outside useState.
 let audioEl: HTMLAudioElement | null = null
 
 export function usePodcastPlayer() {
   const current = useState<PodcastEpisode | null>('player-current', () => null)
-  const showTitle = useState('player-show', () => '')
+  const currentShow = useState<PlayingShow | null>('player-show', () => null)
   const playing = useState('player-playing', () => false)
   const position = useState('player-position', () => 0)
   const duration = useState('player-duration', () => 0)
   const failed = useState<string | null>('player-failed', () => null)
-  /** Is the main player on screen? The mini-player stays away while it is. */
-  const mainVisible = useState('player-main-visible', () => true)
+  /** Which show's card is on screen right now (null if none). */
+  const visibleShow = useState<string | null>('player-visible-show', () => null)
+  /** Which show is selected in "Lyssna & titta". */
+  const selectedShow = useState<string | null>('podcast-selected', () => null)
 
+  const showTitle = computed(() => currentShow.value?.title ?? '')
   const progress = computed(() => (duration.value ? Math.min(100, (position.value / duration.value) * 100) : 0))
+  /** The playing show's own card is visible, so the mini-player can step aside. */
+  const playerInView = computed(() => !!currentShow.value && visibleShow.value === currentShow.value.id)
 
   function onError() {
     playing.value = false
     failed.value = 'Ljudet kunde inte spelas här. Lyssna hos podden i stället.'
   }
 
-  function attach(el: HTMLAudioElement, show: string) {
+  function attach(el: HTMLAudioElement) {
     if (audioEl === el) return
     audioEl = el
-    showTitle.value = show
     el.addEventListener('play', () => (playing.value = true))
     el.addEventListener('pause', () => (playing.value = false))
     el.addEventListener('ended', () => (playing.value = false))
@@ -44,7 +53,8 @@ export function usePodcastPlayer() {
     if (audioEl === el) audioEl = null
   }
 
-  async function toggle(ep?: PodcastEpisode) {
+  /** Play/pause an episode. A different episode (from any show) replaces the current stream. */
+  async function toggle(ep?: PodcastEpisode, show?: PlayingShow) {
     const el = audioEl
     const target = ep ?? current.value
     if (!el || !target?.audioUrl) return
@@ -55,6 +65,7 @@ export function usePodcastPlayer() {
       return
     }
     current.value = target
+    if (show) currentShow.value = show
     position.value = 0
     duration.value = target.durationSeconds ?? 0
     el.src = target.audioUrl
@@ -85,6 +96,7 @@ export function usePodcastPlayer() {
   function stop() {
     audioEl?.pause()
     current.value = null
+    currentShow.value = null
     position.value = 0
   }
 
@@ -100,11 +112,11 @@ export function usePodcastPlayer() {
 
   function updateMediaSession() {
     if (!('mediaSession' in navigator) || !current.value) return
-    // No artwork: we don't republish the show's cover image.
+    // No artwork: we don't republish the shows' cover images.
     navigator.mediaSession.metadata = new MediaMetadata({ title: current.value.title, artist: showTitle.value, album: showTitle.value })
   }
 
-  return { current, showTitle, playing, position, duration, progress, failed, mainVisible, attach, detach, toggle, seekTo, seekBy, seekFromClick, seekFromKey, stop }
+  return { current, currentShow, showTitle, playing, position, duration, progress, failed, visibleShow, selectedShow, playerInView, attach, detach, toggle, seekTo, seekBy, seekFromClick, seekFromKey, stop }
 }
 
 export function clock(sec: number): string {

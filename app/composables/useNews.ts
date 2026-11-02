@@ -1,4 +1,4 @@
-import type { FixturesResponse, NewsResponse, PodcastResponse, SourceArticle, Story } from '#shared/types/domain'
+import type { FixturesResponse, NewsResponse, PodcastsResponse, SourceArticle, Story } from '#shared/types/domain'
 
 /** Real news from the configured feeds, fetched and grouped on the server. */
 export function useNews() {
@@ -10,8 +10,9 @@ export function useNews() {
   return { news: data, stories, status, error }
 }
 
-export function usePodcast() {
-  return useFetch<PodcastResponse>('/api/podcast', { key: 'podcast' })
+/** All podcasts in "Lyssna & titta", each with its own status. */
+export function usePodcasts() {
+  return useFetch<PodcastsResponse>('/api/podcast', { key: 'podcasts', default: () => ({ shows: [] }) })
 }
 
 export function leadOf(story: Story): SourceArticle {

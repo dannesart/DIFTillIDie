@@ -1,1 +1,1 @@
-export default defineEventHandler(() => getPodcast())
+export default defineEventHandler(() => getPodcasts())

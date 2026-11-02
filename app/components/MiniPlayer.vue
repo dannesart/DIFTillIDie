@@ -4,7 +4,7 @@
  * paused mid-listen) and the main player is scrolled out of view.
  * It drives the same <audio> element as the main player.
  */
-const { current, showTitle, playing, position, duration, progress, mainVisible, toggle, seekFromClick, seekFromKey, stop } = usePodcastPlayer()
+const { current, currentShow, showTitle, playing, position, duration, progress, playerInView, selectedShow, toggle, seekFromClick, seekFromKey, stop } = usePodcastPlayer()
 
 // On phones, step aside while someone is typing (the keyboard needs the space).
 const typing = ref(false)
@@ -28,9 +28,11 @@ onBeforeUnmount(() => {
   document.removeEventListener('focusout', onFocusOut)
 })
 
-const visible = computed(() => !!current.value && !mainVisible.value && !(typing.value && small.value))
+const visible = computed(() => !!current.value && !playerInView.value && !(typing.value && small.value))
 
+// Back to the playing show's own player — switching the picker to it if needed.
 function backToPlayer() {
+  if (currentShow.value) selectedShow.value = currentShow.value.id
   document.getElementById('lyssna')?.scrollIntoView({ behavior: 'smooth' })
 }
 </script>

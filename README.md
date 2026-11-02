@@ -60,6 +60,7 @@ Demo content (the posts) lives in [`app/data/`](app/data/). The timestamps are r
 | [Sportbladet, fotboll](https://rss.aftonbladet.se/rss2/small/pages/sections/sportbladet/fotboll/) | Broad, filtered | ✅ 39 items, 3 about DIF |
 | [Sportbladet, hockey](https://rss.aftonbladet.se/rss2/small/pages/sections/sportbladet/hockey/) | Broad, filtered | ✅ 39 items, 1 about DIF |
 | [Djurgårn by night](https://feed.pod.space/djurgarnbynight) | Podcast | ✅ 99 episodes, playable MP3s |
+| [Blårandigt Snack](https://feeds.acast.com/public/shows/68d05bae2cf15c8db006caa8) | Podcast (Acast), added 2026-11-02 at a supporter's request | ✅ 76 episodes, playable MP3s |
 
 Sources investigated but **not integrated**:
 
@@ -125,7 +126,13 @@ Rules:
 
 ## Podcasts and video
 
-*Djurgårn by night* plays in a native player. The audio streams from the MP3 enclosure the show publishes in its RSS feed for podcast players, credited to the show and linked to its episode page. If the feed can't be reached, the old card with search links comes back.
+*Djurgårn by night* and *Blårandigt Snack* (Cosmos & Victor) both play in the app.
+
+- **Show picker:** accessible tabs, with an equaliser on the show that's playing. It starts on the freshest episode, or on the night show after dark.
+- **One audio element** for the whole page, in `PodcastAudio.vue`. Starting any episode replaces the current stream, and the mini-player follows whichever show is playing.
+- **Audio** streams from the MP3 enclosure each show publishes in its RSS feed for podcast players. It's credited to the show and linked to its own page and listening links.
+- **If a show's feed can't be reached,** its tab says so and offers direct listening links.
+- **Adding a show** means adding an entry to `PODCAST_SHOWS` in [`server/lib/podcast.ts`](server/lib/podcast.ts).
 
 `app/data/media.ts` links the remaining shows and channels (DIFpodden, YouTube) to real search pages on Spotify, Apple Podcasts and YouTube, because we haven't verified their official IDs yet. Once you have a verified ID, add `embed` to the item:
 

@@ -88,9 +88,23 @@ export interface PodcastEpisode {
 }
 
 export interface PodcastResponse {
+  /** Stable show id, e.g. "blarandigtsnack". */
+  id: string
   show: { title: string, url: string, author?: string, copyright?: string } | null
   episodes: PodcastEpisode[]
   status: FeedStatus
+  /** Generated cover art. */
+  cover: 'night' | 'snack'
+  tagline: string
+  hosts?: string
+  /** Direct listening links elsewhere — and the fallback if the feed fails. */
+  links: { label: string, url: string }[]
+  nocturnal: boolean
+  newcomer: boolean
+}
+
+export interface PodcastsResponse {
+  shows: PodcastResponse[]
 }
 
 export type ReactionKey = 'hjarta' | 'eld' | 'stjarna' | 'tarar'

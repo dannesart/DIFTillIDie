@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet type="text/xsl" href="/global/feed/rss.xslt" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:googleplay="http://www.google.com/schemas/play-podcasts/1.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:media="http://search.yahoo.com/mrss/" xmlns:podaccess="https://access.acast.com/schema/1.0/" xmlns:acast="https://schema.acast.com/1.0/">
+   <script src="https://feeds.acast.com/global/feed/xslt-polyfill.min.js" xmlns="http://www.w3.org/1999/xhtml"></script>
+    <channel>
+		<ttl>60</ttl>
+		<generator>acast.com</generator>
+		<title>Blårandigt Snack</title>
+		<link>https://feeds.acast.com/public/shows/blarandigt-sn</link>
+		<atom:link href="https://feeds.acast.com/public/shows/68d05bae2cf15c8db006caa8" rel="self" type="application/rss+xml"/>
+		<language>sv</language>
+		<copyright>Blårandigt Snack</copyright>
+		<itunes:keywords>Allsvenskan,djurgården,Sportpodd,Supporterkultur</itunes:keywords>
+		<itunes:author>Blårandigt Snack</itunes:author>
+		<itunes:subtitle>Välkommen till Podcasten Blårandigt Snack. Här pratar vi Djurgården Fotboll och Allsvenskan, från högt till lågt. </itunes:subtitle>
+		<itunes:summary><![CDATA[<p>En podd om Djurgården och Allsvenskan med blårandiga hjärtan. Vi snackar matcher, lag, supportrar och allt som hör till Sveriges finaste lag. Två Djurgårdare som älskar fotboll, pratar Allsvenskan utan filter.</p><p><br></p><hr><p style='color:grey; font-size:0.75em;'> Hosted on Acast. See <a style='color:grey;' target='_blank' rel='noopener noreferrer' href='https://acast.com/privacy'>acast.com/privacy</a> for more information.</p>]]></itunes:summary>
+		<description><![CDATA[<p>En podd om Djurgården och Allsvenskan med blårandiga hjärtan. Vi snackar matcher, lag, supportrar och allt som hör till Sveriges finaste lag. Två Djurgårdare som älskar fotboll, pratar Allsvenskan utan filter.</p><p><br></p><hr><p style='color:grey; font-size:0.75em;'> Hosted on Acast. See <a style='color:grey;' target='_blank' rel='noopener noreferrer' href='https://acast.com/privacy'>acast.com/privacy</a> for more information.</p>]]></description>
+		<itunes:explicit>false</itunes:explicit>
+		<itunes:owner>
+			<itunes:name>Blårandigt Snack</itunes:name>
+			<itunes:email>cosmoslosman@gmail.com</itunes:email>
+		</itunes:owner>
+		<acast:showId>68d05bae2cf15c8db006caa8</acast:showId>
+		<acast:showUrl>blarandigt-sn</acast:showUrl>
+		
+		
+        <acast:network id="68d00a36203f72ea57e20d31" slug="cosmos-losman-68d00a36203f72ea57e20d31"><![CDATA[Cosmos Losman]]></acast:network>
+		<itunes:type>episodic</itunes:type>
+			<itunes:image href="https://assets.pippa.io/shows/68d05bae2cf15c8db006caa8/1760386401766-1c7f2ef2-9e6e-4eba-9cce-0268e76d8cfb.jpeg"/>
+			<image>
+				<url>https://assets.pippa.io/shows/68d05bae2cf15c8db006caa8/1760386401766-1c7f2ef2-9e6e-4eba-9cce-0268e76d8cfb.jpeg</url>
+				<link>https://feeds.acast.com/public/shows/blarandigt-sn</link>
+				<title>Blårandigt Snack</title>
+			</image>
+		<item>
+			<title>Summering Djurgården mot Göteborg och Degerfors</title>
+			<itunes:title>Summering Djurgården mot Göteborg och Degerfors</itunes:title>
+			<pubDate>Sun, 01 Nov 2026 21:23:06 GMT</pubDate>
+			<itunes:duration>1:09:30</itunes:duration>
+			<enclosure url="https://sphinx.acast.com/p/open/s/68d05bae2cf15c8db006caa8/e/6ae7adba339f23a726605037/media.mp3" length="166807554" type="audio/mpeg"/>
+			<guid isPermaLink="false">6ae7adba339f23a726605037</guid>
+			<itunes:explicit>false</itunes:explicit>
+			<link>https://shows.acast.com/blarandigt-sn/episodes/6ae7adba339f23a726605037</link>
+			<acast:episodeId>6ae7adba339f23a726605037</acast:episodeId>
+			<acast:showId>68d05bae2cf15c8db006caa8</acast:showId>
+			
+			<itunes:episodeType>full</itunes:episodeType>
+			<itunes:image href="https://assets.pippa.io/shows/68d05bae2cf15c8db006caa8/1793567675866-ee0f7988-069d-4ea0-bac6-53622166ddb1.jpeg"/>
+			<description><![CDATA[Vi buntar ihop två sumeringar i en efter ett tajt spelschema. Ett förväntat kryss mot Göteborg och en vinst mot Degerfors. Vi går igenom den dåliga formen och oroar oss för framtiden. Hur går tankarna i djurgårdsled nu när säsongen närmar sig ett slut och hur gör vi om Sirius är tre poäng före Hammarby när de möter oss? Lägger vi oss för att säkra att Hammarby inte vinner? Mycket frågor men få svar. Självklart detta och mycket mer i dagens avsnitt!<hr><p style='color:grey; font-size:0.75em;'> Hosted on Acast. See <a style='color:grey;' target='_blank' rel='noopener noreferrer' href='https://acast.com/privacy'>acast.com/privacy</a> for more information.</p>]]></description>
+			<itunes:summary><![CDATA[Vi buntar ihop två sumeringar i en efter ett tajt spelschema. Ett förväntat kryss mot Göteborg och en vinst mot Degerfors. Vi går igenom den dåliga formen och oroar oss för framtiden. Hur går tankarna i djurgårdsled nu när säsongen närmar sig ett slut och hur gör vi om Sirius är tre poäng före Hammarby när de möter oss? Lägger vi oss för att säkra att Hammarby inte vinner? Mycket frågor men få svar. Självklart detta och mycket mer i dagens avsnitt!<hr><p style='color:grey; font-size:0.75em;'> Hosted on Acast. See <a style='color:grey;' target='_blank' rel='noopener noreferrer' href='https://acast.com/privacy'>acast.com/privacy</a> for more information.</p>]]></itunes:summary>
+		</item>
+<item>
+			<title>Försnack | Göteborg - Djurgården |</title>
+			<itunes:title>Försnack | Göteborg - Djurgården |</itunes:title>
+			<pubDate>Tue, 27 Oct 2026 21:28:28 GMT</pubDate>
+			<itunes:duration>35:45</itunes:duration>
+			<enclosure url="https://sphinx.acast.com/p/open/s/68d05bae2cf15c8db006caa8/e/6ae11778664593f806233b62/media.mp3" length="34336226" type="audio/mpeg"/>
+			<guid isPermaLink="false">6ae11778664593f806233b62</guid>
+			<itunes:explicit>false</itunes:explicit>
+			<link>https://shows.acast.com/blarandigt-sn/episodes/6ae11778664593f806233b62</link>
+			<acast:episodeId>6ae11778664593f806233b62</acast:episodeId>
+			<acast:showId>68d05bae2cf15c8db006caa8</acast:showId>
+			
+			<itunes:episodeType>full</itunes:episodeType>
+			<itunes:image href="https://assets.pippa.io/shows/68d05bae2cf15c8db006caa8/1793560176502-640e88c6-c9ca-4791-92ce-56ab7c57f91f.jpeg"/>
+			<description><![CDATA[Ny match och denna gång är det IFK Göteborg som står för motståndet. Vi snackar upp matchen och går igenom vad som måste förbättras från besvikelsen mot Örgryte. <hr><p style='color:grey; font-size:0.75em;'> Hosted on Acast. See <a style='color:grey;' target='_blank' rel='noopener noreferrer' href='https://acast.com/privacy'>acast.com/privacy</a> for more information.</p>]]></description>
+			<itunes:summary><![CDATA[Ny match och denna gång är det IFK Göteborg som står för motståndet. Vi snackar upp matchen och går igenom vad som måste förbättras från besvikelsen mot Örgryte. <hr><p style='color:grey; font-size:0.75em;'> Hosted on Acast. See <a style='color:grey;' target='_blank' rel='noopener noreferrer' href='https://acast.com/privacy'>acast.com/privacy</a> for more information.</p>]]></itunes:summary>
+		</item>
+		<itunes:category text="News">
+			<itunes:category text="Sports News"/>
+		</itunes:category>
+		<itunes:category text="Sports">
+			<itunes:category text="Soccer"/>
+		</itunes:category>
+    	<itunes:category text="Sports"/>
+    </channel>
+</rss>

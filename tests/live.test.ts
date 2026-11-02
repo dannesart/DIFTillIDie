@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { NEWS_SOURCES, toSourceArticles } from '../server/lib/news'
-import { PODCAST_SOURCE, toEpisodes } from '../server/lib/podcast'
+import { PODCAST_SHOWS, toEpisodes } from '../server/lib/podcast'
 import { fetchFeed } from '../server/lib/rss'
 import { DIF_CALENDAR, fixturesFromIcs } from '../server/lib/fixtures'
 
@@ -38,13 +38,17 @@ describe.runIf(live)('live feeds', () => {
     }, 20_000)
   }
 
-  it('the podcast has a recent episode with playable audio', async () => {
-    const { episodes } = toEpisodes(await fetchFeed(PODCAST_SOURCE.feedUrl, { timeoutMs: 15_000 }))
-    const latest = episodes[0]!
-    expect(latest.audioUrl).toBeTruthy()
-    const res = await fetch(latest.audioUrl!, { headers: { range: 'bytes=0-1023' }, signal: AbortSignal.timeout(15_000) })
-    expect([200, 206]).toContain(res.status)
-    expect(res.headers.get('content-type')).toMatch(/^audio\//)
-    await res.body?.cancel()
-  }, 30_000)
+  for (const show of PODCAST_SHOWS) {
+    it(`${show.id} has a recent episode with playable audio`, async () => {
+      const { episodes } = toEpisodes(await fetchFeed(show.feedUrl, { timeoutMs: 15_000 }), show)
+      const latest = episodes[0]!
+      expect(Date.now() - Date.parse(latest.publishedAt)).toBeLessThan(60 * 24 * 3_600_000)
+      expect(latest.audioUrl).toBeTruthy()
+      const res = await fetch(latest.audioUrl!, { headers: { range: 'bytes=0-1023' }, signal: AbortSignal.timeout(15_000) })
+      expect([200, 206]).toContain(res.status)
+      expect(res.headers.get('content-type')).toMatch(/^audio\//)
+      await res.body?.cancel()
+      console.info(`${show.id}: "${latest.title}" (${latest.publishedAt.slice(0, 10)})`)
+    }, 30_000)
+  }
 })

@@ -30,6 +30,20 @@ defineProps<{ cover: MediaItem['cover'], title: string, kind: MediaItem['kind'] 
       </div>
     </template>
 
+    <!-- Snack: a speech bubble on blue stripes -->
+    <template v-else-if="cover === 'snack'">
+      <div class="absolute inset-0 bg-[repeating-linear-gradient(135deg,#5fb0ec_0_16px,#10295a_16px_32px)] transition-transform duration-[1.2s] ease-out-expo group-hover:scale-110" />
+      <div class="absolute inset-0 bg-gradient-to-t from-navy-950/95 via-navy-950/40 to-navy-950/10" />
+      <svg viewBox="0 0 120 100" class="absolute left-1/2 top-[38%] w-[46%] max-w-40 -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_10px_24px_rgb(3_9_21/0.6)]">
+        <path d="M14 10h92a10 10 0 0 1 10 10v44a10 10 0 0 1-10 10H50L28 92V74H14A10 10 0 0 1 4 64V20a10 10 0 0 1 10-10Z" fill="#f3eee3" />
+        <circle cx="38" cy="42" r="6" fill="#10295a" /><circle cx="60" cy="42" r="6" fill="#10295a" /><circle cx="82" cy="42" r="6" fill="#f4c430" />
+      </svg>
+      <div class="absolute inset-x-0 bottom-0 p-4">
+        <span class="block font-display text-2xl font-bold italic leading-none text-krita sm:text-3xl">Blårandigt</span>
+        <span class="kicker text-himmel-200">Snack</span>
+      </div>
+    </template>
+
     <!-- Grass: pitch lines -->
     <template v-else-if="cover === 'grass'">
       <div class="absolute inset-0 bg-[repeating-linear-gradient(0deg,#0f2a55_0_18px,#123063_18px_36px)]" />

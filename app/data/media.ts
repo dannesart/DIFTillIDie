@@ -18,7 +18,7 @@ export interface MediaItem {
   title: string
   tagline: string
   /** Visual identity for the generated cover — no copyrighted artwork. */
-  cover: 'stripes' | 'night' | 'ice' | 'grass'
+  cover: 'stripes' | 'night' | 'snack' | 'ice' | 'grass'
   links: MediaLink[]
   /** Official embed URL (open.spotify.com/embed/... or youtube-nocookie.com/embed/...). */
   embed?: string
@@ -44,15 +44,6 @@ export const media: MediaItem[] = [
     tagline: 'Snacket om allt som är blårandigt – laget, läktaren och livet runt omkring.',
     cover: 'stripes',
     links: podLinks('DIFpodden'),
-  },
-  {
-    id: 'by-night',
-    kind: 'podd',
-    title: 'Djurgår’n by Night',
-    tagline: 'När lamporna släcks på arenan börjar snacket på riktigt.',
-    cover: 'night',
-    links: podLinks('Djurgår\'n by Night'),
-    nocturnal: true,
   },
   {
     id: 'yt-fotboll',

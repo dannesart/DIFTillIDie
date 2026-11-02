@@ -5,11 +5,27 @@ const demoNow = useDemoNow()
 const now = useNow(60_000)
 const night = computed(() => dayPart(now.value ?? demoNow.value) === 'natt')
 
-const { data: podcast } = usePodcast()
-// Real episodes when the feed works; otherwise the old card with search links.
-const live = computed(() => !!podcast.value?.episodes.length)
+const { data } = usePodcasts()
+const shows = computed(() => data.value?.shows ?? [])
+const { selectedShow } = usePodcastPlayer()
 
-const fallbackPods = computed(() => media.filter(m => m.kind === 'podd' && (!live.value || m.id !== 'by-night')))
+// Until someone picks: the night show after dark, otherwise the freshest episode.
+const defaultShow = computed(() => {
+  const list = shows.value
+  if (night.value) {
+    const nocturnal = list.find(s => s.nocturnal && s.episodes.length)
+    if (nocturnal) return nocturnal.id
+  }
+  return [...list].sort((a, b) => (b.episodes[0]?.publishedAt ?? '').localeCompare(a.episodes[0]?.publishedAt ?? ''))[0]?.id ?? ''
+})
+const active = computed({
+  get: () => selectedShow.value ?? defaultShow.value,
+  set: (id: string) => (selectedShow.value = id),
+})
+const activeShow = computed(() => shows.value.find(s => s.id === active.value))
+const liveCount = computed(() => shows.value.filter(s => s.episodes.length).length)
+
+const pods = media.filter(m => m.kind === 'podd')
 const videos = media.filter(m => m.kind === 'video')
 </script>
 
@@ -21,16 +37,30 @@ const videos = media.filter(m => m.kind === 'video')
         <h2 class="section-title mt-3">Lyssna <span class="italic font-normal text-krita-dim">&</span> titta</h2>
       </div>
       <p class="max-w-sm text-sm leading-relaxed text-krita-dim">
-        <template v-if="live">Djurgårn by night spelas direkt här, från poddens eget flöde.</template>
-        <template v-else>Vi når inte poddflödet just nu.</template>
+        <template v-if="liveCount">Blårandiga poddar som spelas direkt här, från sina egna flöden.</template>
+        <template v-else>Vi når inte poddarnas flöden just nu – men länkarna nedan fungerar.</template>
         Övriga poddar och kanaler länkar till riktiga sökningar hos Spotify, Apple Podcasts och YouTube – ingen falsk play-knapp.
       </p>
     </div>
 
-    <PodcastShow v-if="live && podcast" :podcast="podcast" :highlight="night" class="mt-10" />
+    <template v-if="shows.length">
+      <PodcastPicker v-model="active" :shows="shows" :night="night" class="mt-10" />
+      <Transition mode="out-in" enter-from-class="opacity-0 motion-safe:translate-y-2" leave-to-class="opacity-0" enter-active-class="transition duration-300" leave-active-class="transition duration-150">
+        <PodcastShow
+          v-if="activeShow"
+          :id="`panel-${activeShow.id}`"
+          :key="activeShow.id"
+          role="tabpanel"
+          :aria-labelledby="`tab-${activeShow.id}`"
+          :podcast="activeShow"
+          :highlight="night && activeShow.nocturnal"
+          class="mt-4"
+        />
+      </Transition>
+    </template>
 
-    <div class="mt-5 grid gap-5" :class="live ? 'md:grid-cols-1' : 'md:grid-cols-2'">
-      <MediaCard v-for="m in fallbackPods" :key="m.id" :item="m" :highlight="night && m.nocturnal" :large="!live" />
+    <div class="mt-5 grid gap-5">
+      <MediaCard v-for="m in pods" :key="m.id" :item="m" />
     </div>
 
     <h3 class="kicker mt-14 text-krita-dim">Videokanaler</h3>

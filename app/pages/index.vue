@@ -7,7 +7,7 @@ onMounted(() => {
 })
 
 // Fetch real content during SSR; sections read the same data by key.
-await Promise.all([useNews(), usePodcast(), useFixtures()])
+await Promise.all([useNews(), usePodcasts(), useFixtures()])
 </script>
 
 <template>
@@ -21,6 +21,7 @@ await Promise.all([useNews(), usePodcast(), useFixtures()])
       <MediaSection />
     </main>
     <AppFooter />
+    <PodcastAudio />
     <MiniPlayer />
     <StoryComposeDialog />
     <StripeBurst />

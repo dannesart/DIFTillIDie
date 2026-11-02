@@ -2,19 +2,25 @@
 import type { PodcastEpisode, PodcastResponse } from '#shared/types/domain'
 
 /*
- * Real episodes from the show's own RSS feed. Audio streams straight from
- * the enclosure the publisher distributes to podcast players; nothing is
- * downloaded until someone presses play.
+ * One show's real episodes, from its own RSS feed. Audio streams straight
+ * from the enclosures the publisher distributes to podcast players, through
+ * the page's single <audio> element. Nothing loads until someone presses play.
+ * If the feed can't be reached, the card says so and offers direct links.
  */
 const props = defineProps<{ podcast: PodcastResponse, highlight?: boolean }>()
 
 const root = useTemplateRef<HTMLElement>('root')
-const audio = useTemplateRef<HTMLAudioElement>('audio')
-const { current, playing, position, duration, progress, failed, mainVisible, attach, detach, toggle, seekFromClick: seek, seekFromKey: onSeekKey } = usePodcastPlayer()
+const { current, currentShow, playing, position, duration, progress, failed, visibleShow, toggle: togglePlayer, seekFromClick: seek, seekFromKey: onSeekKey } = usePodcastPlayer()
 const showAll = ref(false)
 
+const title = computed(() => props.podcast.show?.title ?? props.podcast.status.outlet)
 const latest = computed(() => props.podcast.episodes[0])
 const more = computed(() => props.podcast.episodes.slice(1, showAll.value ? undefined : 4))
+const host = computed(() => {
+  try { return new URL(props.podcast.show?.url ?? props.podcast.status.homepage).hostname.replace(/^(www|shows)\./, '') }
+  catch { return 'poddens sida' }
+})
+const isThisShowPlaying = computed(() => currentShow.value?.id === props.podcast.id)
 
 function minutes(sec?: number) {
   if (!sec) return ''
@@ -23,42 +29,55 @@ function minutes(sec?: number) {
 }
 
 const isCurrent = (ep: PodcastEpisode) => current.value?.id === ep.id
+const toggle = (ep: PodcastEpisode) => togglePlayer(ep, { id: props.podcast.id, title: title.value })
 
-// Tell the mini-player whether this, the main player, is on screen.
+// Tell the mini-player whether this show's card is on screen.
 let observer: IntersectionObserver | undefined
 onMounted(() => {
-  if (audio.value) attach(audio.value, props.podcast.show?.title ?? 'Podden')
   if (root.value && 'IntersectionObserver' in window) {
-    observer = new IntersectionObserver(([entry]) => (mainVisible.value = !!entry?.isIntersecting), { threshold: 0.15 })
+    observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) visibleShow.value = props.podcast.id
+      else if (visibleShow.value === props.podcast.id) visibleShow.value = null
+      // "On screen" = crossing the middle band of the viewport, so a card taller
+      // than a phone screen still counts while you're looking at it.
+    }, { rootMargin: '-35% 0px -35% 0px', threshold: 0 })
     observer.observe(root.value)
   }
 })
 onBeforeUnmount(() => {
   observer?.disconnect()
-  mainVisible.value = false
-  if (audio.value) detach(audio.value)
+  if (visibleShow.value === props.podcast.id) visibleShow.value = null
 })
 </script>
 
 <template>
   <article ref="root" class="card relative overflow-hidden" :class="highlight && 'border-guld/30'">
-    <!-- The one and only audio element; the mini-player drives it too. -->
-    <audio ref="audio" preload="none" />
-
     <div class="grid lg:grid-cols-[18rem_minmax(0,1fr)]">
-      <MediaCover cover="night" :title="podcast.show?.title ?? ''" kind="podd" class="aspect-[16/9] lg:aspect-auto" />
+      <MediaCover :cover="podcast.cover" :title="title" kind="podd" class="aspect-[16/9] lg:aspect-auto" />
 
       <div class="min-w-0 p-5 sm:p-7">
         <div class="flex flex-wrap items-center gap-2">
           <span class="kicker text-krita-dim">Podcast</span>
-          <span class="kicker rounded-full bg-himmel/15 px-2 py-0.5 text-himmel">Riktiga avsnitt</span>
+          <span v-if="podcast.episodes.length" class="kicker rounded-full bg-himmel/15 px-2 py-0.5 text-himmel">Riktiga avsnitt</span>
+          <span v-if="podcast.newcomer" class="kicker rounded-full bg-guld/15 px-2 py-0.5 text-guld">Ny här 💙</span>
           <span v-if="highlight" class="kicker rounded-full bg-guld/15 px-2 py-0.5 text-guld">🌙 Perfekt läge just nu</span>
           <span v-if="podcast.status.stale" class="kicker rounded-full bg-guld/15 px-2 py-0.5 text-guld">Senast hämtade avsnitt</span>
         </div>
         <h4 class="mt-2 font-display text-3xl font-semibold leading-tight">
-          <a :href="podcast.show?.url" target="_blank" rel="noopener" class="hover:underline decoration-himmel/60 underline-offset-4">{{ podcast.show?.title }}</a>
+          <a :href="podcast.show?.url ?? podcast.status.homepage" target="_blank" rel="noopener" class="hover:underline decoration-himmel/60 underline-offset-4">{{ title }}</a>
         </h4>
-        <p v-if="podcast.show?.author" class="mt-1 text-sm text-krita-dim">{{ podcast.show.author }}</p>
+        <p class="mt-1 text-sm text-krita-dim">
+          <template v-if="podcast.hosts || podcast.show?.author">{{ podcast.hosts ?? podcast.show?.author }} · </template>{{ podcast.tagline }}
+        </p>
+
+        <!-- Feed unreachable: be honest, and still get people listening -->
+        <div v-if="!podcast.episodes.length" class="mt-6 rounded-2xl border border-white/10 bg-navy-950/60 p-5">
+          <p class="font-display text-xl font-semibold">Vi når inte poddens flöde just nu.</p>
+          <p class="mt-1 text-sm text-krita-dim">Lyssna direkt hos podden så länge – vi visar avsnitten här igen när flödet svarar.</p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <a v-for="l in podcast.links" :key="l.url" :href="l.url" target="_blank" rel="noopener" class="chip border-white/12 hover:border-himmel hover:text-himmel">{{ l.label }} ↗</a>
+          </div>
+        </div>
 
         <!-- Latest episode, featured -->
         <div v-if="latest" class="mt-6 rounded-2xl border border-white/10 bg-navy-950/60 p-4 sm:p-5">
@@ -96,7 +115,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <p v-if="failed" class="mt-3 text-sm text-rod" role="status">{{ failed }}</p>
+        <p v-if="failed && isThisShowPlaying" class="mt-3 text-sm text-rod" role="status">{{ failed }}</p>
 
         <!-- Earlier episodes -->
         <ul v-if="more.length" class="mt-4 divide-y divide-white/8">
@@ -122,12 +141,18 @@ onBeforeUnmount(() => {
           {{ showAll ? 'Visa färre avsnitt' : `Visa ${podcast.episodes.length - 4} äldre avsnitt` }}
         </button>
 
-        <p class="mt-5 text-xs leading-relaxed text-krita-dim">
-          Avsnitt och ljud från podcastens eget RSS-flöde hos
-          <a :href="podcast.show?.url" target="_blank" rel="noopener" class="underline underline-offset-2 hover:text-krita">pod.space</a><template v-if="podcast.show?.copyright"> · © {{ podcast.show.copyright }}</template>.
-          Ljudet spelas direkt från podcastens server.
-          <a v-if="latest" :href="latest.url" target="_blank" rel="noopener" class="underline underline-offset-2 hover:text-krita">Öppna senaste avsnittet hos podden ↗</a>
-        </p>
+        <template v-if="podcast.episodes.length">
+          <div class="mt-5 flex flex-wrap items-center gap-2">
+            <span class="kicker text-krita-dim">Lyssna även på</span>
+            <a v-for="l in podcast.links" :key="l.url" :href="l.url" target="_blank" rel="noopener" class="chip border-white/12 hover:border-himmel hover:text-himmel">{{ l.label }} ↗</a>
+          </div>
+          <p class="mt-4 text-xs leading-relaxed text-krita-dim">
+            Avsnitt och ljud från poddens eget RSS-flöde hos
+            <a :href="podcast.show?.url" target="_blank" rel="noopener" class="underline underline-offset-2 hover:text-krita">{{ host }}</a><template v-if="podcast.show?.copyright"> · © {{ podcast.show.copyright }}</template>.
+            Ljudet spelas direkt från poddens server.
+            <a v-if="latest" :href="latest.url" target="_blank" rel="noopener" class="underline underline-offset-2 hover:text-krita">Öppna senaste avsnittet hos podden ↗</a>
+          </p>
+        </template>
       </div>
     </div>
   </article>
