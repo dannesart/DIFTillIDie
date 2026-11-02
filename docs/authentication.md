@@ -1,33 +1,44 @@
-# Supporter accounts: Google sign-in
+# Supporter accounts: sign in with an e-mail code
 
-Supporters can sign in with Google and choose a **display name** and a **unique handle**. Everything else stays public: news, Stories, fixtures and podcasts never require an account. The fictional Snacket på stan posts are untouched.
+Supporters sign in with a **six-digit code sent by e-mail** and choose a **display name** and a **unique handle**. Everything else stays public: news, Stories, fixtures and podcasts never require an account. The fictional Snacket på stan posts are untouched.
+
+We first tried Google OAuth. Google's consent screen showed the random Supabase project domain, and fixing that needs a paid custom domain. The installed iPhone app also can't reliably finish a redirect-based sign-in. Email codes avoid both problems: the supporter never leaves the page.
 
 ## How it works
 
 | Part | Where |
 |---|---|
-| Sign-in flow (PKCE), session, profile state | [`app/lib/auth.ts`](../app/lib/auth.ts) |
+| Code flow, session, profile state | [`app/lib/auth.ts`](../app/lib/auth.ts) |
 | Supabase client, browser only | [`app/plugins/auth.client.ts`](../app/plugins/auth.client.ts) |
-| OAuth callback | [`app/pages/auth/callback.vue`](../app/pages/auth/callback.vue) |
-| UI | `AccountDialog`, `ProfileForm`, `AccountButton` (desktop header), "Du" tab in `MobileNav` |
+| UI | `AccountDialog`, `SignInWithCode`, `ProfileForm`, `AccountButton` (desktop header), "Du" tab in `MobileNav` |
 | Profile rules (shared with the database) | [`shared/utils/profile.ts`](../shared/utils/profile.ts) |
 | Database | [`supabase/migrations/20261102180000_profiles.sql`](../supabase/migrations/20261102180000_profiles.sql) |
+| E-mail template | [`supabase/templates/otp-code.html`](../supabase/templates/otp-code.html) |
 
-- **Flow:**
-  1. "Fortsätt med Google" calls `signInWithOAuth({ provider: 'google' })` with `redirectTo = <origin>/auth/callback` and `prompt=select_account`. supabase-js stores a PKCE code verifier in `localStorage`.
-  2. Google, then Supabase, redirects back to `/auth/callback?code=…`.
-  3. The page calls `exchangeCodeForSession(code)`, loads the profile, and returns to where the supporter started.
-  4. If they have no profile yet, the account dialog opens on "Välkommen in!".
-- **Session:** stored by supabase-js in `localStorage` under `djurgarn-auth` and refreshed automatically. It's restored when the site or the installed app is reopened.
-- **Sign-out:** `signOut({ scope: 'local' })` signs out this device. If the network is down, the local session is removed anyway.
+1. **Address:** the supporter types an e-mail address, and `signInWithOtp({ email, options: { shouldCreateUser } })` sends the code.
+   - The address is trimmed and lowercased, and checked before any request.
+   - The pending address and send time are kept in `localStorage` for up to an hour. So if the installed iPhone app is reloaded while the supporter checks Mail, it still shows the code step.
+2. **Code:** the supporter types the code (iOS can offer it straight from Mail, via `autocomplete="one-time-code"`), and `verifyOtp({ email, token, type: 'email' })` signs them in. The form submits by itself at six digits, and pasted `123 456` or `123-456` works.
+3. **Profile:** new supporters land on "Välkommen in!" to choose a name and handle. Returning supporters see their profile.
+
+- **Resend:** a 60-second client cooldown, matching Supabase's default limit. If Supabase asks for a longer wait ("only request this after N seconds"), we show that instead.
+- **Errors**, each with its own calm message:
+  - invalid address;
+  - code e-mail rate limit;
+  - too many requests;
+  - new accounts refused;
+  - wrong or expired code (the supporter stays on the code step);
+  - too many attempts;
+  - network failure on either step.
+- **Session:** supabase-js stores it in `localStorage` (`djurgarn-auth`) and refreshes it automatically. It's restored when the site or the installed app is reopened.
+- **Sign-out:** `signOut({ scope: 'local' })` signs out this device. Offline, the local session is removed anyway.
+- **No redirects:** nothing arrives via the URL (`detectSessionInUrl: false`), and there's no callback page. That's why this works the same in Safari, Chrome, Android, in-app browsers and the installed home-screen app.
 
 ### Privacy
 
-- **We keep only the user's id.** Google's name, e-mail address and picture are never read into app state, stored in `profiles` or shown. A test checks that they never appear.
-  - Supabase itself keeps Google's identity data in `auth.users`, which is private to the project.
-  - supabase-js's cached session in the supporter's own browser contains it too.
-- **No profile is created automatically.** The supporter chooses what to be called.
-- **Profiles aren't readable by other supporters yet.** Public display gets its own reviewed policy or view when real Snacket posts arrive.
+- **Our state holds:** the user's id, and, while a code is pending, the address the supporter typed, on their own device.
+- **The e-mail address:** it's never shown to anyone else and never stored in `profiles`. Supabase keeps it in `auth.users`, which is private to the project.
+- **Profiles:** none are created automatically, and they aren't readable by other supporters yet. Public display gets its own reviewed policy or view when real Snacket posts arrive.
 
 ### Caching and personal data: the `'/': { isr: 300 }` review
 
@@ -36,8 +47,27 @@ Supporters can sign in with Google and choose a **display name** and a **unique 
   - No cookies are read, and nothing personal is rendered on the server.
   - On the server, `useAuth()` returns a neutral "loading" placeholder, the same as the browser's first render.
 - **Verified in the Netlify build:** a request carrying a session-like cookie produces HTML with no session or user data. It contains only the *public* Supabase URL and publishable key.
-- **`/auth/**`** is `ssr: false` and `cache-control: no-store`: client-rendered and never cached.
 - **If we ever move sessions into cookies or server rendering,** `/` must stop being ISR-cached, or personalised parts must be fetched client-side.
+
+## Registration modes (future): signing in is not permission
+
+We'll eventually want **open**, **approval-required** and **closed** registration, and existing approved supporters must always be able to sign in. The design keeps three things separate:
+
+| Question | Answered by |
+|---|---|
+| *Who are you?* | Signing in (email code). Proves identity only, grants nothing. |
+| *May a new account be created?* | `shouldCreateUser` (the `allowNewAccounts` option in `createAuth`) and Supabase's "Allow new users to sign up" setting |
+| *May you post / take part?* | A future database-enforced membership or approval state, checked by RLS on the posts themselves |
+
+- **Open (today):** `allowNewAccounts: true`. Anyone can create an account and a profile.
+- **Closed:** `allowNewAccounts: false`, plus "Allow new users to sign up" off in Supabase.
+  - Existing supporters still get codes and sign in.
+  - New addresses get "Nya konton kan inte skapas just nu", a message we already handle.
+- **Approval-required:** accounts and profiles can be created, but posting and other privileges need an approved state set by moderators, for example a `memberships` table or a `status` column that only moderators can change.
+  - RLS on posts checks that state, never just `auth.uid()`.
+  - Nothing in today's code treats "signed in" as "allowed to post".
+
+None of this is implemented yet. There are no posts, no approval and no roles.
 
 ## Database: `profiles`
 
@@ -52,13 +82,7 @@ Supporters can sign in with Google and choose a **display name** and a **unique 
   - No `DELETE`.
 - **RLS:** select, insert and update only where `auth.uid() = id`.
 
-### Applying (not done by us; reviewed separately)
-
-```bash
-# with the Supabase CLI, linked to the project
-supabase db push
-# or paste the migration file into the SQL editor
-```
+The migration is **not applied** to the hosted project. Apply it after review with `supabase db push`, or by pasting it into the SQL editor.
 
 ### Tests
 
@@ -68,33 +92,36 @@ supabase db push
   - It also executes the pgTAP suite below through a small pgTAP stand-in, so that file is known to pass.
 - **[`supabase/tests/profiles_rls.test.sql`](../supabase/tests/profiles_rls.test.sql)** is the same checks for the **real** database (pgTAP, 22 assertions).
   - Run it with `supabase test db` (or `--db-url`), as `postgres`.
-  - It inserts two users into `auth.users` **inside a transaction that is rolled back**, so nothing persists. Don't run it against production.
-- **[`tests/auth.test.ts`](../tests/auth.test.ts)** covers the sign-in states and failure paths against a fake Supabase client: restore, sign-in start, cancelled consent, missing verifier, expired code, network failures, sign-out (also offline), profile create, update and conflict, and privacy.
+  - It inserts two users into `auth.users` **inside a transaction that is rolled back**. Don't run it against production.
+- **[`tests/auth.test.ts`](../tests/auth.test.ts)** covers the sign-in states and failure paths against a fake Supabase client:
+  - sending a code, validation, cooldown, the server's retry hint, closed registration and network failures;
+  - verifying, wrong or expired codes, too many attempts, and a pending code surviving an app reload or expiring;
+  - session restore, sign-out (also offline), profile create, update and conflict, and privacy.
 
 ## Required configuration
 
-### Google Cloud Console
-
-1. **APIs & Services → OAuth consent screen:**
-   - User type *External*, app name *Djurgår'n tills jag dör*, a support e-mail and a developer contact.
-   - Scopes: the defaults (`openid`, `email`, `profile`) are enough.
-   - While the app is in **Testing**, only the listed **test users** can sign in. Publish to **Production** before inviting supporters. Basic scopes don't need Google's verification review.
-2. **Credentials → Create OAuth client ID → Web application:**
-   - **Authorized redirect URI:** `https://sofolspxorbicgixjwbp.supabase.co/auth/v1/callback`
-   - **Authorized JavaScript origins:** `http://localhost:3000` and the production origin (e.g. `https://<site>.netlify.app`).
-3. Copy the **Client ID** and **Client secret** into Supabase (next section). The secret belongs **only** in Supabase. This app never needs it.
-
 ### Supabase dashboard (djurgarn-dev)
 
-1. **Authentication → Sign In / Providers → Google:** enable it and paste the Client ID and secret.
-2. **Authentication → URL Configuration:**
-   - **Site URL:** the production origin.
-   - **Redirect URLs** (allow-list):
-     - `http://localhost:3000/auth/callback`
-     - `https://<site>.netlify.app/auth/callback`
-     - deploy previews (optional): `https://*--<site>.netlify.app/auth/callback`
-3. **Recommended:** **Authentication → Sign In / Providers → Email: disable** e-mail sign-ups while Google is the only way in. Otherwise anyone with the publishable key could create password accounts through the API, even though the UI doesn't offer it.
-4. Apply the migration (see above).
+1. **Authentication → Sign In / Providers → Email:** enabled. Leave **Confirm email** on: the code itself is the confirmation.
+2. **Email OTP length: 6.** The app expects six digits (`CODE_LENGTH`).
+3. **Email OTP expiration:** shorter than the default hour is kinder to security, e.g. **600 s (10 min)**. The app forgets a pending code after an hour regardless.
+4. **Authentication → Emails → Templates:** paste [`supabase/templates/otp-code.html`](../supabase/templates/otp-code.html) into **both "Magic link" and "Confirm signup"**.
+   - New supporters may get the latter.
+   - Subject: *Din inloggningskod till Djurgår’n*.
+   - The template must show **`{{ .Token }}`** and must **not** contain `{{ .ConfirmationURL }}`. The app never handles links.
+5. **Allow new users to sign up:** on, for open registration.
+6. **Google provider:** can be disabled again. It isn't used.
+7. Redirect URLs are **not** needed for code sign-in. The Site URL only appears in templates that use links, and ours doesn't.
+8. Apply the migration after review.
+
+### E-mail delivery (SMTP): required before inviting supporters
+
+- **Supabase's built-in sender is for development only.** It delivers only to members of the Supabase organisation's team, and it's heavily rate-limited.
+- **No custom SMTP is configured, and none is included here.**
+- **Before external supporters can sign in,** configure **Authentication → Emails → SMTP Settings** with a real provider, and raise the e-mail rate limit under **Authentication → Rate Limits** to match.
+- **Options:**
+  - Providers that verify a sending domain (Resend, Brevo, Postmark, …) need a domain we control, which a `*.netlify.app` address isn't.
+  - A dedicated mailbox's SMTP (e.g. a Gmail app password) needs no domain, but has daily sending limits and sends as that mailbox.
 
 ### Netlify environment variables
 
@@ -107,45 +134,23 @@ They're read at runtime by the SSR function and sent to browsers, which is fine 
 
 Locally, copy [`.env.example`](../.env.example) to `.env`. If those variables are missing, the account UI hides itself and the rest of the site works as before.
 
-## The installed iPhone app (home-screen PWA)
+## Manual test plan (real devices, once a sender is configured)
 
-**What we know** (from WebKit behaviour reports, not yet tested here):
-
-- **Separate storage:** an installed home-screen web app has its own storage, separate from Safari's. Signing in within a Safari tab doesn't sign in the installed app, and vice versa. (Since iOS 17.2, cookies are copied once at install, but we don't use cookies.)
-- **Leaving the app:** navigating to `accounts.google.com` leaves the app's scope. iOS shows it in an in-app Safari sheet.
-- **Returning:** whether the redirect back to `/auth/callback` (in scope) lands back **inside the standalone app** (where the PKCE verifier lives) or stays in that **Safari sheet** (which may not have the verifier) has varied between iOS versions, and has to be tested on a real device.
-- **What we built for this:**
-  - Everything happens in the same window, with no popups.
-  - The return path and verifier are kept in `localStorage`.
-  - If the callback runs where the verifier is missing, it fails cleanly with "Inloggningen avslutades i ett annat fönster…" instead of a broken state.
-- **Google blocks sign-in in embedded webviews** (Instagram, Facebook…), so the dialog tells those users to open Safari or Chrome.
-
-**If the real-device test fails,** the sturdy fix is a short-lived server-side handoff:
-- Keep the PKCE verifier and state server-side for a few minutes, keyed by the OAuth state, or hand the session over with a one-time code.
-- That needs a small server endpoint and storage, so it's deliberately out of scope until we know it's needed.
-
-### Manual test plan (real iPhone, after Google and Supabase are configured)
-
-Use the deployed site (HTTPS). Note the iOS version.
-
-1. **Safari tab, baseline:** open the site → Du/Logga in → Fortsätt med Google → pick an account → you're back on the page you started from, signed in. A new account gets "Välkommen in!".
-2. **Profile:** choose a name and handle → Spara profil. Try a taken handle (from a second account) → "Upptaget – välj ett annat." Reload → still signed in, profile shown.
-3. **Install:** Dela → Lägg till på hemskärmen. Open the app from the icon. **Expected:** you're *signed out* in the app (separate storage). That's normal.
-4. **Sign in inside the installed app:** Logga in → Fortsätt med Google. Note exactly what happens:
-   - a. Does Google open in a sheet with a "Klar" button, or does the app switch to Safari?
-   - b. After choosing the account, where do you land: back in the standalone app (no Safari UI), or still in the sheet or Safari?
-   - c. Are you signed in **in the standalone app**? Close the sheet if one is still open, then check the "Du" tab.
-   - d. If you see "Inloggningen avslutades i ett annat fönster…", the callback ran outside the app. Report it; that's the case for the server-side handoff.
-5. **Restore:** fully close the installed app (swipe it away), reopen it → still signed in, profile shown.
-6. **Sign out** in the installed app → reopen it → signed out. Check that the Safari tab's session is unaffected (separate storage).
-7. **Public use while signed out and in:** stories, match card, podcast playback (start an episode, browse, the mini-player keeps playing).
-8. **Cancel:** start sign-in and press Cancel or Back at Google → "Inloggningen avbröts…" with a way back.
-9. **In-app browser:** open the link from Instagram or Messenger → the dialog warns that Google blocks sign-in there.
-10. **Android Chrome** (installed and in a tab): repeat 1, 4 and 5. Android usually returns into the installed app via a Custom Tab, but check.
+1. **Safari tab:** Du/Logga in → address → Skicka kod → the e-mail arrives with the code, styled, with no link → type the code (or tap the iOS suggestion) → "Välkommen in!" → choose name and handle → saved.
+2. **Wrong code** → "Koden stämmer inte…", the field clears and you can try again.
+3. **Expired code:** wait past the configured expiry, then enter it → same message, and "Skicka ny kod" works.
+4. **Resend** shows a countdown and works when it reaches zero. Rapid requests show "Vänta lite…".
+5. **Installed iPhone app:** sign in. While the code is on its way, switch to Mail and back, and if possible let iOS reload the app → the code step is still there → enter the code → signed in **inside the app**.
+6. **Restore:** fully close the installed app and reopen it → still signed in, profile shown.
+7. **Sign out** → reopen → signed out. The Safari tab is unaffected (separate storage).
+8. **Change address** on the code step → back to step 1.
+9. **Public use, signed out and in:** stories, match card, podcast playback with the mini-player.
+10. **Android Chrome,** tab and installed: repeat 1, 5 and 6.
 
 ## Not verified (yet)
 
-- **Real Google sign-in end to end.** It needs the Google provider and redirect URLs configured. All Supabase calls in the browser tests were intercepted (no requests to djurgarn-dev, no users created).
-- **The migration and pgTAP suite on the hosted database.** They were run locally in PGlite with a Supabase-like harness, not on Supabase itself.
-- **The installed iPhone app's OAuth return** and session restore. Use the manual plan above.
-- **Android installed-app behaviour.**
+- **Real e-mail delivery and real `signInWithOtp` / `verifyOtp` against Supabase.** All Supabase calls in the browser tests were intercepted, and the hosted project hasn't been touched.
+  - The exact error texts the live Auth server returns for rate limits and closed sign-ups are matched by code and by message. Recheck them once live.
+- **Whether new users get the "Magic link" or the "Confirm signup" template.** Configure both.
+- **The migration and pgTAP suite on the hosted database.** They were run locally in PGlite with a Supabase-like harness.
+- **The installed iPhone app on a real device:** Mail switching, reloads and restore. Use the plan above.

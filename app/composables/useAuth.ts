@@ -12,7 +12,7 @@ export function useAuth(): AuthStore {
   const real = nuxt.$auth as AuthStore | undefined
   if (real) return real
   const { supabaseUrl, supabaseKey } = useRuntimeConfig().public
-  return createAuth(null, { origin: '', initialStatus: supabaseUrl && supabaseKey ? 'loading' : 'unavailable' })
+  return createAuth(null, { initialStatus: supabaseUrl && supabaseKey ? 'loading' : 'unavailable' })
 }
 
 /** Is the account dialog open? (Opened from the header, the bottom nav, or after signing in.) */

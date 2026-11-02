@@ -1,24 +1,16 @@
 <script setup lang="ts">
 /*
- * The supporter account, in one dialog: sign in with Google, choose how you're
+ * The supporter account, in one dialog: sign in with a code by e-mail, choose how you're
  * known on the stands, sign out. Native <dialog> like the others — a centred
  * card on desktop, a bottom sheet on phones.
  */
 const auth = useAuth()
-const { status, profile, profileStatus, error } = auth
+const { status, profile, profileStatus } = auth
 const open = useAccountDialog()
-const { platform } = useInstall()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const editing = ref(false)
-const starting = ref(false)
 let opener: HTMLElement | null = null
-
-// Google refuses sign-in inside some apps' built-in browsers.
-const inAppBrowser = computed(() => {
-  if (!import.meta.client) return false
-  return platform.value === 'ios-inapp' || /FBAN|FBAV|Instagram|Line\/|Snapchat|LinkedInApp|; wv\)/i.test(navigator.userAgent)
-})
 
 watch(open, (isOpen) => {
   const el = dialog.value
@@ -34,7 +26,7 @@ watch(open, (isOpen) => {
   }
 })
 
-// Coming back from Google as a new supporter: open straight onto the profile step.
+// Opened before this component mounted (e.g. from another page): show it right away.
 onMounted(() => {
   if (open.value && dialog.value && !dialog.value.open) {
     dialog.value.showModal()
@@ -53,13 +45,6 @@ function onClick(e: MouseEvent) {
   if (!el || e.target !== el) return
   const r = el.getBoundingClientRect()
   if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) open.value = false
-}
-
-async function google() {
-  starting.value = true
-  // Come back to where you were.
-  const ok = await auth.signInWithGoogle(location.pathname + location.search + location.hash)
-  if (!ok) starting.value = false
 }
 
 async function signOut() {
@@ -82,7 +67,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
         </button>
       </div>
 
-      <!-- Signed out: sign in with Google -->
+      <!-- Signed out: sign in with a six-digit code by e-mail -->
       <template v-if="status === 'signed-out' || status === 'loading'">
         <h2 id="account-title" class="mt-1 font-display text-3xl font-bold leading-tight">Kliv in på läktaren</h2>
         <p class="mt-2 text-sm leading-relaxed text-krita-dim">
@@ -90,28 +75,12 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
           Nyheter, matcher och poddar är öppna för alla, inloggad eller inte.
         </p>
 
-        <p v-if="inAppBrowser" class="mt-4 rounded-2xl bg-guld/10 px-4 py-3 text-sm leading-relaxed text-guld" role="note">
-          Google tillåter inte inloggning i Instagrams, Facebooks och liknande appars inbyggda webbläsare. Öppna sidan i Safari eller Chrome först.
-        </p>
-
-        <button
-          class="mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-white px-5 py-3.5 text-[0.95rem] font-semibold text-[#1f1f1f] shadow-[0_10px_30px_-12px_rgb(255_255_255/0.4)] transition enabled:hover:-translate-y-0.5 disabled:opacity-60"
-          :disabled="starting || status === 'loading'"
-          @click="google"
-        >
-          <svg viewBox="0 0 48 48" class="size-5" aria-hidden="true">
-            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-          </svg>
-          {{ starting ? 'Skickar dig till Google…' : 'Fortsätt med Google' }}
-        </button>
-        <p v-if="error" class="mt-3 rounded-2xl bg-rod/10 px-4 py-3 text-sm text-rod" role="alert">{{ error }}</p>
+        <SignInWithCode v-if="status === 'signed-out'" />
+        <p v-else class="mt-5 text-sm text-krita-dim" aria-live="polite">Ett ögonblick…</p>
 
         <p class="mt-5 flex gap-2.5 text-xs leading-relaxed text-krita-dim">
           <span aria-hidden="true">🔒</span>
-          <span>Google används bara för att veta att det är du. Ditt Google-namn, din e-post och din bild visas aldrig här – du väljer själv vad du heter på läktaren.</span>
+          <span>Din e-postadress används bara för att logga in. Den visas aldrig för andra – du väljer själv vad du heter på läktaren.</span>
         </p>
       </template>
 

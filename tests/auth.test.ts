@@ -1,14 +1,17 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { AUTH_STORAGE_KEY, RETURN_KEY, authErrorMessage, createAuth, parseCallback, profileErrorMessage, safeReturnTo } from '../app/lib/auth'
+import {
+  AUTH_STORAGE_KEY, PENDING_KEY, RESEND_COOLDOWN_S, createAuth, normalizeCode, normalizeEmail, profileErrorMessage,
+  retryAfterSeconds, sendErrorMessage, validateEmail, verifyErrorMessage,
+} from '../app/lib/auth'
 import { normalizeHandle, validateDisplayName, validateHandle } from '../shared/utils/profile'
 
 /* A fake Supabase client: just the calls the auth store makes, all recorded. */
 function fakeClient(opts: {
   session?: unknown
   getSessionError?: unknown
-  oauthError?: unknown
-  exchange?: { session?: unknown, error?: unknown }
+  otpError?: unknown | (() => unknown)
+  verify?: { session?: unknown, error?: unknown }
   signOutError?: unknown
   signOutThrows?: unknown
   profile?: unknown
@@ -18,19 +21,16 @@ function fakeClient(opts: {
   const calls: { method: string, args: unknown[] }[] = []
   let listener: ((event: string, session: unknown) => void) | undefined
   const rec = (method: string, ...args: unknown[]) => calls.push({ method, args })
-  const query = (result: () => unknown) => {
-    const q: Record<string, unknown> = {}
-    for (const m of ['select', 'eq', 'insert', 'update']) q[m] = (...a: unknown[]) => (rec(`db.${m}`, ...a), q)
-    q.maybeSingle = async () => (rec('db.maybeSingle'), result())
-    q.single = async () => (rec('db.single'), result())
-    return q
-  }
   const client = {
     auth: {
       onAuthStateChange: (cb: typeof listener) => { listener = cb; return { data: { subscription: { unsubscribe() {} } } } },
       getSession: async () => (rec('getSession'), { data: { session: opts.session ?? null }, error: opts.getSessionError ?? null }),
-      signInWithOAuth: async (a: unknown) => (rec('signInWithOAuth', a), { data: {}, error: opts.oauthError ?? null }),
-      exchangeCodeForSession: async (code: string) => (rec('exchangeCodeForSession', code), { data: { session: opts.exchange?.session ?? null }, error: opts.exchange?.error ?? null }),
+      signInWithOtp: async (a: unknown) => {
+        rec('signInWithOtp', a)
+        const error = typeof opts.otpError === 'function' ? (opts.otpError as () => unknown)() : opts.otpError
+        return { data: {}, error: error ?? null }
+      },
+      verifyOtp: async (a: unknown) => (rec('verifyOtp', a), { data: { session: opts.verify?.session ?? null }, error: opts.verify?.error ?? null }),
       signOut: async (a: unknown) => {
         rec('signOut', a)
         if (opts.signOutThrows) throw opts.signOutThrows
@@ -40,11 +40,13 @@ function fakeClient(opts: {
     from: (table: string) => {
       rec('from', table)
       let isWrite = false
-      const q = query(() => isWrite ? { data: opts.save?.data ?? null, error: opts.save?.error ?? null } : { data: opts.profile ?? null, error: opts.profileError ?? null })
-      const insert = q.insert as (...a: unknown[]) => unknown
-      const update = q.update as (...a: unknown[]) => unknown
-      q.insert = (...a: unknown[]) => { isWrite = true; return insert(...a) }
-      q.update = (...a: unknown[]) => { isWrite = true; return update(...a) }
+      const result = () => isWrite ? { data: opts.save?.data ?? null, error: opts.save?.error ?? null } : { data: opts.profile ?? null, error: opts.profileError ?? null }
+      const q: Record<string, unknown> = {}
+      for (const m of ['select', 'eq']) q[m] = (...a: unknown[]) => (rec(`db.${m}`, ...a), q)
+      q.insert = (...a: unknown[]) => (isWrite = true, rec('db.insert', ...a), q)
+      q.update = (...a: unknown[]) => (isWrite = true, rec('db.update', ...a), q)
+      q.maybeSingle = async () => (rec('db.maybeSingle'), result())
+      q.single = async () => (rec('db.single'), result())
       return q
     },
   }
@@ -58,19 +60,24 @@ function memoryStorage() {
 
 const session = (id = 'user-lotta') => ({
   access_token: 't',
-  user: { id, email: 'lotta.private@gmail.example', user_metadata: { full_name: 'Lotta Privat Googlesson', avatar_url: 'https://lh3.googleusercontent.example/x.jpg' } },
+  user: { id, email: 'lotta.private@example.test', user_metadata: { full_name: 'Lotta Privat Efternamn' } },
 })
 const row = { id: 'user-lotta', display_name: 'Lotta från Gärdet', handle: 'kaminen81' }
 const tick = () => new Promise(r => setTimeout(r, 5))
 
+/** A clock we can move. */
+function clock(start = 1_800_000_000_000) {
+  let t = start
+  return { now: () => t, advance: (ms: number) => (t += ms) }
+}
+
 describe('state', () => {
   it('is unavailable without a client (missing configuration)', () => {
-    expect(createAuth(null, { origin: 'https://x.test' }).status.value).toBe('unavailable')
+    expect(createAuth(null).status.value).toBe('unavailable')
   })
 
   it('starts "loading", then signed-out without a stored session', async () => {
-    const { client } = fakeClient()
-    const auth = createAuth(client, { origin: 'https://x.test', storage: memoryStorage() })
+    const auth = createAuth(fakeClient().client, { storage: memoryStorage() })
     expect(auth.status.value).toBe('loading')
     await auth.init()
     expect(auth.status.value).toBe('signed-out')
@@ -78,129 +85,203 @@ describe('state', () => {
 
   it('restores a stored session on start-up (e.g. reopening the installed app) and loads the profile', async () => {
     const { client, calls } = fakeClient({ session: session(), profile: row })
-    const auth = createAuth(client, { origin: 'https://x.test', storage: memoryStorage() })
+    const auth = createAuth(client, { storage: memoryStorage() })
     await auth.init()
     expect(auth.status.value).toBe('signed-in')
-    expect(calls.some(c => c.method === 'signInWithOAuth')).toBe(false)
+    expect(calls.some(c => c.method === 'signInWithOtp' || c.method === 'verifyOtp')).toBe(false)
     await tick(); await auth.whenProfileLoaded()
     expect(auth.profileStatus.value).toBe('ready')
     expect(auth.profile.value).toEqual({ id: 'user-lotta', displayName: 'Lotta från Gärdet', handle: 'kaminen81' })
   })
 
   it('reports a missing profile for a new supporter', async () => {
-    const { client } = fakeClient({ session: session(), profile: null })
-    const auth = createAuth(client, { origin: 'https://x.test', storage: memoryStorage() })
+    const auth = createAuth(fakeClient({ session: session(), profile: null }).client, { storage: memoryStorage() })
     await auth.init(); await tick(); await auth.whenProfileLoaded()
     expect(auth.profileStatus.value).toBe('missing')
   })
 
   it('reports a profile load failure without signing out', async () => {
-    const { client } = fakeClient({ session: session(), profileError: new TypeError('Failed to fetch') })
-    const auth = createAuth(client, { origin: 'https://x.test', storage: memoryStorage() })
+    const auth = createAuth(fakeClient({ session: session(), profileError: new TypeError('Failed to fetch') }).client, { storage: memoryStorage() })
     await auth.init(); await tick(); await auth.whenProfileLoaded()
     expect(auth.status.value).toBe('signed-in')
     expect(auth.profileStatus.value).toBe('error')
   })
 
   it('treats a failed restore (e.g. offline, expired token) as signed out', async () => {
-    const { client } = fakeClient({ getSessionError: new TypeError('Failed to fetch') })
-    const auth = createAuth(client, { origin: 'https://x.test', storage: memoryStorage() })
+    const auth = createAuth(fakeClient({ getSessionError: new TypeError('Failed to fetch') }).client, { storage: memoryStorage() })
     await auth.init()
     expect(auth.status.value).toBe('signed-out')
   })
 
   it('follows auth events, clearing the profile on sign-out elsewhere', async () => {
     const { client, emit } = fakeClient({ session: session(), profile: row })
-    const auth = createAuth(client, { origin: 'https://x.test', storage: memoryStorage() })
+    const auth = createAuth(client, { storage: memoryStorage() })
     await auth.init(); await tick(); await auth.whenProfileLoaded()
     emit('SIGNED_OUT', null)
     expect(auth.status.value).toBe('signed-out')
     expect(auth.profile.value).toBeNull()
   })
 
-  it('never exposes Google’s name, e-mail or picture', async () => {
-    const { client } = fakeClient({ session: session(), profile: null })
-    const auth = createAuth(client, { origin: 'https://x.test', storage: memoryStorage() })
+  it('never exposes the account’s e-mail or identity metadata', async () => {
+    const auth = createAuth(fakeClient({ session: session(), profile: null }).client, { storage: memoryStorage() })
     await auth.init(); await tick(); await auth.whenProfileLoaded()
-    const exposed = JSON.stringify({ s: auth.status.value, u: auth.userId.value, p: auth.profile.value, ps: auth.profileStatus.value })
-    expect(exposed).not.toMatch(/Googlesson|private@gmail|googleusercontent/)
+    const exposed = JSON.stringify({ s: auth.status.value, u: auth.userId.value, p: auth.profile.value, ps: auth.profileStatus.value, e: auth.pendingEmail.value })
+    expect(exposed).not.toMatch(/private@example|Efternamn/)
   })
 })
 
-describe('signing in with Google', () => {
-  it('starts the PKCE OAuth flow with our callback and remembers where to return', async () => {
+describe('step 1: requesting a code', () => {
+  it('sends a code to the normalised address and remembers it was sent', async () => {
+    const c = clock()
+    const storage = memoryStorage()
     const { client, calls } = fakeClient()
-    const storage = memoryStorage()
-    const auth = createAuth(client, { origin: 'https://djurgarn.example', storage })
-    await auth.signInWithGoogle('/#snacket')
-    const call = calls.find(c => c.method === 'signInWithOAuth')!
-    expect(call.args[0]).toEqual({ provider: 'google', options: { redirectTo: 'https://djurgarn.example/auth/callback', queryParams: { prompt: 'select_account' } } })
-    expect(storage.map.get(RETURN_KEY)).toBe('/#snacket')
+    const auth = createAuth(client, { storage, now: c.now })
+    await auth.init()
+    expect(await auth.requestCode('  Lotta@Example.SE ')).toEqual({ ok: true })
+    expect(calls.find(x => x.method === 'signInWithOtp')!.args).toEqual([{ email: 'lotta@example.se', options: { shouldCreateUser: true } }])
+    expect(auth.pendingEmail.value).toBe('lotta@example.se')
+    expect(JSON.parse(storage.map.get(PENDING_KEY)!)).toEqual({ email: 'lotta@example.se', sentAt: c.now() })
   })
 
-  it('never stores an off-site return address', async () => {
-    const storage = memoryStorage()
-    const auth = createAuth(fakeClient().client, { origin: 'https://x.test', storage })
-    for (const bad of ['//evil.example', 'https://evil.example', '/\\evil.example', 'javascript:alert(1)', '/auth/callback?code=x']) {
-      await auth.signInWithGoogle(bad)
-      expect(storage.map.get(RETURN_KEY), bad).toBe('/')
-    }
+  it('rejects an invalid address before any request', async () => {
+    const { client, calls } = fakeClient()
+    const auth = createAuth(client, { storage: memoryStorage() })
+    await auth.init()
+    expect(await auth.requestCode('lotta@')).toEqual({ ok: false, message: 'Det ser inte ut som en e-postadress.', field: 'email' })
+    expect(await auth.requestCode('   ')).toMatchObject({ ok: false, field: 'email' })
+    expect(calls.some(x => x.method === 'signInWithOtp')).toBe(false)
   })
 
-  it('shows a message if the flow cannot start', async () => {
-    const auth = createAuth(fakeClient({ oauthError: { message: 'Unsupported provider: provider is not enabled' } }).client, { origin: 'https://x.test', storage: memoryStorage() })
-    expect(await auth.signInWithGoogle()).toBe(false)
-    expect(auth.error.value).toMatch(/inte påslagen/)
+  it('enforces a resend cooldown for the same address, and lifts it after 60 s', async () => {
+    const c = clock()
+    const { client, calls } = fakeClient()
+    const auth = createAuth(client, { storage: memoryStorage(), now: c.now })
+    await auth.init()
+    await auth.requestCode('lotta@example.se')
+    expect(auth.resendIn()).toBe(RESEND_COOLDOWN_S)
+    expect(await auth.requestCode('lotta@example.se')).toEqual({ ok: false, message: 'Vänta lite innan du ber om en ny kod.' })
+    c.advance(59_000)
+    expect(auth.resendIn()).toBe(1)
+    c.advance(1_000)
+    expect(auth.resendIn()).toBe(0)
+    expect(await auth.requestCode('lotta@example.se')).toEqual({ ok: true })
+    expect(calls.filter(x => x.method === 'signInWithOtp')).toHaveLength(2)
+  })
+
+  it('adopts the wait time Supabase asks for when rate-limited', async () => {
+    const c = clock()
+    const auth = createAuth(fakeClient({ otpError: { status: 429, code: 'over_email_send_rate_limit', message: 'For security purposes, you can only request this after 42 seconds.' } }).client, { storage: memoryStorage(), now: c.now })
+    await auth.init()
+    expect(await auth.requestCode('lotta@example.se')).toMatchObject({ ok: false, message: 'Vänta lite innan du ber om en ny kod.' })
+    expect(auth.resendIn()).toBe(42)
+  })
+
+  it('explains when new accounts can’t be created (closed registration)', async () => {
+    const auth = createAuth(fakeClient({ otpError: { status: 422, code: 'otp_disabled', message: 'Signups not allowed for otp' } }).client, { storage: memoryStorage() })
+    await auth.init()
+    expect(await auth.requestCode('ny@example.se')).toMatchObject({ ok: false, message: expect.stringMatching(/Nya konton kan inte skapas/) })
+  })
+
+  it('can keep existing supporters signing in while refusing new accounts', async () => {
+    const { client, calls } = fakeClient()
+    const auth = createAuth(client, { storage: memoryStorage(), allowNewAccounts: false })
+    await auth.init()
+    await auth.requestCode('lotta@example.se')
+    expect(calls.find(x => x.method === 'signInWithOtp')!.args).toEqual([{ email: 'lotta@example.se', options: { shouldCreateUser: false } }])
+  })
+
+  it('handles network failure', async () => {
+    const auth = createAuth(fakeClient({ otpError: new TypeError('Failed to fetch') }).client, { storage: memoryStorage() })
+    await auth.init()
+    expect(await auth.requestCode('lotta@example.se')).toMatchObject({ ok: false, message: expect.stringMatching(/Ingen kontakt/) })
+    expect(auth.pendingEmail.value).toBeNull()
   })
 })
 
-describe('the OAuth callback', () => {
-  it('exchanges the code, loads the profile and returns to the saved place', async () => {
-    const storage = memoryStorage()
-    storage.setItem(RETURN_KEY, '/#stories')
-    const { client, calls } = fakeClient({ exchange: { session: session() }, profile: null })
-    const auth = createAuth(client, { origin: 'https://x.test', storage })
-    const r = await auth.handleCallback('https://x.test/auth/callback?code=abc123')
-    expect(calls.find(c => c.method === 'exchangeCodeForSession')!.args).toEqual(['abc123'])
-    expect(r).toEqual({ ok: true, returnTo: '/#stories', needsProfile: true })
+describe('step 2: verifying the code', () => {
+  async function codeSent(o: Parameters<typeof fakeClient>[0] = {}) {
+    const f = fakeClient(o)
+    const auth = createAuth(f.client, { storage: memoryStorage() })
+    await auth.init()
+    await auth.requestCode('lotta@example.se')
+    return { auth, calls: f.calls }
+  }
+
+  it('verifies the code for the pending address and signs in', async () => {
+    const { auth, calls } = await codeSent({ verify: { session: session() }, profile: null })
+    expect(await auth.verifyCode('123 456')).toEqual({ ok: true, needsProfile: true })
+    expect(calls.find(x => x.method === 'verifyOtp')!.args).toEqual([{ email: 'lotta@example.se', token: '123456', type: 'email' }])
     expect(auth.status.value).toBe('signed-in')
-    expect(storage.map.has(RETURN_KEY)).toBe(false)
+    expect(auth.pendingEmail.value).toBeNull()
   })
 
-  it('handles a cancelled Google consent', async () => {
-    const auth = createAuth(fakeClient().client, { origin: 'https://x.test', storage: memoryStorage() })
-    const r = await auth.handleCallback('https://x.test/auth/callback?error=access_denied&error_description=The+user+denied')
-    expect(r).toEqual({ ok: false, message: expect.stringMatching(/avbröts/) })
+  it('knows a returning supporter already has a profile', async () => {
+    const { auth } = await codeSent({ verify: { session: session() }, profile: row })
+    expect(await auth.verifyCode('123456')).toEqual({ ok: true, needsProfile: false })
   })
 
-  it('explains a missing code verifier (callback opened in another window, e.g. iOS home-screen app)', async () => {
-    const auth = createAuth(fakeClient({ exchange: { error: { message: 'invalid request: both auth code and code verifier should be non-empty' } } }).client, { origin: 'https://x.test', storage: memoryStorage() })
-    const r = await auth.handleCallback('https://x.test/auth/callback?code=abc')
-    expect(r.ok).toBe(false)
-    expect((r as { message: string }).message).toMatch(/annat fönster/)
-    expect(auth.status.value).not.toBe('signed-in')
+  it('rejects incomplete codes before any request', async () => {
+    const { auth, calls } = await codeSent()
+    expect(await auth.verifyCode('12345')).toEqual({ ok: false, message: 'Koden har 6 siffror.' })
+    expect(calls.some(x => x.method === 'verifyOtp')).toBe(false)
   })
 
-  it('handles an expired or reused code', async () => {
-    const auth = createAuth(fakeClient({ exchange: { error: { message: 'invalid flow state, no valid flow state found', code: 'flow_state_not_found' } } }).client, { origin: 'https://x.test', storage: memoryStorage() })
-    expect(await auth.handleCallback('https://x.test/auth/callback?code=old')).toEqual({ ok: false, message: expect.stringMatching(/för gammal/) })
+  it('explains a wrong or expired code and stays on the code step', async () => {
+    const { auth } = await codeSent({ verify: { error: { status: 403, code: 'otp_expired', message: 'Token has expired or is invalid' } } })
+    expect(await auth.verifyCode('000000')).toEqual({ ok: false, message: expect.stringMatching(/stämmer inte eller har gått ut/) })
+    expect(auth.status.value).toBe('signed-out')
+    expect(auth.pendingEmail.value).toBe('lotta@example.se')
   })
 
-  it('handles network failure during the exchange', async () => {
-    const auth = createAuth(fakeClient({ exchange: { error: new TypeError('Failed to fetch') } }).client, { origin: 'https://x.test', storage: memoryStorage() })
-    expect(await auth.handleCallback('https://x.test/auth/callback?code=abc')).toEqual({ ok: false, message: expect.stringMatching(/Ingen kontakt/) })
+  it('handles too many attempts and network failure', async () => {
+    expect(verifyErrorMessage({ status: 429, code: 'over_request_rate_limit', message: 'Request rate limit reached' })).toMatch(/För många försök/)
+    const { auth } = await codeSent({ verify: { error: new TypeError('Failed to fetch') } })
+    expect(await auth.verifyCode('123456')).toEqual({ ok: false, message: expect.stringMatching(/Ingen kontakt/) })
   })
 
-  it('handles a callback page opened without a code', async () => {
-    const auth = createAuth(fakeClient().client, { origin: 'https://x.test', storage: memoryStorage() })
-    expect(await auth.handleCallback('https://x.test/auth/callback')).toEqual({ ok: false, message: expect.stringMatching(/ingen inloggning/) })
+  it('needs a code to have been requested first', async () => {
+    const auth = createAuth(fakeClient().client, { storage: memoryStorage() })
+    await auth.init()
+    expect(await auth.verifyCode('123456')).toEqual({ ok: false, message: 'Be om en kod först.' })
+  })
+
+  it('survives the app being reloaded while the supporter checks Mail', async () => {
+    const storage = memoryStorage()
+    const c = clock()
+    const first = createAuth(fakeClient().client, { storage, now: c.now })
+    await first.init()
+    await first.requestCode('lotta@example.se')
+    c.advance(20_000)
+    const { client, calls } = fakeClient({ verify: { session: session() } })
+    const second = createAuth(client, { storage, now: c.now })
+    await second.init()
+    expect(second.pendingEmail.value).toBe('lotta@example.se')
+    expect(second.resendIn()).toBe(40)
+    expect((await second.verifyCode('123456')).ok).toBe(true)
+    expect(calls.find(x => x.method === 'verifyOtp')!.args[0]).toMatchObject({ email: 'lotta@example.se' })
+  })
+
+  it('forgets a pending code after an hour', async () => {
+    const storage = memoryStorage()
+    storage.setItem(PENDING_KEY, JSON.stringify({ email: 'lotta@example.se', sentAt: 1_000 }))
+    const auth = createAuth(fakeClient().client, { storage, now: () => 1_000 + 61 * 60_000 })
+    await auth.init()
+    expect(auth.pendingEmail.value).toBeNull()
+    expect(storage.map.has(PENDING_KEY)).toBe(false)
+  })
+
+  it('can go back to change the address', async () => {
+    const { auth } = await codeSent()
+    auth.cancelCode()
+    expect(auth.pendingEmail.value).toBeNull()
+    expect(auth.resendIn()).toBe(0)
   })
 })
 
 describe('signing out', () => {
   it('signs out this device and forgets the profile', async () => {
     const { client, calls } = fakeClient({ session: session(), profile: row })
-    const auth = createAuth(client, { origin: 'https://x.test', storage: memoryStorage() })
+    const auth = createAuth(client, { storage: memoryStorage() })
     await auth.init(); await tick(); await auth.whenProfileLoaded()
     await auth.signOut()
     expect(calls.find(c => c.method === 'signOut')!.args).toEqual([{ scope: 'local' }])
@@ -211,7 +292,7 @@ describe('signing out', () => {
   it('still ends signed out locally when the network is down', async () => {
     const storage = memoryStorage()
     storage.setItem(AUTH_STORAGE_KEY, '{"access_token":"t"}')
-    const auth = createAuth(fakeClient({ session: session(), signOutThrows: new TypeError('Failed to fetch') }).client, { origin: 'https://x.test', storage })
+    const auth = createAuth(fakeClient({ session: session(), signOutThrows: new TypeError('Failed to fetch') }).client, { storage })
     await auth.init()
     await auth.signOut()
     expect(auth.status.value).toBe('signed-out')
@@ -222,7 +303,7 @@ describe('signing out', () => {
 describe('saving the profile', () => {
   async function signedIn(o: Parameters<typeof fakeClient>[0]) {
     const f = fakeClient({ session: session(), ...o })
-    const auth = createAuth(f.client, { origin: 'https://x.test', storage: memoryStorage() })
+    const auth = createAuth(f.client, { storage: memoryStorage() })
     await auth.init(); await tick(); await auth.whenProfileLoaded()
     return { auth, calls: f.calls }
   }
@@ -262,26 +343,33 @@ describe('saving the profile', () => {
   })
 
   it('refuses to save when signed out', async () => {
-    const auth = createAuth(fakeClient().client, { origin: 'https://x.test', storage: memoryStorage() })
+    const auth = createAuth(fakeClient().client, { storage: memoryStorage() })
     await auth.init()
     expect(await auth.saveProfile({ displayName: 'Lotta', handle: 'lotta' })).toEqual({ ok: false, errors: { form: 'Logga in först.' } })
   })
 })
 
 describe('helpers', () => {
-  it('safeReturnTo keeps same-site paths only', () => {
-    expect(safeReturnTo('/#lyssna')).toBe('/#lyssna')
-    expect(safeReturnTo('/?a=1')).toBe('/?a=1')
-    expect(safeReturnTo(null)).toBe('/')
+  it('e-mail: normalise and validate', () => {
+    expect(normalizeEmail('  Lotta@Example.SE ')).toBe('lotta@example.se')
+    expect(validateEmail('lotta@example.se')).toBeNull()
+    for (const bad of ['', 'lotta', 'lotta@', '@example.se', 'lotta@example', 'lo tta@example.se']) expect(validateEmail(bad), bad).not.toBeNull()
   })
 
-  it('parseCallback reads query and fragment', () => {
-    expect(parseCallback('https://x.test/auth/callback?code=1')).toEqual({ code: '1', error: undefined, description: undefined })
-    expect(parseCallback('https://x.test/auth/callback#error=server_error&error_description=x')).toMatchObject({ error: 'server_error', description: 'x' })
+  it('code: digits only, at most six', () => {
+    expect(normalizeCode('123 456')).toBe('123456')
+    expect(normalizeCode('12-34-56-78')).toBe('123456')
+    expect(normalizeCode('abc')).toBe('')
   })
 
-  it('authErrorMessage falls back to something calm', () => {
-    expect(authErrorMessage({ message: 'something odd' })).toMatch(/gick inte att slutföra/)
+  it('reads Supabase’s retry hint', () => {
+    expect(retryAfterSeconds({ message: 'For security purposes, you can only request this after 7 seconds.' })).toBe(7)
+    expect(retryAfterSeconds({ message: 'nope' })).toBeNull()
+  })
+
+  it('send errors fall back to something calm', () => {
+    expect(sendErrorMessage({ message: 'Email address "x" is invalid', code: 'email_address_invalid' })).toMatch(/fungerar inte/)
+    expect(sendErrorMessage({ message: 'something odd' })).toMatch(/kunde inte skickas/)
   })
 
   it('profile rules: normalize, validate', () => {

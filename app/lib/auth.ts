@@ -4,13 +4,19 @@ import type { SupporterProfile } from '#shared/utils/profile'
 import { normalizeHandle, validateDisplayName, validateHandle } from '#shared/utils/profile'
 
 /*
- * Supporter accounts: Google sign-in through Supabase Auth (PKCE), plus the
- * supporter's own profile. Framework-free so it can be unit-tested with a fake
- * client; the Nuxt plugin creates one instance in the browser.
+ * Supporter accounts: a six-digit code by e-mail (Supabase signInWithOtp /
+ * verifyOtp), plus the supporter's own profile. The supporter never leaves the
+ * page — no redirects — so it behaves the same in Safari, other browsers and
+ * the installed home-screen app. Framework-free so it can be unit-tested with
+ * a fake client; the Nuxt plugin creates one instance in the browser.
  *
- * Privacy: we only ever keep the user's id. Google's name, e-mail address and
- * picture are never read, stored in our state, or shown — the profile is what
- * the supporter chooses to be called here.
+ * Signing in only proves who someone is. It grants nothing else: permission to
+ * join or post will be a separate, database-enforced decision (see
+ * docs/authentication.md, "Registration modes").
+ *
+ * Privacy: our state holds the user's id and, while a code is pending, the
+ * e-mail address they typed (on their own device). The address is never shown
+ * to anyone else or stored in the profile.
  */
 
 export type AuthStatus = 'loading' | 'signed-out' | 'signed-in' | 'unavailable'
@@ -18,54 +24,79 @@ export type ProfileStatus = 'idle' | 'loading' | 'missing' | 'ready' | 'error'
 
 /** Where supabase-js keeps the session (localStorage). */
 export const AUTH_STORAGE_KEY = 'djurgarn-auth'
-/** Where to go after the round trip to Google. */
-export const RETURN_KEY = 'djurgarn:auth-return'
-export const CALLBACK_PATH = '/auth/callback'
+/** A code that's on its way: survives the app being reloaded while the supporter checks Mail. */
+export const PENDING_KEY = 'djurgarn:otp-pending'
+/** Matches Supabase's default email OTP length. */
+export const CODE_LENGTH = 6
+/** Supabase allows one code e-mail per address per 60 s by default. */
+export const RESEND_COOLDOWN_S = 60
+/** Forget a pending code after this long (Supabase's default expiry is 1 h). */
+const PENDING_TTL_MS = 60 * 60 * 1000
 
 type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 export interface AuthOptions {
-  /** e.g. https://djurgarn.netlify.app — the callback must be allow-listed in Supabase. */
-  origin: string
   storage?: KeyValueStorage
   /** What to report before init() (and on the server): must match on both sides. */
   initialStatus?: AuthStatus
+  /**
+   * May signing in create a new account? false = closed registration: existing
+   * supporters still sign in, new e-mail addresses are refused.
+   */
+  allowNewAccounts?: boolean
+  now?: () => number
 }
 
-/** Only same-site paths ("/", "/#snacket"); anything else (//evil.com, https://…) becomes "/". */
-export function safeReturnTo(path: unknown): string {
-  if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || path.startsWith('/\\')) return '/'
-  if (path.startsWith(CALLBACK_PATH)) return '/'
-  return path
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
+export function normalizeEmail(input: string): string {
+  return input.trim().toLowerCase()
 }
 
-export function parseCallback(url: string): { code?: string, error?: string, description?: string } {
-  const u = new URL(url)
-  // Errors can come back in the query (PKCE) or the fragment (implicit / some providers).
-  const hash = new URLSearchParams(u.hash.replace(/^#/, ''))
-  const get = (k: string) => u.searchParams.get(k) ?? hash.get(k) ?? undefined
-  return { code: get('code'), error: get('error') ?? get('error_code'), description: get('error_description') }
+export function validateEmail(email: string): string | null {
+  if (!email) return 'Skriv din e-postadress.'
+  if (email.length > 254 || !EMAIL.test(email)) return 'Det ser inte ut som en e-postadress.'
+  return null
+}
+
+/** Keep only digits; accept a pasted "123 456" or "123-456". */
+export function normalizeCode(input: string): string {
+  return input.replace(/\D/g, '').slice(0, CODE_LENGTH)
 }
 
 const NETWORK = 'Ingen kontakt med servern. Kolla uppkopplingen och försök igen.'
 
 function isNetworkError(e: unknown): boolean {
   const msg = String((e as { message?: string })?.message ?? e)
-  return e instanceof TypeError || /fetch|network|failed to fetch|load failed/i.test(msg)
+  return e instanceof TypeError || /failed to fetch|network|load failed|fetch failed/i.test(msg)
 }
 
-/** Human, Swedish messages for sign-in problems. */
-export function authErrorMessage(e: { message?: string, code?: string, error?: string } | string | undefined): string {
-  const raw = typeof e === 'string' ? e : `${e?.code ?? e?.error ?? ''} ${e?.message ?? ''}`
-  if (/access_denied/i.test(raw)) return 'Inloggningen avbröts. Inget har ändrats – försök igen när du vill.'
-  // Expired or already-used code: the flow state is gone on the server.
-  if (/flow_state_not_found|flow_state_expired|no valid flow state|expired/i.test(raw)) return 'Inloggningslänken hann bli för gammal. Försök igen.'
-  // The code verifier lives in this browser's storage; if the callback opens elsewhere it's missing.
-  if (/code.?verifier|bad_code_verifier/i.test(raw)) {
-    return 'Inloggningen avslutades i ett annat fönster än där den startade – det kan hända i hemskärmsappen på iPhone. Gå tillbaka och försök igen.'
-  }
-  if (/provider.*(disabled|not enabled)|unsupported provider/i.test(raw)) return 'Inloggning med Google är inte påslagen än.'
+interface AuthLikeError { message?: string, code?: string, status?: number }
+
+/** Seconds Supabase asks us to wait ("…only request this after 42 seconds"), if it said. */
+export function retryAfterSeconds(e: AuthLikeError | undefined): number | null {
+  const m = e?.message?.match(/after (\d+) seconds?/i)
+  return m ? Number(m[1]) : null
+}
+
+/** Human, Swedish messages for problems sending a code. */
+export function sendErrorMessage(e: AuthLikeError | undefined): string {
+  const raw = `${e?.code ?? ''} ${e?.message ?? ''}`
   if (isNetworkError(e)) return NETWORK
+  if (/over_email_send_rate_limit|only request this after|email rate limit/i.test(raw)) return 'Vänta lite innan du ber om en ny kod.'
+  if (/over_request_rate_limit|too many requests/i.test(raw) || e?.status === 429) return 'För många försök just nu. Vänta en stund och försök igen.'
+  if (/signups? not allowed|signup_disabled|otp_disabled|user not found/i.test(raw)) return 'Nya konton kan inte skapas just nu. Har du redan ett konto? Kolla att adressen stämmer.'
+  if (/email_address_invalid|invalid.*email|unable to validate email/i.test(raw)) return 'Den e-postadressen fungerar inte. Kolla stavningen.'
+  if (/email_provider_disabled|email logins are disabled/i.test(raw)) return 'Inloggning med e-post är inte påslagen än.'
+  return 'Koden kunde inte skickas. Försök igen om en stund.'
+}
+
+/** Human, Swedish messages for problems with the code itself. */
+export function verifyErrorMessage(e: AuthLikeError | undefined): string {
+  const raw = `${e?.code ?? ''} ${e?.message ?? ''}`
+  if (isNetworkError(e)) return NETWORK
+  if (/otp_expired|expired|invalid/i.test(raw)) return 'Koden stämmer inte eller har gått ut. Kolla siffrorna eller be om en ny kod.'
+  if (/over_request_rate_limit|too many/i.test(raw) || e?.status === 429) return 'För många försök. Vänta en stund innan du försöker igen.'
   return 'Inloggningen gick inte att slutföra. Försök igen.'
 }
 
@@ -88,15 +119,56 @@ export function profileErrorMessage(e: { code?: string, message?: string } | unk
 interface ProfileRow { id: string, display_name: string, handle: string }
 const toProfile = (r: ProfileRow): SupporterProfile => ({ id: r.id, displayName: r.display_name, handle: r.handle })
 
-export function createAuth(client: SupabaseClient | null, options: AuthOptions) {
+interface Pending { email: string, sentAt: number }
+
+export function createAuth(client: SupabaseClient | null, options: AuthOptions = {}) {
   const storage = options.storage ?? globalThis.localStorage
+  const now = options.now ?? Date.now
+  const allowNewAccounts = options.allowNewAccounts ?? true
+
   const status = ref<AuthStatus>(options.initialStatus ?? (client ? 'loading' : 'unavailable'))
   const userId = ref<string | null>(null)
   const profile = ref<SupporterProfile | null>(null)
   const profileStatus = ref<ProfileStatus>('idle')
-  const error = ref<string | null>(null)
+  /** The address a code was sent to, while waiting for it. */
+  const pendingEmail = ref<string | null>(null)
+  /** When the last code was sent (ms), for the resend cooldown. */
+  const sentAt = ref<number | null>(null)
+  /** Extra wait the server asked for, on top of our own cooldown. */
+  const serverWaitUntil = ref<number | null>(null)
   let profileRequest = 0
   let loading: Promise<void> | null = null
+
+  function readPending() {
+    try {
+      const raw = storage.getItem(PENDING_KEY)
+      if (!raw) return
+      const p = JSON.parse(raw) as Pending
+      if (typeof p.email === 'string' && typeof p.sentAt === 'number' && now() - p.sentAt < PENDING_TTL_MS) {
+        pendingEmail.value = p.email
+        sentAt.value = p.sentAt
+      }
+      else storage.removeItem(PENDING_KEY)
+    }
+    catch { /* unreadable: start over */ }
+  }
+
+  function writePending(p: Pending | null) {
+    pendingEmail.value = p?.email ?? null
+    sentAt.value = p?.sentAt ?? null
+    try {
+      if (p) storage.setItem(PENDING_KEY, JSON.stringify(p))
+      else storage.removeItem(PENDING_KEY)
+    }
+    catch { /* storage blocked: the code still works in this session */ }
+  }
+
+  /** Seconds left before another code may be requested (0 = now). */
+  function resendIn(at = now()): number {
+    const ours = sentAt.value ? sentAt.value + RESEND_COOLDOWN_S * 1000 : 0
+    const until = Math.max(ours, serverWaitUntil.value ?? 0)
+    return Math.max(0, Math.ceil((until - at) / 1000))
+  }
 
   function applySession(session: Session | null) {
     const id = session?.user?.id ?? null
@@ -111,6 +183,7 @@ export function createAuth(client: SupabaseClient | null, options: AuthOptions) 
 
   async function init() {
     if (!client) return
+    readPending()
     client.auth.onAuthStateChange((_event, session) => applySession(session))
     try {
       const { data, error: e } = await client.auth.getSession()
@@ -143,59 +216,53 @@ export function createAuth(client: SupabaseClient | null, options: AuthOptions) 
     return loading
   }
 
-  /** Off to Google. supabase-js navigates the page; nothing else happens on success. */
-  async function signInWithGoogle(returnTo = '/') {
-    if (!client) return false
-    error.value = null
-    try { storage.setItem(RETURN_KEY, safeReturnTo(returnTo)) }
-    catch { /* storage blocked: we'll land on the home page */ }
+  /** Step 1: e-mail a six-digit code. */
+  async function requestCode(input: string): Promise<{ ok: true } | { ok: false, message: string, field?: 'email' }> {
+    if (!client) return { ok: false, message: 'Inloggning är inte påslagen här.' }
+    const email = normalizeEmail(input)
+    const invalid = validateEmail(email)
+    if (invalid) return { ok: false, message: invalid, field: 'email' }
+    // Same address again: respect the cooldown. A different address starts fresh.
+    if (email === pendingEmail.value && resendIn() > 0) return { ok: false, message: 'Vänta lite innan du ber om en ny kod.' }
     try {
-      const { error: e } = await client.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${options.origin}${CALLBACK_PATH}`,
-          // Let people pick the right Google account instead of silently reusing one.
-          queryParams: { prompt: 'select_account' },
-        },
-      })
+      const { error: e } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: allowNewAccounts } })
       if (e) throw e
-      return true
+      serverWaitUntil.value = null
+      writePending({ email, sentAt: now() })
+      return { ok: true }
     }
     catch (e) {
-      error.value = authErrorMessage(e as { message?: string })
-      return false
+      const wait = retryAfterSeconds(e as AuthLikeError)
+      if (wait) serverWaitUntil.value = now() + wait * 1000
+      const message = sendErrorMessage(e as AuthLikeError)
+      return { ok: false, message, field: /e-postadress/.test(message) && !/Vänta/.test(message) ? 'email' : undefined }
     }
   }
 
-  /** On /auth/callback: finish the PKCE exchange. */
-  async function handleCallback(url: string): Promise<{ ok: true, returnTo: string, needsProfile: boolean } | { ok: false, message: string }> {
-    if (!client) return { ok: false, message: 'Inloggning är inte konfigurerad här.' }
-    const params = parseCallback(url)
-    if (params.error) return { ok: false, message: authErrorMessage(`${params.error} ${params.description ?? ''}`) }
-    if (!params.code) {
-      // Maybe supabase-js already finished, or someone opened the page directly.
-      const { data } = await client.auth.getSession()
-      if (data.session) applySession(data.session)
-      else return { ok: false, message: 'Det finns ingen inloggning att slutföra här.' }
-    }
-    else {
-      try {
-        const { data, error: e } = await client.auth.exchangeCodeForSession(params.code)
-        if (e) throw e
-        applySession(data.session)
-      }
-      catch (e) {
-        return { ok: false, message: authErrorMessage(e as { message?: string }) }
-      }
-    }
-    await loadProfile()
-    let returnTo = '/'
+  /** Step 2: check the code. On success supabase-js stores the session. */
+  async function verifyCode(input: string): Promise<{ ok: true, needsProfile: boolean } | { ok: false, message: string }> {
+    if (!client) return { ok: false, message: 'Inloggning är inte påslagen här.' }
+    const email = pendingEmail.value
+    if (!email) return { ok: false, message: 'Be om en kod först.' }
+    const token = normalizeCode(input)
+    if (token.length !== CODE_LENGTH) return { ok: false, message: `Koden har ${CODE_LENGTH} siffror.` }
     try {
-      returnTo = safeReturnTo(storage.getItem(RETURN_KEY))
-      storage.removeItem(RETURN_KEY)
+      const { data, error: e } = await client.auth.verifyOtp({ email, token, type: 'email' })
+      if (e) throw e
+      writePending(null)
+      applySession(data.session)
+      await loadProfile()
+      return { ok: true, needsProfile: profileStatus.value === 'missing' }
     }
-    catch { /* storage blocked */ }
-    return { ok: true, returnTo, needsProfile: profileStatus.value === 'missing' }
+    catch (e) {
+      return { ok: false, message: verifyErrorMessage(e as AuthLikeError) }
+    }
+  }
+
+  /** Back to step 1 (wrong address, or start over). */
+  function cancelCode() {
+    writePending(null)
+    serverWaitUntil.value = null
   }
 
   /** Sign out on this device. Always ends signed out locally, even offline. */
@@ -206,10 +273,7 @@ export function createAuth(client: SupabaseClient | null, options: AuthOptions) 
       if (e) throw e
     }
     catch {
-      try {
-        storage.removeItem(AUTH_STORAGE_KEY)
-        storage.removeItem(`${AUTH_STORAGE_KEY}-code-verifier`)
-      }
+      try { storage.removeItem(AUTH_STORAGE_KEY) }
       catch { /* nothing more we can do */ }
     }
     applySession(null)
@@ -243,7 +307,11 @@ export function createAuth(client: SupabaseClient | null, options: AuthOptions) 
     }
   }
 
-  return { status, userId, profile, profileStatus, error, init, loadProfile, signInWithGoogle, handleCallback, signOut, saveProfile, whenProfileLoaded: () => loading ?? Promise.resolve() }
+  return {
+    status, userId, profile, profileStatus, pendingEmail, sentAt,
+    init, loadProfile, requestCode, verifyCode, cancelCode, resendIn, signOut, saveProfile,
+    whenProfileLoaded: () => loading ?? Promise.resolve(),
+  }
 }
 
 export type AuthStore = ReturnType<typeof createAuth>

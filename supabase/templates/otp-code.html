@@ -1,0 +1,47 @@
+<!--
+  Djurgår'n tills jag dör — sign-in code e-mail.
+  Paste into Supabase: Authentication → Emails → Templates, for BOTH
+  "Magic link" and "Confirm signup" (new supporters may get the latter).
+  Subject: Din inloggningskod till Djurgår’n
+  It must show {{ .Token }} and must NOT contain {{ .ConfirmationURL }}:
+  the app signs in by code only and never handles links.
+-->
+<!doctype html>
+<html lang="sv">
+  <body style="margin:0;padding:0;background:#061229;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#061229;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#0a1b3d;border-radius:20px;overflow:hidden;">
+            <tr>
+              <td style="height:8px;background:repeating-linear-gradient(90deg,#5fb0ec 0 10px,#10295a 10px 20px);background-color:#5fb0ec;font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:28px 28px 8px;font-family:Georgia,'Times New Roman',serif;color:#f3eee3;">
+                <div style="font:600 12px/1.4 Arial,Helvetica,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#f4c430;">Djurgår’n tills jag dör</div>
+                <h1 style="margin:10px 0 0;font-size:28px;line-height:1.15;font-weight:700;">Din inloggningskod</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 28px 0;font:16px/1.55 Arial,Helvetica,sans-serif;color:#b9bfcc;">
+                Skriv in koden i appen för att kliva in på läktaren.
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:24px 28px;">
+                <div style="display:inline-block;padding:16px 24px;border-radius:16px;background:#061229;border:1px solid #1b3c7c;font:700 34px/1 'Courier New',Courier,monospace;letter-spacing:.35em;color:#f3eee3;">{{ .Token }}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 28px 28px;font:13px/1.55 Arial,Helvetica,sans-serif;color:#b9bfcc;">
+                Koden gäller en kort stund och kan bara användas en gång.
+                Bad du inte om den? Då kan du strunta i det här mejlet – ingen kan logga in utan koden.
+              </td>
+            </tr>
+          </table>
+          <div style="padding:16px;font:12px/1.5 Arial,Helvetica,sans-serif;color:#6b7590;">Ett supporterprojekt – inte en officiell kanal för Djurgårdens IF.</div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

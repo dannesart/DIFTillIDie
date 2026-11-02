@@ -28,8 +28,6 @@ export default defineNuxtConfig({
     // Shared CDN HTML is safe because sign-in lives entirely in the browser:
     // the server never sees a session, so this page is identical for everyone.
     '/': { isr: 300 },
-    // The OAuth callback is per-visitor: render it in the browser, never cache it.
-    '/auth/**': { ssr: false, headers: { 'cache-control': 'no-store' } },
     '/api/news': { isr: 600 },
     '/api/podcast': { isr: 600 },
     '/api/fixtures': { isr: 900 },
