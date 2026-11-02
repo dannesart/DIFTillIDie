@@ -149,6 +149,14 @@ So DIFpodden gets a static discovery card with "Lyssna hos Patreon", the Spotify
 
 The card then shows a click-to-load player. Nothing is loaded from Spotify or YouTube until the visitor asks for it.
 
+## Supporter accounts (Google sign-in)
+
+Supporters can sign in with Google through Supabase Auth and choose a display name and handle. Nothing public requires an account, and Snacket på stan's demo posts are unchanged.
+
+- **Docs:** setup, the security model, the caching review, required Google and Supabase configuration, and the iPhone test plan are in [`docs/authentication.md`](docs/authentication.md).
+- **Migration:** [`supabase/migrations/`](supabase/migrations/), with pgTAP authorization tests in [`supabase/tests/`](supabase/tests/).
+- **Local setup:** copy `.env.example` to `.env` with the project URL and **publishable** key. Without them, the account UI hides itself.
+
 ## Installable app (PWA)
 
 Supporters can put Djurgår’n on their home screen. It opens full-screen into the same mobile experience: bottom nav, mini-player, dialogs.

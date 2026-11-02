@@ -13,6 +13,9 @@ const items: { id: Section, label: string }[] = [
 ]
 
 const active = ref<Section>('hem')
+const { status: authStatus, profile } = useAuth()
+const accountOpen = useAccountDialog()
+const hasAccount = computed(() => authStatus.value !== 'unavailable')
 const { playing } = usePodcastPlayer()
 const typing = useTyping()
 const desktop = useMedia('(min-width: 1024px)')
@@ -79,7 +82,7 @@ function go(id: Section) {
     :class="hidden && 'translate-y-full'"
     :inert="hidden || undefined"
   >
-    <ul class="mx-auto grid h-16 max-w-xl grid-cols-4">
+    <ul class="mx-auto grid h-16 max-w-xl" :class="hasAccount ? 'grid-cols-5' : 'grid-cols-4'">
       <li v-for="item in items" :key="item.id">
         <a
           :href="item.id === 'hem' ? '#' : `#${item.id}`"
@@ -120,6 +123,18 @@ function go(id: Section) {
           {{ item.label }}
           <span v-if="item.id === 'lyssna' && playing" class="sr-only">(spelar nu)</span>
         </a>
+      </li>
+      <!-- Your account: opens the account dialog (not a section) -->
+      <li v-if="hasAccount">
+        <button
+          class="relative flex h-full w-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold text-krita-dim transition-colors hover:text-krita motion-safe:active:scale-95"
+          aria-haspopup="dialog"
+          @click="accountOpen = true"
+        >
+          <AccountGlyph compact class="size-6" />
+          {{ authStatus === 'signed-in' ? 'Du' : 'Logga in' }}
+          <span v-if="authStatus === 'signed-in' && !profile" class="sr-only">(slutför din profil)</span>
+        </button>
       </li>
     </ul>
   </nav>

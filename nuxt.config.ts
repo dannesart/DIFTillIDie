@@ -11,12 +11,25 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
   },
 
+  runtimeConfig: {
+    public: {
+      // Set NUXT_PUBLIC_SUPABASE_URL / NUXT_PUBLIC_SUPABASE_KEY (see .env.example).
+      // Only the *publishable* key belongs here — it's meant for browsers.
+      supabaseUrl: '',
+      supabaseKey: '',
+    },
+  },
+
   routeRules: {
     // Fictional posts and matches are public: keep the site out of search results for now.
     '/**': { headers: { 'x-robots-tag': 'noindex, nofollow' } },
     // On Netlify, `isr` becomes durable CDN caching (stale-while-revalidate),
     // so publishers are fetched at most every few minutes, not per visit.
+    // Shared CDN HTML is safe because sign-in lives entirely in the browser:
+    // the server never sees a session, so this page is identical for everyone.
     '/': { isr: 300 },
+    // The OAuth callback is per-visitor: render it in the browser, never cache it.
+    '/auth/**': { ssr: false, headers: { 'cache-control': 'no-store' } },
     '/api/news': { isr: 600 },
     '/api/podcast': { isr: 600 },
     '/api/fixtures': { isr: 900 },

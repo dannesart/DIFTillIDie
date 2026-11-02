@@ -27,6 +27,7 @@ await Promise.all([useNews(), usePodcasts(), useFixtures()])
     <MobileNav />
     <InstallHint />
     <InstallGuide />
+    <AccountDialog />
     <StripeBurst />
   </div>
 </template>

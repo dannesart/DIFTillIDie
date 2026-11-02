@@ -54,6 +54,8 @@ const nav = [
           {{ o.label }}
         </button>
       </div>
+      <!-- On phones and tablets the account lives in the bottom nav -->
+      <AccountButton class="hidden lg:grid" />
     </div>
   </header>
 </template>
