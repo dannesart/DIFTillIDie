@@ -4,7 +4,8 @@ A digital home for Djurgården supporters, covering football and hockey: stories
 
 > **Partly real, partly demo.**
 > - **Real:** Stories, fetched from the publishers' own RSS feeds, and *Djurgårn by night* episodes.
-> - **Invented:** the people and posts in *Snacket på stan*, and the next match. The page labels both as demo.
+> - **Real, too:** the next match, from the clubs' official schedules (see [Fixtures](#fixtures)).
+> - **Invented:** the people and posts in *Snacket på stan*. The page labels them as demo.
 >
 > Anything a visitor writes, reacts to or comments on is saved only in their own browser (`localStorage`). Search engines are kept out for now: a `noindex` meta tag plus an `X-Robots-Tag` header.
 
@@ -35,7 +36,7 @@ The vocabulary is kept small, in [`shared/types/domain.ts`](shared/types/domain.
 - **SourceArticle**: one outlet's article. It keeps its own publisher, original headline, the publisher's own teaser, URL and publication date, and is never merged with other sources.
 - **Post**: a supporter's post in Snacket, with reactions, comments, @mentions, #tags and an optional attached Story.
 
-Demo content (posts, the match) lives in [`app/data/`](app/data/). The timestamps are relative and are fixed once on the server (`useDemoNow`), so SSR and hydration agree.
+Demo content (the posts) lives in [`app/data/`](app/data/). The timestamps are relative and are fixed once on the server (`useDemoNow`), so SSR and hydration agree.
 
 ## Things to try
 
@@ -44,7 +45,7 @@ Demo content (posts, the match) lives in [`app/data/`](app/data/). The timestamp
 - **"Snackas om i N inlägg"** on a Story filters the feed to posts about it. An attached Story inside a post scrolls back to that Story and highlights it.
 - **Hetast / Nyast på stan.** "Hetast" is engagement cooled by age, so the order changes as you react.
 - **Click an @handle** to mention that person in the composer. **Click a #tag** to filter the feed.
-- **"Lägg i kalendern"** downloads a real `.ics` file for the (demo) match.
+- **"Lägg i kalendern"** downloads an `.ics` file for the real next match.
 - After 23:00 the night sky comes out, and the podcast gets a 🌙 badge.
 - **Start an episode, then scroll away.** A mini-player follows you through Stories and Snacket, driving the same audio element as the main player. On phones it steps aside while you type, and lock-screen controls work through the Media Session API.
 - Type **D-I-F** anywhere on the page.
@@ -95,6 +96,30 @@ How it works, in [`server/lib/`](server/lib/) (plain, testable functions) and [`
   - If a fetch fails or times out (8 s), the last good result is shown and marked stale. If there is none, the source is shown as unreachable; nothing is invented.
   - On Netlify, `isr` route rules add durable CDN caching: `/` for 5 min and `/api/*` for 10 min.
 - **Endpoints:** `/api/news` and `/api/podcast`, each returning a status per source.
+
+## Fixtures
+
+The next-match card counts down to verified first-team matches. It covers:
+
+| Team | Coverage | Source |
+|---|---|---|
+| Fotboll herr | Automatic | dif.se's public match-calendar subscription: [`/api/calendar?category=herrar`](https://www.dif.se/api/calendar?category=herrar), the link offered on [dif.se/matcher](https://www.dif.se/matcher) |
+| Fotboll dam | Automatic | Same, with `category=damer` |
+| Hockey herr | **Manual** | [`server/lib/fixtures.ts`](server/lib/fixtures.ts) `MANUAL_FIXTURES`, each entry checked against [difhockey.se](https://www.difhockey.se/game-schedule) and stamped with `verifiedAt` |
+| Hockey dam (SDHL) | None yet | Shown on the card as "no verified schedule yet" |
+
+What we found when looking for machine-readable fixture data (2026-11-02):
+
+- **dif.se** publishes iCalendar subscriptions per squad: herrar, damer and ungdom. The responses are `text/calendar` with `max-age=14400`. Event times are floating local times, with `X-WR-TIMEZONE: Europe/Stockholm` set on the calendar. We convert them to UTC with DST handled (see [`server/lib/ics.ts`](server/lib/ics.ts)).
+- **difhockey.se and shl.se** offer only an ECAL sign-up widget ("Kalenderfil SHL/SDHL" → `ql.e-c.al`), which gives each subscriber a personal calendar. We found no public feed or supported schedule API. We don't scrape the schedule pages or reuse the widget's key, so hockey is maintained by hand. **Add new hockey fixtures to `MANUAL_FIXTURES` after checking difhockey.se.** Past entries drop off automatically.
+
+Rules:
+
+- **First team only:** we fetch only the herrar and damer calendars, and keep only competitions known to be first-team (Allsvenskan, OBOS Damallsvenskan, Svenska cupen and friendlies). *Ligacupen Elit* is in the herrar calendar, but we haven't verified its level, so it's excluded.
+- **Status notes:** "(trupp annonserad)" is removed from the title. "(preliminär tid och datum)" becomes a *Preliminär tid* badge.
+- **Never a past match:** the server sends only upcoming fixtures, and the client re-checks against its own clock every second. A match whose kickoff has passed is never "next".
+- **Honest empty state:** if nothing verified is coming up, the card says so.
+- **Caching:** 30 min in memory (stale-while-revalidate, last good result on failure), plus Netlify CDN on `/api/fixtures` for 15 min. If dif.se can't be reached, the hand-verified hockey match still shows.
 
 ## Podcasts and video
 

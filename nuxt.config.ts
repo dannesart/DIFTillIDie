@@ -19,6 +19,7 @@ export default defineNuxtConfig({
     '/': { isr: 300 },
     '/api/news': { isr: 600 },
     '/api/podcast': { isr: 600 },
+    '/api/fixtures': { isr: 900 },
   },
 
   fonts: {

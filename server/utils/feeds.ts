@@ -3,6 +3,8 @@ import type { NewsSource, SourceResult } from '../lib/news'
 import { NEWS_SOURCES, loadSource } from '../lib/news'
 import { groupIntoStories } from '../lib/grouping'
 import { loadPodcast } from '../lib/podcast'
+import type { FixturesState } from '../lib/fixtures'
+import { loadFixtures } from '../lib/fixtures'
 
 /*
  * Caching, in two layers and without a database:
@@ -53,6 +55,24 @@ export const getPodcast = defineCachedFunction(
     maxAge: FEED_MAX_AGE,
     swr: true,
     getKey: () => 'djurgarnbynight',
+    validate: entry => entry.value?.status.ok === true,
+  },
+)
+
+const lastGoodFixtures: FixturesState = {}
+
+// dif.se itself says max-age=14400 (4 h); 30 min keeps changed kickoffs fresh enough.
+export const getFixtures = defineCachedFunction(
+  async () => {
+    const result = await loadFixtures({ lastGood: lastGoodFixtures })
+    if (!result.status.ok) console.warn(`[feeds] fixtures: ${result.status.error}`)
+    return result
+  },
+  {
+    name: 'fixtures',
+    maxAge: 30 * 60,
+    swr: true,
+    getKey: () => 'dif',
     validate: entry => entry.value?.status.ok === true,
   },
 )

@@ -40,7 +40,7 @@ const year = computed(() => new Date(demoNow.value).getFullYear())
 
       <div class="mt-12 flex flex-wrap gap-x-6 gap-y-2 border-t border-white/8 pt-6 text-xs text-krita-dim">
         <p>© {{ year }} Djurgår’n tills jag dör – ett supporterprojekt, inte en officiell kanal för Djurgårdens IF.</p>
-        <p>Nyheter och poddavsnitt är riktiga och tillhör sina utgivare. Snacket på stan och nästa match är påhittade.</p>
+        <p>Nyheter, poddavsnitt och matcher är riktiga och tillhör sina utgivare. Snacket på stan är påhittat.</p>
       </div>
     </div>
   </footer>

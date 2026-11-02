@@ -1,10 +1,6 @@
 <script setup lang="ts">
-import type { Fixture } from '~/data/fixtures'
-
 const demoNow = useDemoNow()
 const now = useNow()
-const fixtures = useFixtures()
-const { sport } = useSport()
 
 const part = computed(() => dayPart(now.value ?? demoNow.value))
 const greeting = computed(() => ({
@@ -14,44 +10,7 @@ const greeting = computed(() => ({
   natt: 'Sent ute, Djurgårdare?',
 })[part.value])
 
-const fixture = computed<Fixture>(() => {
-  const list = fixtures.value.filter(f => sport.value === 'alla' || f.sport === sport.value)
-  return [...list].sort((a, b) => a.kickoff.localeCompare(b.kickoff))[0]!
-})
-
-const left = computed(() => countdown(fixture.value.kickoff, now.value ?? demoNow.value))
-const units = computed(() => [
-  { label: 'dagar', value: left.value.dagar },
-  { label: 'tim', value: left.value.timmar },
-  { label: 'min', value: left.value.minuter },
-  { label: 'sek', value: now.value ? left.value.sekunder : null },
-])
-
 const days = computed(() => daysSinceFounding(now.value ?? demoNow.value).toLocaleString('sv-SE'))
-
-/** A real, working reminder: a calendar file for the (demo) match. */
-function downloadIcs() {
-  const f = fixture.value
-  const start = new Date(f.kickoff)
-  const end = new Date(start.getTime() + 2 * 3_600_000)
-  const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
-  const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Djurgarn tills jag dor//SV',
-    'BEGIN:VEVENT',
-    `UID:${f.sport}-${stamp(start)}@djurgarn`,
-    `DTSTAMP:${stamp(new Date())}`,
-    `DTSTART:${stamp(start)}`,
-    `DTEND:${stamp(end)}`,
-    `SUMMARY:Djurgården – ${f.opponent} (${f.competition}) [DEMO]`,
-    `LOCATION:${f.venue}`,
-    'DESCRIPTION:Demomatch från Djurgår\'n tills jag dör. Kontrollera alltid tider hos klubben.',
-    'END:VEVENT', 'END:VCALENDAR',
-  ].join('\r\n')
-  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }))
-  const a = Object.assign(document.createElement('a'), { href: url, download: `djurgarden-${f.opponent.toLowerCase()}.ics` })
-  a.click()
-  URL.revokeObjectURL(url)
-}
 </script>
 
 <template>
@@ -100,36 +59,7 @@ function downloadIcs() {
 
       <!-- Next match -->
       <aside class="animate-rise self-end [animation-delay:120ms]">
-        <div class="card grain relative overflow-hidden p-6 sm:p-7">
-          <div class="stripes absolute inset-x-0 top-0 h-1.5 [--stripe:10px]" />
-          <div class="flex items-center justify-between">
-            <p class="kicker text-krita-dim">Nästa match · {{ fixture.sport }}</p>
-            <span class="kicker rounded-full border border-guld/40 px-2 py-0.5 text-guld">Demomatch</span>
-          </div>
-
-          <Transition mode="out-in" enter-from-class="opacity-0 translate-y-2" leave-to-class="opacity-0 -translate-y-2" enter-active-class="transition duration-300" leave-active-class="transition duration-200">
-            <div :key="fixture.sport" class="mt-5">
-              <p class="font-display text-3xl font-bold leading-tight sm:text-4xl">
-                Djurgården <span class="font-normal italic text-krita-dim">mot</span> {{ fixture.opponent }}
-              </p>
-              <p class="mt-2 text-sm text-krita-dim">
-                {{ fixture.competition }} · {{ fixture.venue }} · <span class="capitalize">{{ kickoffLabel(fixture.kickoff) }}</span>
-              </p>
-            </div>
-          </Transition>
-
-          <div class="mt-6 grid grid-cols-4 gap-2" aria-live="off">
-            <div v-for="u in units" :key="u.label" class="rounded-2xl bg-navy-950/70 px-2 py-3 text-center">
-              <span class="block font-display text-3xl font-bold tabular-nums sm:text-4xl">{{ u.value === null ? '··' : String(u.value).padStart(2, '0') }}</span>
-              <span class="kicker text-krita-dim">{{ u.label }}</span>
-            </div>
-          </div>
-
-          <button class="mt-5 flex w-full items-center justify-center gap-2 rounded-full border border-white/12 py-3 text-sm font-semibold transition hover:border-himmel hover:text-himmel" @click="downloadIcs">
-            <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
-            Lägg i kalendern
-          </button>
-        </div>
+        <MatchCard />
 
         <p class="mt-4 px-2 text-sm text-krita-dim">
           Djurgården har funnits i <span class="font-display text-base font-bold text-krita tabular-nums">{{ days }}</span> dagar.

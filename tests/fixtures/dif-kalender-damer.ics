@@ -1,0 +1,71 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//sebbo.net//ical-generator//EN
+URL:https://www.dif.se/
+NAME:Djurgården Fotboll
+X-WR-CALNAME:Djurgården Fotboll
+X-WR-CALDESC:Stockholms Stolthet
+TIMEZONE-ID:Europe/Stockholm
+X-WR-TIMEZONE:Europe/Stockholm
+BEGIN:VEVENT
+UID:match-126875@dif.se
+SEQUENCE:0
+DTSTAMP:20261102T160619
+DTSTART:20260214T120000
+DTEND:20260214T140000
+SUMMARY:Djurgården - Brommapojkarna (trupp annonserad) (Svenska cupen dam
+ )
+LOCATION:3Arena
+DESCRIPTION:3Arena\n\nSvenska cupen dam
+BEGIN:VALARM
+ACTION:DISPLAY
+TRIGGER:-PT2H
+DESCRIPTION:Djurgården - Brommapojkarna (trupp annonserad)
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:match-126832@dif.se
+SEQUENCE:0
+DTSTAMP:20261102T160619
+DTSTART:20260110T130000
+DTEND:20260110T150000
+SUMMARY:KIF Örebro - Djurgården (trupp annonserad) (Träningsmatch dam)
+LOCATION:Behrn Arena
+DESCRIPTION:Behrn Arena\n\nTräningsmatch dam
+BEGIN:VALARM
+ACTION:DISPLAY
+TRIGGER:-PT2H
+DESCRIPTION:KIF Örebro - Djurgården (trupp annonserad)
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:match-126889@dif.se
+SEQUENCE:0
+DTSTAMP:20261102T160619
+DTSTART:20261106T180000
+DTEND:20261106T200000
+SUMMARY:Djurgården - BK Häcken (Obos Damallsvenskan)
+LOCATION:Kristinebergs IP
+DESCRIPTION:Kristinebergs IP\n\nObos Damallsvenskan
+BEGIN:VALARM
+ACTION:DISPLAY
+TRIGGER:-PT2H
+DESCRIPTION:Djurgården - BK Häcken
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:match-126908@dif.se
+SEQUENCE:0
+DTSTAMP:20261102T160619
+DTSTART:20261115T140000
+DTEND:20261115T160000
+SUMMARY:Eskilstuna United - Djurgården (Obos Damallsvenskan)
+LOCATION:Tunavallen
+DESCRIPTION:Tunavallen\n\nObos Damallsvenskan
+BEGIN:VALARM
+ACTION:DISPLAY
+TRIGGER:-PT2H
+DESCRIPTION:Eskilstuna United - Djurgården
+END:VALARM
+END:VEVENT
+END:VCALENDAR

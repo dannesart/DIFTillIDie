@@ -120,3 +120,44 @@ export interface Post {
   comments: PostComment[]
   demo: boolean
 }
+
+export type FixtureTeam = 'herr' | 'dam'
+
+/** A first-team match, from an official source. */
+export interface Fixture {
+  id: string
+  sport: Sport
+  team: FixtureTeam
+  /** e.g. "Allsvenskan", "OBOS Damallsvenskan", "SHL". */
+  competition: string
+  /** Team names in the official order: home first. */
+  home: string
+  away: string
+  venue?: string
+  /** UTC instant of kickoff / puck drop. */
+  kickoff: string
+  /** The club marks the date/time as preliminary. */
+  preliminary: boolean
+  /** `dif-kalender`: dif.se's calendar, fetched automatically. `manual`: checked and entered by hand. */
+  source: 'dif-kalender' | 'manual'
+  /** For manual entries: the day it was checked on the official site. */
+  verifiedAt?: string
+  officialUrl: string
+  ticketsUrl?: string
+}
+
+export interface TeamScope {
+  sport: Sport
+  team: FixtureTeam
+  label: string
+  /** automatic: synced from an official calendar. manual: hand-verified. none: not covered yet. */
+  coverage: 'automatic' | 'manual' | 'none'
+}
+
+export interface FixturesResponse {
+  /** Upcoming only, earliest first. */
+  fixtures: Fixture[]
+  status: FeedStatus
+  scope: TeamScope[]
+  generatedAt: string
+}

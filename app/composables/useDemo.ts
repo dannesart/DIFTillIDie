@@ -1,5 +1,4 @@
 import type { Sport } from '#shared/types/domain'
-import { buildDemoFixtures } from '~/data/fixtures'
 
 /**
  * The moment demo content is anchored to. Created once on the server and
@@ -27,11 +26,6 @@ export function useSport() {
   const sport = useState<SportFilter>('sport', () => 'alla')
   const matches = (s?: Sport) => sport.value === 'alla' || !s || s === sport.value
   return { sport, matches }
-}
-
-export function useFixtures() {
-  const now = useDemoNow()
-  return useState('fixtures', () => buildDemoFixtures(now.value))
 }
 
 /** Scroll to a Story and make it glow for a moment. */

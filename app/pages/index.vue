@@ -3,7 +3,7 @@ const { load } = useSnacket()
 onMounted(load)
 
 // Fetch real content during SSR; sections read the same data by key.
-await Promise.all([useNews(), usePodcast()])
+await Promise.all([useNews(), usePodcast(), useFixtures()])
 </script>
 
 <template>
