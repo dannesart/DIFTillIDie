@@ -14,7 +14,7 @@ const days = computed(() => daysSinceFounding(now.value ?? demoNow.value).toLoca
 </script>
 
 <template>
-  <section class="relative isolate overflow-hidden">
+  <section id="hem" class="relative isolate scroll-mt-20 overflow-hidden">
     <!-- Night sky, only after dark -->
     <div v-if="part === 'natt'" aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10">
       <span

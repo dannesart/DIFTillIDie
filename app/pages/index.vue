@@ -24,6 +24,7 @@ await Promise.all([useNews(), usePodcasts(), useFixtures()])
     <PodcastAudio />
     <MiniPlayer />
     <StoryComposeDialog />
+    <MobileNav />
     <StripeBurst />
   </div>
 </template>

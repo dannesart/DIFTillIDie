@@ -40,6 +40,7 @@ Demo content (the posts) lives in [`app/data/`](app/data/). The timestamps are r
 
 ## Things to try
 
+- **On a phone or tablet**, the bottom bar (Hem · Stories · Snacket · Lyssna) jumps between sections without reloading, so podcasts keep playing. The active section is highlighted, and the bar steps aside while you type.
 - **Allt / Fotboll / Hockey** in the header filters the whole page: stories, feed and next match.
 - **Source pills** link straight to each original article.
 - **"Snackas om i N inlägg"** on a Story filters the feed to posts about it. An attached Story inside a post scrolls back to that Story and highlights it.

@@ -24,6 +24,19 @@
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/*
+ * Height of the mobile bottom navigation, including the phone's safe area.
+ * Floating controls (the mini-player) sit above it; 0 where it isn't shown.
+ */
+:root {
+  --nav-h: calc(4rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 1024px) {
+  :root {
+    --nav-h: 0px;
+  }
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
@@ -45,6 +58,10 @@
   ::selection {
     background: var(--color-guld);
     color: var(--color-navy-950);
+  }
+  /* Sections receive focus from the bottom nav for screen readers; no box around a whole section. */
+  section[tabindex="-1"]:focus {
+    outline: none;
   }
   :focus-visible {
     outline: 2px solid var(--color-guld);

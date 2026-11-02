@@ -7,26 +7,8 @@
 const { current, currentShow, showTitle, playing, position, duration, progress, playerInView, selectedShow, toggle, seekFromClick, seekFromKey, stop } = usePodcastPlayer()
 
 // On phones, step aside while someone is typing (the keyboard needs the space).
-const typing = ref(false)
-const small = ref(false)
-let mq: MediaQueryList | undefined
-const onMq = () => (small.value = !!mq?.matches)
-const isField = (t: EventTarget | null) => t instanceof HTMLElement && !!t.closest('input, textarea, select, [contenteditable]')
-const onFocusIn = (e: FocusEvent) => (typing.value = isField(e.target))
-const onFocusOut = () => (typing.value = false)
-
-onMounted(() => {
-  mq = window.matchMedia('(max-width: 639px)')
-  onMq()
-  mq.addEventListener('change', onMq)
-  document.addEventListener('focusin', onFocusIn)
-  document.addEventListener('focusout', onFocusOut)
-})
-onBeforeUnmount(() => {
-  mq?.removeEventListener('change', onMq)
-  document.removeEventListener('focusin', onFocusIn)
-  document.removeEventListener('focusout', onFocusOut)
-})
+const typing = useTyping()
+const small = useMedia('(max-width: 639px)')
 
 const visible = computed(() => !!current.value && !playerInView.value && !(typing.value && small.value))
 
@@ -39,7 +21,7 @@ function backToPlayer() {
 
 <template>
   <!-- Keeps the footer from hiding under the player at the very bottom of the page -->
-  <div v-if="current" aria-hidden="true" class="h-20" />
+  <div v-if="current" aria-hidden="true" class="h-[4.5rem]" />
 
   <Transition
     enter-active-class="transition duration-500 ease-out-expo"
@@ -49,7 +31,7 @@ function backToPlayer() {
   >
     <aside
       v-if="visible && current"
-      class="fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[23rem]"
+      class="fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem]"
       aria-label="Spelare"
     >
       <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-navy-900/90 shadow-[0_24px_60px_-24px_rgb(3_9_21/0.95)] backdrop-blur-xl">
