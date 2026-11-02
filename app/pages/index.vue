@@ -18,6 +18,7 @@ await Promise.all([useNews(), usePodcast()])
       <MediaSection />
     </main>
     <AppFooter />
+    <MiniPlayer />
     <StripeBurst />
   </div>
 </template>

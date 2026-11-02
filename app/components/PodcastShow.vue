@@ -8,12 +8,9 @@ import type { PodcastEpisode, PodcastResponse } from '#shared/types/domain'
  */
 const props = defineProps<{ podcast: PodcastResponse, highlight?: boolean }>()
 
+const root = useTemplateRef<HTMLElement>('root')
 const audio = useTemplateRef<HTMLAudioElement>('audio')
-const current = ref<PodcastEpisode | null>(null)
-const playing = ref(false)
-const position = ref(0)
-const duration = ref(0)
-const failed = ref<string | null>(null)
+const { current, playing, position, duration, progress, failed, mainVisible, attach, detach, toggle, seekFromClick: seek, seekFromKey: onSeekKey } = usePodcastPlayer()
 const showAll = ref(false)
 
 const latest = computed(() => props.podcast.episodes[0])
@@ -25,64 +22,28 @@ function minutes(sec?: number) {
   return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`
 }
 
-function clock(sec: number) {
-  const s = Math.max(0, Math.floor(sec))
-  const h = Math.floor(s / 3600)
-  const mm = String(Math.floor((s % 3600) / 60)).padStart(h ? 2 : 1, '0')
-  return `${h ? `${h}:` : ''}${mm}:${String(s % 60).padStart(2, '0')}`
-}
-
-async function toggle(ep: PodcastEpisode) {
-  const el = audio.value
-  if (!el || !ep.audioUrl) return
-  failed.value = null
-  if (current.value?.id === ep.id) {
-    if (el.paused) await el.play().catch(onError)
-    else el.pause()
-    return
-  }
-  current.value = ep
-  position.value = 0
-  duration.value = ep.durationSeconds ?? 0
-  el.src = ep.audioUrl
-  await el.play().catch(onError)
-}
-
-function onError() {
-  playing.value = false
-  failed.value = 'Ljudet kunde inte spelas här. Lyssna hos podden i stället.'
-}
-
-function seek(e: MouseEvent) {
-  const el = audio.value
-  if (!el || !duration.value) return
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  el.currentTime = ((e.clientX - rect.left) / rect.width) * duration.value
-}
-
-function onSeekKey(e: KeyboardEvent) {
-  const el = audio.value
-  if (!el) return
-  if (e.key === 'ArrowRight') el.currentTime += 15
-  if (e.key === 'ArrowLeft') el.currentTime -= 15
-}
-
 const isCurrent = (ep: PodcastEpisode) => current.value?.id === ep.id
-const progress = computed(() => (duration.value ? Math.min(100, (position.value / duration.value) * 100) : 0))
+
+// Tell the mini-player whether this, the main player, is on screen.
+let observer: IntersectionObserver | undefined
+onMounted(() => {
+  if (audio.value) attach(audio.value, props.podcast.show?.title ?? 'Podden')
+  if (root.value && 'IntersectionObserver' in window) {
+    observer = new IntersectionObserver(([entry]) => (mainVisible.value = !!entry?.isIntersecting), { threshold: 0.15 })
+    observer.observe(root.value)
+  }
+})
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  mainVisible.value = false
+  if (audio.value) detach(audio.value)
+})
 </script>
 
 <template>
-  <article class="card relative overflow-hidden" :class="highlight && 'border-guld/30'">
-    <audio
-      ref="audio"
-      preload="none"
-      @play="playing = true"
-      @pause="playing = false"
-      @ended="playing = false"
-      @timeupdate="position = ($event.target as HTMLAudioElement).currentTime"
-      @loadedmetadata="duration = ($event.target as HTMLAudioElement).duration || duration"
-      @error="current && onError()"
-    />
+  <article ref="root" class="card relative overflow-hidden" :class="highlight && 'border-guld/30'">
+    <!-- The one and only audio element; the mini-player drives it too. -->
+    <audio ref="audio" preload="none" />
 
     <div class="grid lg:grid-cols-[18rem_minmax(0,1fr)]">
       <MediaCover cover="night" :title="podcast.show?.title ?? ''" kind="podd" class="aspect-[16/9] lg:aspect-auto" />

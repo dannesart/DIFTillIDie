@@ -46,6 +46,7 @@ Demo content (posts, the match) lives in [`app/data/`](app/data/). The timestamp
 - **Click an @handle** to mention that person in the composer. **Click a #tag** to filter the feed.
 - **"Lägg i kalendern"** downloads a real `.ics` file for the (demo) match.
 - After 23:00 the night sky comes out, and the podcast gets a 🌙 badge.
+- **Start an episode, then scroll away.** A mini-player follows you through Stories and Snacket, driving the same audio element as the main player. On phones it steps aside while you type, and lock-screen controls work through the Media Session API.
 - Type **D-I-F** anywhere on the page.
 
 ## News feeds
