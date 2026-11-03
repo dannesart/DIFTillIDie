@@ -89,6 +89,10 @@ async function removeReal() {
       <span class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel">→</span>
     </button>
 
+    <!-- Real posts: real reactions and comments, from Supabase -->
+    <RealPostInteractions v-if="post.real" :post-id="post.id" />
+
+    <!-- Demo-snack: local-only reactions and comments, as before -->
     <footer v-if="!post.real" class="mt-4 flex flex-wrap items-center gap-1.5">
       <button
         v-for="r in REACTIONS"

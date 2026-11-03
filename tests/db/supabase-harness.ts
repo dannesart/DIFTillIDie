@@ -74,7 +74,8 @@ export async function realDataSnapshot(db: Db) {
   const users = await db.query<{ id: string }>('select id from auth.users order by id')
   const profiles = await db.query('select id, display_name, handle from public.profiles order by id')
   const posts = await db.query('select author_id, body from public.posts order by body')
-  return { users: users.rows.map(r => r.id), profiles: profiles.rows, posts: posts.rows }
+  const comments = await db.query('select author_id, body from public.post_comments order by body')
+  return { users: users.rows.map(r => r.id), profiles: profiles.rows, posts: posts.rows, comments: comments.rows }
 }
 
 /** The Postgres error code of a failed query (e.g. 42501 permission denied), or 'ok'. */

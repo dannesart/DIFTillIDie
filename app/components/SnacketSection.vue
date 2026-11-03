@@ -212,7 +212,7 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
               </div>
               <p class="mt-3 text-xs leading-relaxed text-krita-dim">
                 Som gäst kan du läsa allt, och reagera och kommentera i demo-snacket (bara i den här webbläsaren).
-                <button v-if="canSignIn" class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Logga in</button><template v-if="canSignIn"> för att publicera på riktigt.</template>
+                <button v-if="canSignIn" class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Logga in</button><template v-if="canSignIn"> för att publicera, reagera och kommentera på riktigt.</template>
               </p>
             </template>
 

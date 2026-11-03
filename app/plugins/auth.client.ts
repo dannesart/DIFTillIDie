@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { AUTH_STORAGE_KEY, createAuth } from '~/lib/auth'
+import { createInteractions } from '~/lib/interactions'
 import { createCommunity } from '~/lib/posts'
 
 /*
@@ -25,6 +26,7 @@ export default defineNuxtPlugin(() => {
   const auth = createAuth(client)
   void auth.init()
   const community = createCommunity(client, auth)
+  const interactions = createInteractions(client, auth, community)
 
   // Back on the tab after a while (e.g. the other phone just posted): fetch again.
   document.addEventListener('visibilitychange', () => {
@@ -32,5 +34,5 @@ export default defineNuxtPlugin(() => {
     if (document.visibilityState === 'visible' && at && Date.now() - at > 60_000) void community.refresh()
   })
 
-  return { provide: { auth, community } }
+  return { provide: { auth, community, interactions } }
 })

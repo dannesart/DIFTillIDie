@@ -154,7 +154,7 @@ The card then shows a click-to-load player. Nothing is loaded from Spotify or Yo
 
 Supporters sign in with a six-digit code sent by e-mail (Supabase `signInWithOtp` / `verifyOtp`), without ever leaving the page, and choose a display name and handle. Nothing public requires an account, and Snacket på stan's fictional posts are unchanged.
 
-Signed in with a profile, you **publish** to Snacket på stan under that name and handle, for everyone to read. The design, the security model, the tests and a two-device test plan are in [`docs/snacket-posts.md`](docs/snacket-posts.md). Local demo reactions, comments and drafts are kept separately per account and for the guest, so a shared browser never shows one supporter's local content to another.
+Signed in with a profile, you **publish**, **react** (💙 🔥 ⭐ 😭, one per post) and **comment** in Snacket på stan under that name and handle, for everyone to read. Reactions and comments: [`docs/snacket-interactions.md`](docs/snacket-interactions.md). The design, the security model, the tests and a two-device test plan are in [`docs/snacket-posts.md`](docs/snacket-posts.md). Local demo reactions, comments and drafts are kept separately per account and for the guest, so a shared browser never shows one supporter's local content to another.
 
 - **Docs:** setup, the security model, the caching review, the e-mail template, SMTP requirements, future registration modes and a device test plan are in [`docs/authentication.md`](docs/authentication.md).
 - **Migration:** [`supabase/migrations/`](supabase/migrations/), with pgTAP authorization tests in [`supabase/tests/`](supabase/tests/).

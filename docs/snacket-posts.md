@@ -25,7 +25,7 @@ Snacket på stan now has two clearly separate parts:
   - If a refresh fails while posts are shown, they stay with a note that they may be stale.
   - The feed also refetches when you return to the tab after more than a minute, which is handy for the two-device test.
 - **Deleting your own post:** "Ta bort" → "Ja, ta bort för alla", confirmed by Supabase. Posts can't be edited.
-- **Not in scope today:** comments, reactions, follows, notifications and algorithms. Real posts show no reaction buttons, because a button that only works locally would pretend.
+- **Reactions and comments** on real posts arrived later; see [snacket-interactions.md](snacket-interactions.md). Follows, notifications and algorithms are still out of scope.
 
 ### Honesty decisions
 
