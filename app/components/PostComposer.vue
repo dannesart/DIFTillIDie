@@ -1,28 +1,38 @@
 <script setup lang="ts">
 import type { Sport, Story } from '#shared/types/domain'
+import { POST_MAX, postLength } from '~/lib/posts'
 
 /*
  * One composer, two homes: at the top of Snacket på stan, and in the
  * "Snacka om detta" dialog, where `story` locks the attachment and the
  * text is bound to that Story's draft via v-model:body.
+ *
+ * Writing here means publishing for real, so it's only offered to someone
+ * who can publish: signed-out visitors get a way to sign in instead. A post
+ * is only "out" once Supabase has confirmed it; on failure the text stays.
  */
 const props = defineProps<{ story?: Story, autofocus?: boolean }>()
 const body = defineModel<string>('body', { default: '' })
 const emit = defineEmits<{ published: [postId: string, text: string] }>()
 
 const { me, identity, owner, publish, filter } = useSnacket()
+const { status: authStatus } = useAuth()
+const { publishing } = useCommunity()
 const { stories } = useNews()
 const accountOpen = useAccountDialog()
 const { sport: sportFilter } = useSport()
 
-const MAX = 280
 const sport = ref<Sport | undefined>()
 const storyId = ref('')
 const focused = ref(false)
+const error = ref<string | null>(null)
 const textarea = useTemplateRef<HTMLTextAreaElement>('textarea')
+const hintId = useId()
 
 const inline = computed(() => !!props.story)
 const attached = computed(() => props.story ?? stories.value.find(s => storyAnswersTo(s, storyId.value)))
+/** Guests can't publish, so they aren't handed a text box that would only pretend to. */
+const canWrite = computed(() => identity.value.kind !== 'guest')
 
 const prompts = ['Vad snackas det om på stan?', 'Hur kändes det i kväll?', 'Vem ska starta på lördag?', 'Någon som ska på bortamatchen?']
 const storyPrompts = ['Vad tycker du?', 'Säg din sak, Djurgårdare.', 'Hur ser du på det här?', 'Ditt hjärta, dina ord.']
@@ -43,32 +53,42 @@ if (!props.story) {
   }, { immediate: true })
 }
 
-const left = computed(() => MAX - body.value.length)
-const expanded = computed(() => inline.value || focused.value || body.value.length > 0)
+const left = computed(() => POST_MAX - postLength(body.value))
+const expanded = computed(() => inline.value || focused.value || body.value.length > 0 || !!error.value)
+watch(body, () => (error.value = null))
 
 // Text typed as one person is never posted as the next. (The Story composer's
 // text is that Story's draft, which is already kept per person.)
 if (!props.story) watch(owner, (_next, prev) => { if (prev) body.value = '' })
 
-function submit() {
-  if (!me.value || !body.value.trim() || left.value < 0) return
-  const text = body.value.trim()
-  const id = publish(text, {
+async function submit() {
+  if (!me.value || publishing.value || !body.value.trim() || left.value < 0) return
+  error.value = null
+  const r = await publish(body.value, {
     sport: sport.value,
     storyId: props.story?.id ?? (storyId.value || undefined),
     keepView: inline.value,
   })
+  if (!r.ok) {
+    // The text stays exactly as it was.
+    error.value = r.message
+    return
+  }
   body.value = ''
   if (inline.value) {
-    if (id) emit('published', id, text)
+    emit('published', r.post.id, r.post.body)
     return
   }
   storyId.value = ''
   textarea.value?.blur()
-  document.getElementById('snacket')?.scrollIntoView({ behavior: 'smooth' })
+  document.getElementById('snacket-real')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function mention(handle: string) {
+  if (!canWrite.value) {
+    accountOpen.value = true
+    return
+  }
   const tag = `@${handle} `
   if (!body.value.includes(tag)) body.value = `${body.value}${body.value && !body.value.endsWith(' ') ? ' ' : ''}${tag}`
   textarea.value?.focus()
@@ -79,9 +99,31 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
 </script>
 
 <template>
+  <!-- Signed out: sign in to write -->
+  <div
+    v-if="!canWrite"
+    class="flex flex-wrap items-center gap-3 p-4 sm:p-5"
+    :class="inline ? 'rounded-2xl border border-white/10 bg-navy-950/60' : 'card'"
+  >
+    <template v-if="authStatus === 'unavailable'">
+      <p class="text-sm text-krita-dim">Att publicera inlägg är inte påslaget här.</p>
+    </template>
+    <template v-else>
+      <p class="min-w-0 flex-1 text-sm leading-relaxed">
+        <span class="font-semibold">Vill du snacka{{ inline ? ' om det här' : '' }}?</span>
+        <span class="text-krita-dim"> Logga in med din e-post, så publicerar du med din supporterprofil.</span>
+      </p>
+      <button type="button" class="rounded-full bg-guld px-5 py-2 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="accountOpen = true">
+        Logga in
+      </button>
+    </template>
+  </div>
+
   <form
+    v-else
     class="p-4 transition duration-300 sm:p-5"
     :class="[inline ? 'rounded-2xl border border-white/10 bg-navy-950/60' : 'card', expanded && !inline && 'border-himmel/40 shadow-[0_20px_60px_-30px_rgb(95_176_236/0.6)]']"
+    :aria-busy="publishing"
     @submit.prevent="submit"
   >
     <div class="flex gap-3">
@@ -93,8 +135,10 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
           v-model="body"
           :rows="expanded ? 3 : 1"
           :placeholder="prompt"
+          :readonly="publishing"
           class="w-full resize-none bg-transparent leading-relaxed placeholder:text-krita-dim/70 focus:outline-none"
           :class="inline ? 'pt-1 text-[0.95rem]' : 'pt-2.5 text-base'"
+          :aria-describedby="hintId"
           @focus="focused = true"
           @blur="focused = false"
           @keydown.meta.enter.prevent="submit"
@@ -139,10 +183,14 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
         v-else
         type="submit"
         class="rounded-full bg-himmel px-5 py-2 text-sm font-bold text-navy-950 transition enabled:hover:-translate-y-0.5 enabled:hover:bg-himmel-300 disabled:opacity-40"
-        :disabled="!me || !body.trim() || left < 0"
+        :disabled="!me || publishing || !body.trim() || left < 0"
       >
-        Släng ut det
+        {{ publishing ? 'Publicerar…' : 'Publicera' }}
       </button>
+      <p :id="hintId" class="basis-full text-xs text-krita-dim">
+        Syns för alla i Snacket på stan, även för den som inte är inloggad.
+      </p>
     </div>
+    <p v-if="error" class="mt-3 rounded-xl bg-rod/15 px-3 py-2 text-sm font-semibold text-krita" role="alert">{{ error }}</p>
   </form>
 </template>

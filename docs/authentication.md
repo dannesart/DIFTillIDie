@@ -1,6 +1,6 @@
 # Supporter accounts: sign in with an e-mail code
 
-Supporters sign in with a **six-digit code sent by e-mail** and choose a **display name** and a **unique handle**. Everything else stays public: news, Stories, fixtures and podcasts never require an account. The fictional Snacket på stan posts are untouched. Signed in, you snack under your own profile, still locally only (see [Snacket identity](#snacket-identity-local-only)).
+Supporters sign in with a **six-digit code sent by e-mail** and choose a **display name** and a **unique handle**. Everything else stays public: news, Stories, fixtures and podcasts never require an account. The fictional Snacket på stan posts are untouched. Signed in with a profile, you publish real posts (see [snacket-posts.md](snacket-posts.md)).
 
 We first tried Google OAuth. Google's consent screen showed the random Supabase project domain, and fixing that needs a paid custom domain. The installed iPhone app also can't reliably finish a redirect-based sign-in. Email codes avoid both problems: the supporter never leaves the page.
 
@@ -38,7 +38,7 @@ We first tried Google OAuth. Google's consent screen showed the random Supabase 
 
 - **Our state holds:** the user's id, and, while a code is pending, the address the supporter typed, on their own device.
 - **The e-mail address:** it's never shown to anyone else and never stored in `profiles`. Supabase keeps it in `auth.users`, which is private to the project.
-- **Profiles:** none are created automatically, and they aren't readable by other supporters yet. Public display gets its own reviewed policy or view when real Snacket posts arrive.
+- **Profiles:** none are created automatically. With the posts migration, a supporter's `display_name` and `handle` become readable by everyone once they've published a post, and nothing else ever is (see [snacket-posts.md](snacket-posts.md#what-changes-for-profiles)).
 
 ### Caching and personal data: the `'/': { isr: 300 }` review
 
@@ -49,9 +49,11 @@ We first tried Google OAuth. Google's consent screen showed the random Supabase 
 - **Verified in the Netlify build:** a request carrying a session-like cookie produces HTML with no session or user data. It contains only the *public* Supabase URL and publishable key.
 - **If we ever move sessions into cookies or server rendering,** `/` must stop being ISR-cached, or personalised parts must be fetched client-side.
 
-## Snacket identity (local only)
+## Snacket identity (local content)
 
-Snacket på stan has no posts backend yet. Everything a visitor writes, reacts to or drafts stays in their browser's `localStorage`. What signing in changes is **who** that content is written as, and **whose** local content is shown.
+> Since [real posts](snacket-posts.md), posting means publishing to Supabase. What follows still governs the **local** parts: reactions and comments on demo posts, Story drafts, and posts written before Snacket became real (shown in Demo-snack, never uploaded).
+
+Everything below stays in the browser's `localStorage`. What signing in changes is **who** that content is written as, and **whose** local content is shown.
 
 - **Owners.** Local content is stored per owner ([`app/lib/localScope.ts`](../app/lib/localScope.ts)):
   - The **guest** keeps the original keys, `djurgarn:snacket:v1` and `djurgarn:drafts:v1`, so existing data is untouched.
@@ -177,23 +179,15 @@ Locally, copy [`.env.example`](../.env.example) to `.env`. If those variables ar
 8. **Change address** on the code step → back to step 1.
 9. **Public use, signed out and in:** stories, match card, podcast playback with the mini-player.
 10. **Android Chrome,** tab and installed: repeat 1, 5 and 6.
-11. **Snacket identity:**
-    - As a guest, post something.
-    - Sign in → your guest post is hidden, and "Du på läktaren" shows your profile and mentions the guest post.
-    - Post, comment and start a Story draft → all show your name.
+11. **Snacket identity, local parts:**
+    - As a guest, comment on a demo post.
+    - Sign in → that comment is hidden, and "Du på läktaren" shows your profile.
+    - Comment on a demo post and start a Story draft → both show your name.
     - Change your profile → they update at once.
-    - Sign out → only the guest post is back.
-    - Sign in as someone else → none of the first account's posts, comments or drafts are shown.
+    - Sign out → only the guest comment is back.
+    - Sign in as someone else → none of the first account's local comments or drafts are shown.
 
-The equivalent of step 11 was run in a headless browser against the dev server, with all Supabase calls intercepted. It covered:
-
-- existing guest data;
-- signing in without a profile, then creating one;
-- editing the profile (posts, comments and avatar updated live);
-- signing out;
-- a second, returning account on the same browser;
-- reloading;
-- switching back.
+Real posts have their own two-device plan in [snacket-posts.md](snacket-posts.md#manual-two-device-test-plan-after-applying-the-migration).
 
 ## Verified against the hosted project
 

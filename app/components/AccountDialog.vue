@@ -71,7 +71,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
       <template v-if="status === 'signed-out' || status === 'loading'">
         <h2 id="account-title" class="mt-1 font-display text-3xl font-bold leading-tight">Kliv in på läktaren</h2>
         <p class="mt-2 text-sm leading-relaxed text-krita-dim">
-          Logga in och snacka med din egen supporterprofil i stället för som gäst.
+          Logga in för att publicera i Snacket på stan med din egen supporterprofil.
           Nyheter, matcher och poddar är öppna för alla, inloggad eller inte.
         </p>
 
@@ -87,7 +87,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
       <!-- Signed in, no profile yet (or editing it) -->
       <template v-else-if="status === 'signed-in' && (profileStatus === 'missing' || editing)">
         <h2 id="account-title" class="mt-1 font-display text-3xl font-bold leading-tight">{{ editing ? 'Ändra profil' : 'Välkommen in! 💙' }}</h2>
-        <p v-if="!editing" class="mt-2 text-sm leading-relaxed text-krita-dim">Välj hur du syns på läktaren. Det är namnet du snackar med i Snacket på stan – andra ser det först när det riktiga Snacket öppnar.</p>
+        <p v-if="!editing" class="mt-2 text-sm leading-relaxed text-krita-dim">Välj hur du syns på läktaren. Det är namnet du publicerar med i Snacket på stan, och det syns för alla när du har skrivit något.</p>
         <ProfileForm class="mt-5" :initial="editing ? profile : null" @saved="editing = false" @cancel="editing = false" />
         <button v-if="!editing" class="mt-4 text-xs font-semibold text-krita-dim underline decoration-white/20 underline-offset-2 hover:text-krita" @click="signOut">Logga ut</button>
       </template>
@@ -103,7 +103,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
           </div>
         </div>
         <p class="mt-4 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm leading-relaxed text-krita-dim">
-          Du snackar med den här profilen i Snacket på stan. Det är fortfarande demo: det du skriver sparas bara i den här webbläsaren och syns inte för någon annan än.
+          Du publicerar i Snacket på stan med den här profilen. Namnet och handlet syns för alla när du har skrivit något – din e-postadress aldrig.
         </p>
         <div class="mt-5 flex flex-wrap gap-2">
           <button class="rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold transition hover:border-himmel hover:text-himmel" @click="editing = true">Ändra profil</button>

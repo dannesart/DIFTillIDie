@@ -76,8 +76,8 @@ describe('someone else’s profile', () => {
 
   it('cannot be read', async () => {
     await as(db, 'authenticated', LOTTA, async () => {
-      expect((await db.query('select * from public.profiles')).rows).toEqual([])
-      expect((await db.query('select * from public.profiles where id = $1', [HASSE])).rows).toEqual([])
+      expect((await db.query('select id, display_name, handle from public.profiles')).rows).toEqual([])
+      expect((await db.query('select id, display_name, handle from public.profiles where id = $1', [HASSE])).rows).toEqual([])
     })
   })
 
@@ -160,15 +160,19 @@ describe('grants', () => {
       select grantee, privilege_type from information_schema.role_table_grants
       where table_schema = 'public' and table_name = 'profiles' and grantee in ('anon', 'authenticated', 'public')
       order by grantee, privilege_type`)
-    expect(rows).toEqual([{ grantee: 'authenticated', privilege_type: 'SELECT' }])
+    // Everything is column-level (SELECT since the posts migration).
+    expect(rows).toEqual([])
     const cols = await db.query<{ privilege_type: string, column_name: string }>(`
       select privilege_type, column_name from information_schema.column_privileges
-      where table_schema = 'public' and table_name = 'profiles' and grantee = 'authenticated' and privilege_type in ('INSERT', 'UPDATE')
+      where table_schema = 'public' and table_name = 'profiles' and grantee = 'authenticated' and privilege_type in ('SELECT', 'INSERT', 'UPDATE')
       order by privilege_type, column_name`)
     expect(cols.rows).toEqual([
       { privilege_type: 'INSERT', column_name: 'display_name' },
       { privilege_type: 'INSERT', column_name: 'handle' },
       { privilege_type: 'INSERT', column_name: 'id' },
+      { privilege_type: 'SELECT', column_name: 'display_name' },
+      { privilege_type: 'SELECT', column_name: 'handle' },
+      { privilege_type: 'SELECT', column_name: 'id' },
       { privilege_type: 'UPDATE', column_name: 'display_name' },
       { privilege_type: 'UPDATE', column_name: 'handle' },
     ])

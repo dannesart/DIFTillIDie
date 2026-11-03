@@ -5,9 +5,10 @@ A digital home for Djurgården supporters, covering football and hockey: stories
 > **Partly real, partly demo.**
 > - **Real:** Stories, fetched from the publishers' own RSS feeds, and *Djurgårn by night* episodes.
 > - **Real, too:** the next match, from the clubs' official schedules (see [Fixtures](#fixtures)).
-> - **Invented:** the people and posts in *Snacket på stan*. The page labels them as demo.
+> - **Real, too:** posts under *Från läktaren* in Snacket på stan, published by signed-in supporters and stored in Supabase (see [Real posts](docs/snacket-posts.md)).
+> - **Invented:** the people and posts under *Demo-snack*. Each card is marked "påhittad".
 >
-> Anything a visitor writes, reacts to or comments on is saved only in their own browser (`localStorage`). Search engines are kept out for now: a `noindex` meta tag plus an `X-Robots-Tag` header.
+> Reactions and comments on the demo posts, and any posts written before Snacket became real, are saved only in the visitor's own browser (`localStorage`) and are never uploaded. Search engines are kept out for now: a `noindex` meta tag plus an `X-Robots-Tag` header.
 
 ## Stack
 
@@ -34,7 +35,7 @@ The vocabulary is kept small, in [`shared/types/domain.ts`](shared/types/domain.
 
 - **Story**: an event, as one or more SourceArticles. It has no headline of its own: it shows the earliest source's original headline, credited to that source. `sharedNames` lists the names that caused the sources to be grouped.
 - **SourceArticle**: one outlet's article. It keeps its own publisher, original headline, the publisher's own teaser, URL and publication date, and is never merged with other sources.
-- **Post**: a supporter's post in Snacket, with reactions, comments, @mentions, #tags and an optional attached Story.
+- **Post**: a supporter's post in Snacket, with @mentions, #tags and an optional attached Story. Real posts live in Supabase (`public.posts`); demo posts also have reactions and comments, kept locally.
 
 Demo content (the posts) lives in [`app/data/`](app/data/). The timestamps are relative and are fixed once on the server (`useDemoNow`), so SSR and hydration agree.
 
@@ -44,8 +45,8 @@ Demo content (the posts) lives in [`app/data/`](app/data/). The timestamps are r
 - **Allt / Fotboll / Hockey** in the header filters the whole page: stories, feed and next match.
 - **Source pills** link straight to each original article.
 - **"Snackas om i N inlägg"** on a Story filters the feed to posts about it. An attached Story inside a post scrolls back to that Story and highlights it.
-- **Hetast / Nyast på stan.** "Hetast" is engagement cooled by age, so the order changes as you react.
-- **"Snacka om detta"** on any Story opens a dialog (a bottom sheet on phones) for writing about it, with the Story attached. Drafts survive closing it by accident. The post lands in Snacket på stan, stored only in this browser. The small "💬 N inlägg" link next to the button takes you to what's already been said.
+- **Hetast / Nyast** in Demo-snack. "Hetast" is engagement cooled by age, so the order changes as you react. The real feed is simply newest first.
+- **"Snacka om detta"** on any Story opens a dialog (a bottom sheet on phones) for writing about it, with the Story attached. Drafts survive closing it by accident. Signed in with a profile, the post is published to Snacket på stan for everyone. The small "💬 N inlägg" link next to the button takes you to what's already been said.
 - **The source badge on the match card** ("dif.se" / "Verifierad …") opens details on team coverage and where the fixtures come from.
 - **Click an @handle** to mention that person in the composer. **Click a #tag** to filter the feed.
 - **"Lägg i kalendern"** downloads an `.ics` file for the real next match.
@@ -153,7 +154,7 @@ The card then shows a click-to-load player. Nothing is loaded from Spotify or Yo
 
 Supporters sign in with a six-digit code sent by e-mail (Supabase `signInWithOtp` / `verifyOtp`), without ever leaving the page, and choose a display name and handle. Nothing public requires an account, and Snacket på stan's fictional posts are unchanged.
 
-Signed in with a profile, you post, comment and draft in Snacket under that name and handle, and edits to the profile show everywhere at once. Posts are still **local only**: nothing is sent to a server. Each account, and the guest, has its own local posts, reactions, comments and drafts, so a shared browser never shows one supporter's content to another or re-attributes guest posts.
+Signed in with a profile, you **publish** to Snacket på stan under that name and handle, for everyone to read. The design, the security model, the tests and a two-device test plan are in [`docs/snacket-posts.md`](docs/snacket-posts.md). Local demo reactions, comments and drafts are kept separately per account and for the guest, so a shared browser never shows one supporter's local content to another.
 
 - **Docs:** setup, the security model, the caching review, the e-mail template, SMTP requirements, future registration modes and a device test plan are in [`docs/authentication.md`](docs/authentication.md).
 - **Migration:** [`supabase/migrations/`](supabase/migrations/), with pgTAP authorization tests in [`supabase/tests/`](supabase/tests/).

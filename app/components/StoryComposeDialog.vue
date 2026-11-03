@@ -7,7 +7,7 @@
  */
 const { activeId, draftFor, setDraft, close } = useStoryCompose()
 const { stories } = useNews()
-const { postsForStory, filter } = useSnacket()
+const { postsForStory, filter, identity } = useSnacket()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const composer = useTemplateRef<{ focus: () => void }>('composer')
@@ -80,7 +80,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
     ref="dialog"
     class="compose-dialog text-krita"
     aria-labelledby="compose-title"
-    aria-describedby="compose-local"
+    aria-describedby="compose-note"
     @close="onClose"
     @click="onClick"
   >
@@ -111,10 +111,10 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
         </div>
 
         <template v-if="published === null">
-          <p v-if="restored && draft" class="mt-3 text-xs font-semibold text-guld">Ditt utkast finns kvar.</p>
+          <p v-if="restored && draft && identity.kind !== 'guest'" class="mt-3 text-xs font-semibold text-guld">Ditt utkast finns kvar.</p>
           <PostComposer ref="composer" v-model:body="draft" :story="story" class="mt-3" @published="onPublished" />
           <div class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-krita-dim">
-            <p id="compose-local"><span aria-hidden="true">🔒</span> Sparas bara i den här webbläsaren – ingen annan kan se det än.</p>
+            <p id="compose-note">Ditt utkast sparas medan du skriver. Publicerade inlägg syns för alla i Snacket på stan.</p>
             <button v-if="earlier.length" class="font-semibold hover:text-krita" @click="readInSnacket">
               {{ earlier.length }} {{ earlier.length === 1 ? 'inlägg' : 'inlägg' }} om detta →
             </button>
@@ -129,7 +129,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
           </svg>
           <p class="mt-4 font-display text-3xl font-bold">Ute på stan<span class="text-rod">!</span></p>
           <p class="mx-auto mt-3 max-w-sm rounded-2xl bg-white/[0.05] px-4 py-3 text-left text-sm leading-relaxed">”{{ published }}”</p>
-          <p id="compose-local" class="mt-3 text-xs text-krita-dim">Syns i Snacket på stan – sparat bara i den här webbläsaren.</p>
+          <p id="compose-note" class="mt-3 text-xs text-krita-dim">Publicerat i Snacket på stan – nu kan alla se det.</p>
           <div class="mt-6 flex flex-wrap justify-center gap-2">
             <button id="compose-done" class="rounded-full bg-guld px-6 py-2.5 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="close()">Klar</button>
             <button class="rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold transition hover:border-himmel hover:text-himmel" @click="readInSnacket">Visa i Snacket</button>

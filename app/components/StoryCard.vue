@@ -122,7 +122,7 @@ watch(talk, (n, old) => {
       <button
         v-if="talk"
         class="inline-flex items-center gap-1.5 text-sm font-semibold text-krita-dim transition hover:text-krita"
-        :title="'Läs i Snacket på stan (sparat i den här webbläsaren)'"
+        title="Läs i Snacket på stan"
         @click="readTalk"
       >
         <span aria-hidden="true">💬</span>

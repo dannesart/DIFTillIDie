@@ -6,7 +6,7 @@ import { REACTIONS } from '~/composables/useSnacket'
 const props = defineProps<{ post: FeedPost }>()
 const emit = defineEmits<{ mention: [handle: string] }>()
 
-const { toggleReaction, addComment, remove, filter, me, identity, owner } = useSnacket()
+const { toggleReaction, addComment, remove, filter, me, identity, owner, community } = useSnacket()
 const accountOpen = useAccountDialog()
 const { show } = useStorySpotlight()
 const { stories } = useNews()
@@ -29,6 +29,18 @@ function sendComment() {
   addComment(props.post.id, draft.value)
   draft.value = ''
 }
+
+// Deleting a real post is for everyone, so it asks first and waits for Supabase.
+const confirming = ref(false)
+const removing = ref(false)
+const removeError = ref<string | null>(null)
+async function removeReal() {
+  removing.value = true
+  removeError.value = null
+  const r = await community.remove(props.post.id)
+  removing.value = false
+  if (!r.ok) removeError.value = r.message
+}
 </script>
 
 <template>
@@ -38,17 +50,27 @@ function sendComment() {
       <div class="min-w-0 flex-1">
         <p class="flex flex-wrap items-baseline gap-x-2">
           <span class="font-semibold">{{ post.author.name }}</span>
+          <!-- A real supporter may pick the same name or handle as a fictional one; the card says which is which. -->
+          <span v-if="post.demo" class="self-center rounded-full border border-guld/40 px-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-guld" title="Påhittad supporter i demo-snacket">påhittad</span>
           <button class="text-sm text-krita-dim hover:text-himmel" :title="`Nämn @${post.author.handle}`" @click="emit('mention', post.author.handle)">@{{ post.author.handle }}</button>
         </p>
         <p class="text-xs text-krita-dim">
           <span v-if="post.author.flair">{{ post.author.flair }} · </span>
           <TimeAgo :at="post.createdAt" />
           <span v-if="post.sport" class="capitalize"> · {{ post.sport }}</span>
-          <span v-if="post.own" title="Sparat bara i den här webbläsaren – ingen annan ser det"> · <span aria-hidden="true">🔒</span> bara här</span>
+          <span v-if="post.own && !post.real" title="Sparat bara i den här webbläsaren – ingen annan ser det"> · <span aria-hidden="true">🔒</span> bara här</span>
         </p>
       </div>
-      <button v-if="post.own" class="text-xs text-krita-dim hover:text-rod" @click="remove(post.id)">Ta bort</button>
+      <template v-if="post.own && post.real">
+        <div v-if="confirming" class="flex shrink-0 items-center gap-2 text-xs">
+          <button class="font-bold text-rod hover:underline disabled:opacity-50" :disabled="removing" @click="removeReal">{{ removing ? 'Tar bort…' : 'Ja, ta bort för alla' }}</button>
+          <button class="text-krita-dim hover:text-krita" :disabled="removing" @click="confirming = false; removeError = null">Avbryt</button>
+        </div>
+        <button v-else class="text-xs text-krita-dim hover:text-rod" @click="confirming = true">Ta bort</button>
+      </template>
+      <button v-else-if="post.own" class="text-xs text-krita-dim hover:text-rod" @click="remove(post.id)">Ta bort</button>
     </header>
+    <p v-if="removeError" class="mt-2 text-right text-xs font-semibold text-rod" role="alert">{{ removeError }}</p>
 
     <p class="mt-3 whitespace-pre-line text-[1.02rem] leading-relaxed">
       <template v-for="(t, i) in tokens" :key="i">
@@ -67,7 +89,7 @@ function sendComment() {
       <span class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel">→</span>
     </button>
 
-    <footer class="mt-4 flex flex-wrap items-center gap-1.5">
+    <footer v-if="!post.real" class="mt-4 flex flex-wrap items-center gap-1.5">
       <button
         v-for="r in REACTIONS"
         :key="r.key"
@@ -86,7 +108,7 @@ function sendComment() {
       </button>
     </footer>
 
-    <div v-if="open" class="mt-4 space-y-3 border-t border-white/8 pt-4">
+    <div v-if="open && !post.real" class="mt-4 space-y-3 border-t border-white/8 pt-4">
       <div v-for="c in post.comments" :key="c.id" class="flex gap-2.5">
         <Avatar :name="c.author.name" size="sm" />
         <div class="min-w-0 flex-1 rounded-2xl rounded-tl-sm bg-white/[0.04] px-3.5 py-2.5">

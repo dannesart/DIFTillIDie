@@ -2,6 +2,7 @@ import type { NewsResponse, Post, PostAuthor, PostComment, ReactionKey, Sport, S
 import { buildDemoPosts } from '~/data/posts'
 import type { LocalOwner, SnacketIdentity } from '~/lib/localScope'
 import { readScoped, resolveIdentity, scopedKey } from '~/lib/localScope'
+import type { CommunityPost, PublishResult } from '~/lib/posts'
 
 export const REACTIONS: { key: ReactionKey, emoji: string, label: string }[] = [
   { key: 'hjarta', emoji: '💙', label: 'Blått hjärta' },
@@ -32,7 +33,24 @@ interface LocalState {
 export interface FeedPost extends Post {
   mine: ReactionKey[]
   own: boolean
+  /** Published for real, in Supabase: no reactions or comments yet. */
+  real?: boolean
 }
+
+const toFeedPost = (p: CommunityPost, me: string | null): FeedPost => ({
+  id: p.id,
+  author: { name: p.author.name, handle: p.author.handle },
+  body: p.body,
+  createdAt: p.createdAt,
+  sport: p.sport,
+  storyId: p.storyId,
+  reactions: { hjarta: 0, eld: 0, stjarna: 0, tarar: 0 },
+  comments: [],
+  demo: false,
+  mine: [],
+  own: !!me && p.author.id === me,
+  real: true,
+})
 
 const STORAGE_KEY = 'djurgarn:snacket:v1'
 
@@ -65,6 +83,7 @@ export function useSnacket() {
   const filter = useState<FeedFilter>('snacket-filter', () => ({}))
   const { sport, matches } = useSport()
   const auth = useAuth()
+  const community = useCommunity()
   const authOwner = useLocalOwner()
   // Read the news already fetched for the page; never triggers a fetch itself.
   const { data: news } = useNuxtData<NewsResponse>('news')
@@ -93,6 +112,7 @@ export function useSnacket() {
     if (loaded.value || !import.meta.client) return
     loaded.value = true
     watch(authOwner, switchTo, { immediate: true })
+    void community.refresh()
   }
 
   const all = computed<FeedPost[]>(() => {
@@ -108,22 +128,31 @@ export function useSnacket() {
     })
   })
 
-  const feed = computed(() => {
-    const now = loaded.value ? Date.now() : demoNow.value
+  /** Real posts, newest first, exactly as Supabase returned them. */
+  const realAll = computed<FeedPost[]>(() => community.posts.value.map(p => toFeedPost(p, auth.userId.value)))
+
+  function passes(p: FeedPost) {
     const { tag, storyId } = filter.value
     const story = storyId ? news.value?.stories.find(s => storyAnswersTo(s, storyId)) : undefined
-    const list = all.value.filter(p =>
-      matches(p.sport)
+    return matches(p.sport)
       && (!storyId || (story ? storyAnswersTo(story, p.storyId) : p.storyId === storyId))
-      && (!tag || p.body.toLowerCase().includes(`#${tag.toLowerCase()}`)),
-    )
+      && (!tag || p.body.toLowerCase().includes(`#${tag.toLowerCase()}`))
+  }
+
+  /** The real feed: newest first, no ranking. */
+  const realFeed = computed(() => realAll.value.filter(passes))
+
+  /** The demo feed (fictional posts plus this browser's old local posts), with its Hetast/Nyast sorting. */
+  const feed = computed(() => {
+    const now = loaded.value ? Date.now() : demoNow.value
+    const list = all.value.filter(passes)
     return mode.value === 'nyast'
       ? list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       : list.sort((a, b) => heat(b, now) - heat(a, now))
   })
 
-  /** Posts about a Story, newest first. */
-  const postsForStory = (story: Story) => all.value
+  /** Posts about a Story, real and demo, newest first. */
+  const postsForStory = (story: Story) => [...realAll.value, ...all.value]
     .filter(p => storyAnswersTo(story, p.storyId))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const countForStory = (story: Story) => postsForStory(story).length
@@ -144,33 +173,19 @@ export function useSnacket() {
   }
 
   /**
-   * Publish a post (only to this browser). By default the feed jumps to
-   * "Nyast" so you see it; `keepView` leaves the feed as it is, for
-   * posting from somewhere else on the page, like a Story.
+   * Publish for real, to Supabase, as the signed-in supporter. Only a
+   * confirmed insert counts. By default the filters are cleared so the new
+   * post is in view; `keepView` leaves them, for posting from a Story.
    */
-  function publish(body: string, opts: { sport?: Sport, storyId?: string, keepView?: boolean } = {}): string | undefined {
-    const text = body.trim()
-    if (!text || !me.value) return
+  async function publish(body: string, opts: { sport?: Sport, storyId?: string, keepView?: boolean } = {}): Promise<PublishResult> {
     const { keepView, ...attach } = opts
-    const id = `mine-${uid()}`
-    local.value.posts.unshift({
-      id,
-      author: { ...me.value },
-      body: text,
-      createdAt: new Date().toISOString(),
-      ...attach,
-      reactions: { hjarta: 0, eld: 0, stjarna: 0, tarar: 0 },
-      comments: [],
-      demo: false,
-    })
-    save()
-    if (!keepView) {
-      mode.value = 'nyast'
-      filter.value = {}
-    }
-    return id
+    if (identity.value.kind !== 'member') return { ok: false, message: 'Logga in och välj ditt läktarnamn för att publicera.' }
+    const r = await community.publish({ body, ...attach })
+    if (r.ok && !keepView) filter.value = {}
+    return r
   }
 
+  /** Remove one of this browser's old local posts. */
   function remove(postId: string) {
     local.value.posts = local.value.posts.filter(p => p.id !== postId)
     save()
@@ -188,5 +203,5 @@ export function useSnacket() {
     save()
   }
 
-  return { all, feed, mode, filter, sport, me, identity, owner, guestPostCount, load, toggleReaction, addComment, publish, remove, setName, countForStory, postsForStory }
+  return { all, feed, realAll, realFeed, community, mode, filter, sport, me, identity, owner, guestPostCount, load, toggleReaction, addComment, publish, remove, setName, countForStory, postsForStory }
 }

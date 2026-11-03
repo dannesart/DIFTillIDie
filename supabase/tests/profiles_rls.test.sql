@@ -20,9 +20,10 @@ select ok((select relrowsecurity from pg_class where oid = 'public.profiles'::re
 select is(
   (select count(*)::int from information_schema.role_table_grants where table_schema = 'public' and table_name = 'profiles' and grantee in ('anon', 'public')),
   0, 'anon and public have no table privileges');
+-- Since the posts migration, SELECT is column-level too (id, display_name, handle).
 select is(
-  (select array_agg(privilege_type::text order by privilege_type) from information_schema.role_table_grants where table_schema = 'public' and table_name = 'profiles' and grantee = 'authenticated'),
-  array['SELECT'], 'authenticated has only SELECT at table level (INSERT/UPDATE are column-level)');
+  (select count(*)::int from information_schema.role_table_grants where table_schema = 'public' and table_name = 'profiles' and grantee = 'authenticated'),
+  0, 'authenticated has no table-level privileges (SELECT, INSERT and UPDATE are column-level)');
 
 -- ── Anonymous ────────────────────────────────────────────────────────────
 set local role anon;
@@ -52,7 +53,7 @@ select throws_ok($$ update public.profiles set created_at = now() - interval '10
 select throws_ok($$ delete from public.profiles $$, '42501', null, 'Lotta cannot delete profiles');
 
 -- ── Lotta vs Hasse's profile ─────────────────────────────────────────────
-select is_empty($$ select * from public.profiles where id = '22222222-2222-4222-8222-222222222222' $$, 'Lotta cannot read Hasse''s profile');
+select is_empty($$ select id, display_name, handle from public.profiles where id = '22222222-2222-4222-8222-222222222222' $$, 'Lotta cannot read Hasse''s profile');
 select is_empty($$ update public.profiles set display_name = 'Hackad' where id = '22222222-2222-4222-8222-222222222222' returning id $$, 'Lotta cannot update Hasse''s profile');
 select results_eq($$ update public.profiles set display_name = 'Lotta G' returning id::text $$, array['11111111-1111-4111-8111-111111111111'], 'An UPDATE without WHERE touches only Lotta''s row');
 select throws_ok($$ insert into public.profiles (id, display_name, handle) values ('22222222-2222-4222-8222-222222222222', 'Fake Hasse', 'fake_hasse') $$, '42501', null, 'Lotta cannot create a profile for Hasse');
