@@ -62,7 +62,7 @@ Everything in Snacket på stan is real and stored in Supabase (see [snacket-post
 
 - **Still local and per owner:**
   - **Story drafts.** The guest keeps `djurgarn:drafts:v1`, and each account has `djurgarn:drafts:v1:account:<user id>`. Switching account clears a half-typed post or comment and closes an open Story dialog.
-  - **Posts written before Snacket became real**, under `djurgarn:snacket:v1` (guest) or `djurgarn:snacket:v1:account:<user id>`. They're shown read-only, to their owner only, collapsed under "Bara på den här enheten" ([`LegacyLocalPosts.vue`](../app/components/LegacyLocalPosts.vue), [`app/lib/legacyLocal.ts`](../app/lib/legacyLocal.ts)). They're never uploaded, never counted and never mixed into the feed. The writer can remove one at a time. Nothing else in that stored data is changed or deleted.
+  - **Posts written before Snacket became real**, under `djurgarn:snacket:v1` (guest) or `djurgarn:snacket:v1:account:<user id>`, are **dormant**: the app no longer reads them, and never publishes, migrates or deletes them.
 
 ## Registration modes (future): signing in is not permission
 

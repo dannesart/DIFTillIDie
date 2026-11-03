@@ -1,6 +1,4 @@
 import type { NewsResponse, ReactionKey, Sport, Story } from '#shared/types/domain'
-import type { LegacyLocalPost } from '~/lib/legacyLocal'
-import { readLegacyPosts, removeLegacyPost } from '~/lib/legacyLocal'
 import type { SnacketIdentity } from '~/lib/localScope'
 import { resolveIdentity } from '~/lib/localScope'
 import type { CommunityPost, PublishResult } from '~/lib/posts'
@@ -8,7 +6,9 @@ import type { CommunityPost, PublishResult } from '~/lib/posts'
 /*
  * Snacket på stan: real posts by signed-in supporters, from Supabase,
  * newest first. Filters (sport, #tag, Story) and Story counts come only
- * from those posts. Old browser-local posts are kept apart, read-only.
+ * from those posts. (Posts some browsers saved locally before Snacket
+ * became real are left dormant in localStorage: never read, published or
+ * deleted.)
  */
 
 export const REACTIONS: { key: ReactionKey, emoji: string, label: string }[] = [
@@ -47,8 +47,6 @@ const toFeedPost = (p: CommunityPost, me: string | null): FeedPost => ({
 export function useSnacket() {
   const loaded = useState('snacket-loaded', () => false)
   const filter = useState<FeedFilter>('snacket-filter', () => ({}))
-  /** This owner's posts from before Snacket became real. Browser only, never published. */
-  const legacy = useState<LegacyLocalPost[]>('snacket-legacy', () => [])
   const { sport, matches } = useSport()
   const auth = useAuth()
   const community = useCommunity()
@@ -64,8 +62,6 @@ export function useSnacket() {
   function load() {
     if (loaded.value || !import.meta.client) return
     loaded.value = true
-    // Each owner sees only their own old local posts, and only on this device.
-    watch(owner, o => (legacy.value = o ? readLegacyPosts(localStorage, o) : []), { immediate: true })
     void community.refresh()
   }
 
@@ -100,13 +96,5 @@ export function useSnacket() {
     return r
   }
 
-  /** Remove one old local post, because its writer asked to. Nothing else is touched. */
-  function removeLegacy(id: string): boolean {
-    const o = owner.value
-    if (!o || !removeLegacyPost(localStorage, o, id)) return false
-    legacy.value = readLegacyPosts(localStorage, o)
-    return true
-  }
-
-  return { all, feed, community, filter, sport, me, identity, owner, legacy, load, publish, removeLegacy, countForStory, postsForStory }
+  return { all, feed, community, filter, sport, me, identity, owner, load, publish, countForStory, postsForStory }
 }

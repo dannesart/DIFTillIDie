@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Sport, Story } from '#shared/types/domain'
+import { createComposerOpen, focusDestination } from '~/lib/composerState'
 import { POST_MAX, postLength } from '~/lib/posts'
 
 /*
@@ -24,8 +25,8 @@ const { sport: sportFilter } = useSport()
 
 const sport = ref<Sport | undefined>()
 const storyId = ref('')
-const focused = ref(false)
 const error = ref<string | null>(null)
+const form = useTemplateRef<HTMLFormElement>('form')
 const textarea = useTemplateRef<HTMLTextAreaElement>('textarea')
 const hintId = useId()
 
@@ -54,7 +55,11 @@ if (!props.story) {
 }
 
 const left = computed(() => POST_MAX - postLength(body.value))
-const expanded = computed(() => inline.value || focused.value || body.value.length > 0 || !!error.value)
+// Open/closed is its own state (see composerState): choosing a Story or a
+// sport never closes the composer, whatever happens to focus on the way.
+const composerOpen = createComposerOpen(() => !body.value.trim() && !storyId.value && !error.value)
+const expanded = computed(() => inline.value || composerOpen.open.value || body.value.length > 0 || !!error.value)
+const onFocusOut = (e: FocusEvent) => composerOpen.leave(focusDestination(form.value, e.relatedTarget))
 watch(body, () => (error.value = null))
 
 // Text typed as one person is never posted as the next. (The Story composer's
@@ -80,7 +85,9 @@ async function submit() {
     return
   }
   storyId.value = ''
-  textarea.value?.blur()
+  composerOpen.reset()
+  // Focus stays on the composer's own control otherwise, now hidden.
+  if (form.value?.contains(document.activeElement)) (document.activeElement as HTMLElement).blur()
   document.getElementById('snacket-feed')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
@@ -121,10 +128,14 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
 
   <form
     v-else
+    ref="form"
     class="p-4 transition duration-300 sm:p-5"
     :class="[inline ? 'rounded-2xl border border-white/10 bg-navy-950/60' : 'card', expanded && !inline && 'border-himmel/40 shadow-[0_20px_60px_-30px_rgb(95_176_236/0.6)]']"
     :aria-busy="publishing"
     @submit.prevent="submit"
+    @focusin="composerOpen.enter()"
+    @focusout="onFocusOut"
+    @keydown.esc="composerOpen.escape() && textarea?.blur()"
   >
     <div class="flex gap-3">
       <Avatar :name="me?.name ?? 'Du'" :size="inline ? 'sm' : undefined" />
@@ -139,15 +150,13 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
           class="w-full resize-none bg-transparent leading-relaxed placeholder:text-krita-dim/70 focus:outline-none"
           :class="inline ? 'pt-1 text-[0.95rem]' : 'pt-2.5 text-base'"
           :aria-describedby="hintId"
-          @focus="focused = true"
-          @blur="focused = false"
           @keydown.meta.enter.prevent="submit"
           @keydown.ctrl.enter.prevent="submit"
         />
       </label>
     </div>
 
-    <div v-show="expanded" class="mt-3 flex flex-wrap items-center gap-2 border-t border-white/8 pt-3" @mousedown.prevent>
+    <div v-show="expanded" class="mt-3 flex flex-wrap items-center gap-2 border-t border-white/8 pt-3">
       <template v-if="!inline">
         <button
           v-for="s in (['fotboll', 'hockey'] as const)"
@@ -164,7 +173,7 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
           <span class="truncate">Om: {{ leadOf(attached).headline }}</span>
           <button type="button" class="ml-0.5 shrink-0 opacity-70 hover:opacity-100" aria-label="Ta bort kopplingen till Storyn" @click="storyId = ''">✕</button>
         </span>
-        <select v-else v-model="storyId" class="chip max-w-[14rem] cursor-pointer border-white/12 bg-navy-900 text-krita-dim focus:outline-none" aria-label="Koppla till en Story" @mousedown.stop>
+        <select v-else v-model="storyId" class="chip max-w-[14rem] cursor-pointer border-white/12 bg-navy-900 text-krita-dim outline-none focus-visible:border-himmel" aria-label="Koppla till en Story">
           <option value="">Koppla till en Story…</option>
           <option v-for="s in stories" :key="s.id" :value="s.id">{{ leadOf(s).outlet }}: {{ leadOf(s).headline.slice(0, 60) }}</option>
         </select>

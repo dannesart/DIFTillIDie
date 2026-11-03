@@ -7,7 +7,7 @@ A digital home for Djurgården supporters, covering football and hockey: stories
 > - **The next match** comes from the clubs' official schedules (see [Fixtures](#fixtures)).
 > - **Snacket på stan** has posts, reactions and comments by signed-in supporters, stored in Supabase (see [Real posts](docs/snacket-posts.md)). There is no fictional content.
 >
-> Some visitors wrote posts before Snacket became real; those were only ever saved in their own browser. They stay there, read-only and visible only to their writer ("Bara på den här enheten"), and are never uploaded. Search engines are kept out for now: a `noindex` meta tag plus an `X-Robots-Tag` header.
+> Some visitors wrote posts before Snacket became real; those were only ever saved in their own browser. They are left dormant there: never shown, uploaded or deleted. Search engines are kept out for now: a `noindex` meta tag plus an `X-Robots-Tag` header.
 
 ## Stack
 

@@ -3,11 +3,10 @@ import type { SupporterProfile } from '#shared/utils/profile'
 import type { AuthStatus, ProfileStatus } from './auth'
 
 /*
- * Whose browser-local content is this? Story drafts, and the old local posts
- * from before Snacket became real, are stored per owner: the guest keeps the
- * original storage keys (so existing data stays put), and every signed-in
- * account gets its own. Switching account on a shared browser therefore
- * never shows, or re-attributes, someone else's local content.
+ * Whose browser-local content is this? Story drafts are stored per owner:
+ * the guest keeps the original storage key, and every signed-in account gets
+ * its own. Switching account on a shared browser therefore never shows, or
+ * re-attributes, someone else's draft.
  */
 export type LocalOwner = 'guest' | `account:${string}`
 

@@ -34,22 +34,17 @@ Mission #14 removed the fictional Snacket. That meant removing:
 
 The banner became a short **Pilot** banner: "Allt här är på riktigt…".
 
-**Old browser-local posts.** Some visitors wrote posts before real publishing existed. Those were only ever saved in their own browser, under `djurgarn:snacket:v1` (or `…:account:<id>`).
+**Old browser-local posts.** Some visitors wrote posts before real publishing existed. Those were only ever saved in their own browser, under `djurgarn:snacket:v1` (or `…:account:<id>`). They're now **dormant**:
 
-- **Never uploaded or attributed.** Uploading would publish words written as private, and attributing guest posts to an account would be guesswork.
-- **Never silently deleted.** No storage key is removed or rewritten on load.
-- **Shown only to their owner, on that device.** Each owner's own posts appear in a collapsed panel below the feed, "🔒 Dina N gamla inlägg · Bara på den här enheten", together with any local comments written on them. The panel is shown only when there's something in it.
-- **Not in the feed.** They aren't in the feed, its hashtags or its Story counts.
-- **Read-only.** There's no way to publish, react or comment from the panel, so there's no second local publishing experience.
-- **Removable on request.** The writer can remove one post at a time, after "Ja, ta bort från enheten". Only that post and its comments go; the rest of the stored bucket is written back unchanged.
+- **Not shown anywhere.** A read-only "Bara på den här enheten" viewer was tried in this mission and then removed: Snacket shows only real Supabase content.
+- **Never uploaded, migrated or attributed.** Uploading would publish words written as private, and attributing guest posts to an account would be guesswork.
+- **Never deleted.** No code reads, rewrites or removes those keys. They stay in the browser until its owner clears site data.
 
 **Tradeoffs:**
 
-- **Local reactions and comments on the fictional posts are no longer visible anywhere.** The posts they belonged to are gone, so they'd have no context. They stay in storage, untouched, rather than being deleted.
-- **The guest's local name** ("Byt namn") stays in storage too. Nothing uses it any more.
-- **There's no "publish this old post" button.** A supporter who wants to share an old post can copy its text into the composer themselves, which is an explicit act under their own name. A button for it would come close to automatic re-publishing.
-- **If a guest's browser data is cleared, the old posts are gone,** as they always would have been. They were never anywhere else.
-- **Most visitors never see the panel.** It only appears in browsers that actually hold old posts.
+- **A visitor who wrote local posts back then can no longer see them in the app.** The data is still in their browser's storage. Bringing back a viewer later would be a UI change only.
+- **The same goes for local reactions and comments on the retired fictional posts, and the old guest name:** they're dormant in storage, unused.
+- **Clearing browser data removes them,** as it always would have. They were never anywhere else.
 
 ### Honesty decisions (Mission #12)
 
@@ -113,7 +108,6 @@ Posts need visible authors, which the profiles migration anticipated ("public di
 | Migration | [`supabase/migrations/20261103144226_posts.sql`](../supabase/migrations/20261103144226_posts.sql) |
 | Store: read, publish, delete, error messages | [`app/lib/posts.ts`](../app/lib/posts.ts), provided by [`app/plugins/auth.client.ts`](../app/plugins/auth.client.ts), used via `useCommunity()` |
 | Feed, filters and Story counts | [`app/composables/useSnacket.ts`](../app/composables/useSnacket.ts): `feed` (filtered) and `all` |
-| Old browser-local posts (read-only) | [`app/lib/legacyLocal.ts`](../app/lib/legacyLocal.ts), [`LegacyLocalPosts.vue`](../app/components/LegacyLocalPosts.vue) |
 | UI | `SnacketSection`, `PostComposer`, `PostCard`, `StoryComposeDialog` |
 
 - **Posts are fetched in the browser.** The server never renders them, so the CDN-cached homepage stays identical for everyone and the feed is always fresh.

@@ -104,8 +104,6 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
               </template>
             </template>
           </section>
-
-          <LegacyLocalPosts />
         </div>
 
         <aside class="space-y-5 lg:sticky lg:top-24 lg:self-start">
