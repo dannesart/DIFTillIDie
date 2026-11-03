@@ -16,7 +16,7 @@ Järnmannen publishes something. Mattias reacts and comments. Both of them, and 
 
 ## What supporters see
 
-- **Reactions:** the same chips as Demo-snack (💙 🔥 ⭐ 😭) on every real post.
+- **Reactions:** 💙 🔥 ⭐ 😭 chips on every post.
   - **Counts are everyone's.** Your own reaction is highlighted.
   - **One active reaction per post.** Tapping it again removes it; tapping another replaces it.
   - **Nothing moves until Supabase confirms.** Meanwhile the chips are disabled, and a second tap does nothing.
@@ -30,7 +30,6 @@ Järnmannen publishes something. Mattias reacts and comments. Both of them, and 
   - Tapping a reaction shows *"Vill du vara med? Logga in för att reagera och kommentera."*, never a dead button.
   - Under a thread: "Logga in för att kommentera."
   - Signed in without a profile, both prompts say "Välj ditt läktarnamn" instead.
-- **Demo-snack** keeps its local-only reactions and comments. Nothing there is sent anywhere, and nothing real is mixed into it.
 - **Fresh data:** totals, your highlights and any open threads reload with the feed ("Hämta nya inlägg", or returning to the tab). Signing out clears the highlights, and signing in loads the new supporter's own.
 
 ## Data model and permissions
@@ -151,7 +150,7 @@ That's all. No user IDs, no rows, no timestamps, nothing about posts that don't 
    - `rpc/post_stats` returns counts only.
 8. **A** deletes the comment ("Ta bort" → "Ja, ta bort"). It disappears on C after fetching again. If A has no posts, A's profile is no longer readable by C.
 9. **B** deletes the post. In the dashboard, its comments and reactions are gone too.
-10. **Unaffected:** Demo-snack reactions and comments, Stories, podcasts and the match card all work signed out and in.
+10. **Unaffected:** Stories, podcasts and the match card all work signed out and in.
 
 ## Not verified (yet)
 

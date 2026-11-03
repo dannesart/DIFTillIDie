@@ -81,7 +81,7 @@ async function submit() {
   }
   storyId.value = ''
   textarea.value?.blur()
-  document.getElementById('snacket-real')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  document.getElementById('snacket-feed')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function mention(handle: string) {

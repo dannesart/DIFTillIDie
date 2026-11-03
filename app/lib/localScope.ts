@@ -3,11 +3,11 @@ import type { SupporterProfile } from '#shared/utils/profile'
 import type { AuthStatus, ProfileStatus } from './auth'
 
 /*
- * Whose local Snacket content is this? Posts, comments, reactions and drafts
- * are stored per owner: the guest keeps the original storage keys (so existing
- * data stays put), and every signed-in account gets its own. Switching account
- * on a shared browser therefore never shows, or re-attributes, someone else's
- * local content.
+ * Whose browser-local content is this? Story drafts, and the old local posts
+ * from before Snacket became real, are stored per owner: the guest keeps the
+ * original storage keys (so existing data stays put), and every signed-in
+ * account gets its own. Switching account on a shared browser therefore
+ * never shows, or re-attributes, someone else's local content.
  */
 export type LocalOwner = 'guest' | `account:${string}`
 
@@ -21,21 +21,20 @@ export function localOwnerFor(status: AuthStatus, userId: string | null): LocalO
 export const scopedKey = (base: string, owner: LocalOwner) => (owner === 'guest' ? base : `${base}:${owner}`)
 
 /**
- * Who you post as. A guest posts under their local guest name; a signed-in
- * supporter only under their own, complete profile, never the guest name.
+ * Who you post as. Only a signed-in supporter with their own, complete
+ * profile has an author identity; a guest reads, and is invited to sign in.
  */
 export type SnacketIdentity =
-  | { kind: 'guest' | 'member', author: PostAuthor }
-  | { kind: 'pending' | 'needs-profile', author?: undefined }
+  | { kind: 'member', author: PostAuthor }
+  | { kind: 'guest' | 'pending' | 'needs-profile', author?: undefined }
 
 export function resolveIdentity(
   owner: LocalOwner | null,
-  guest: PostAuthor,
   profile: SupporterProfile | null,
   profileStatus: ProfileStatus,
 ): SnacketIdentity {
   if (!owner) return { kind: 'pending' }
-  if (owner === 'guest') return { kind: 'guest', author: guest }
+  if (owner === 'guest') return { kind: 'guest' }
   if (profileStatus === 'ready' && profile && owner === `account:${profile.id}`) {
     return { kind: 'member', author: { name: profile.displayName, handle: profile.handle } }
   }

@@ -49,37 +49,20 @@ We first tried Google OAuth. Google's consent screen showed the random Supabase 
 - **Verified in the Netlify build:** a request carrying a session-like cookie produces HTML with no session or user data. It contains only the *public* Supabase URL and publishable key.
 - **If we ever move sessions into cookies or server rendering,** `/` must stop being ISR-cached, or personalised parts must be fetched client-side.
 
-## Snacket identity (local content)
+## Snacket identity and browser-local content
 
-> Since [real posts](snacket-posts.md), posting means publishing to Supabase. What follows still governs the **local** parts: reactions and comments on demo posts, Story drafts, and posts written before Snacket became real (shown in Demo-snack, never uploaded).
+Everything in Snacket på stan is real and stored in Supabase (see [snacket-posts.md](snacket-posts.md) and [snacket-interactions.md](snacket-interactions.md)). Who may write is decided by the database. On the client, `resolveIdentity` ([`app/lib/localScope.ts`](../app/lib/localScope.ts)) only decides what to offer:
 
-Everything below stays in the browser's `localStorage`. What signing in changes is **who** that content is written as, and **whose** local content is shown.
+| State | What Snacket offers |
+|---|---|
+| Signed out (or accounts not configured) | Reading everything; a friendly "Logga in" wherever you'd write, react or comment. No local name. |
+| Signed in, profile ready | Publishing, reacting and commenting as the profile's display name and handle. "Du på läktaren" → "Din profil". |
+| Signed in, no profile (or it failed to load) | "Välj läktarnamn" first; anything typed is kept. |
+| Auth still restoring | A moment's wait; no local content shown. |
 
-- **Owners.** Local content is stored per owner ([`app/lib/localScope.ts`](../app/lib/localScope.ts)):
-  - The **guest** keeps the original keys, `djurgarn:snacket:v1` and `djurgarn:drafts:v1`, so existing data is untouched.
-  - Each **signed-in account** gets its own keys, suffixed `:account:<user id>`.
-- **Who you post as:**
-
-  | State | Identity |
-  |---|---|
-  | Signed out (or accounts not configured) | The local guest name, "Du @blarandiggast" by default, changed with "Byt namn". Unchanged from before. |
-  | Signed in, profile ready | The profile's display name and handle, and the avatar derived from the name. "Du på läktaren" opens the account dialog ("Din profil") instead of "Byt namn". |
-  | Signed in, no profile (or it failed to load) | You can't post or comment yet. "Välj läktarnamn" opens the profile step, and anything typed is kept. |
-  | Auth still restoring | No local content is shown, and posting waits a moment. |
-
-- **Live authorship.** Everything in an account's bucket was written by that account, so its posts and comments always show the **current** profile. A profile edit updates them at once, with no reload.
-- **No re-attribution.** Guest posts are never shown as, or moved to, the signed-in supporter. While signed in they're hidden, and "Du på läktaren" says how many there are. They come back on sign-out.
-- **Switching accounts on one browser:**
-  - Each account sees only its own local posts, reactions, comments and Story drafts.
-  - A half-typed post or reply is cleared, and an open Story dialog closes.
-  - An account's own content is only ever shown under that account's own profile: `resolveIdentity` checks that the profile's id matches the bucket.
-- **Still local and demo:**
-  - Own posts carry "🔒 bara här".
-  - The Story dialog and "Du på läktaren" say that nothing is visible to anyone else.
-  - The section is labelled demo.
-  - Signing out keeps an account's local content in this browser, as before, so it returns when the supporter signs in again. It's never shown to anyone else on the page.
-
-Tests: [`tests/local-scope.test.ts`](../tests/local-scope.test.ts) covers owners, keys and identity, including a profile that doesn't match the bucket. The browser test is described under [Manual test plan](#manual-test-plan-real-devices).
+- **Still local and per owner:**
+  - **Story drafts.** The guest keeps `djurgarn:drafts:v1`, and each account has `djurgarn:drafts:v1:account:<user id>`. Switching account clears a half-typed post or comment and closes an open Story dialog.
+  - **Posts written before Snacket became real**, under `djurgarn:snacket:v1` (guest) or `djurgarn:snacket:v1:account:<user id>`. They're shown read-only, to their owner only, collapsed under "Bara på den här enheten" ([`LegacyLocalPosts.vue`](../app/components/LegacyLocalPosts.vue), [`app/lib/legacyLocal.ts`](../app/lib/legacyLocal.ts)). They're never uploaded, never counted and never mixed into the feed. The writer can remove one at a time. Nothing else in that stored data is changed or deleted.
 
 ## Registration modes (future): signing in is not permission
 
@@ -179,13 +162,11 @@ Locally, copy [`.env.example`](../.env.example) to `.env`. If those variables ar
 8. **Change address** on the code step → back to step 1.
 9. **Public use, signed out and in:** stories, match card, podcast playback with the mini-player.
 10. **Android Chrome,** tab and installed: repeat 1, 5 and 6.
-11. **Snacket identity, local parts:**
-    - As a guest, comment on a demo post.
-    - Sign in → that comment is hidden, and "Du på läktaren" shows your profile.
-    - Comment on a demo post and start a Story draft → both show your name.
-    - Change your profile → they update at once.
-    - Sign out → only the guest comment is back.
-    - Sign in as someone else → none of the first account's local comments or drafts are shown.
+11. **Story drafts, per account:**
+    - Signed in, start a Story draft and close the dialog. "Fortsätt ditt utkast" appears.
+    - Sign out → the draft isn't offered.
+    - Sign in as someone else → it isn't offered either.
+    - Sign back in as yourself → it's back.
 
 Real posts have their own two-device plan in [snacket-posts.md](snacket-posts.md#manual-two-device-test-plan-after-applying-the-migration).
 

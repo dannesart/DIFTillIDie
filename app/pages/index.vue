@@ -12,7 +12,7 @@ await Promise.all([useNews(), usePodcasts(), useFixtures()])
 
 <template>
   <div class="relative min-h-dvh overflow-x-clip">
-    <DemoBanner />
+    <PilotBanner />
     <AppHeader />
     <main>
       <HeroMatchday />

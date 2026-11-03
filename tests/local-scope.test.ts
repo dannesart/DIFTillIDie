@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { localOwnerFor, readScoped, resolveIdentity, scopedKey } from '../app/lib/localScope'
 
-const GUEST = { name: 'Du', handle: 'blarandiggast', flair: 'Ny på stan' }
 const HASSE = { id: 'aaaa-1', displayName: 'Hasse på Söder', handle: 'hasse' }
 const LOTTA = { id: 'bbbb-2', displayName: 'Lotta från Gärdet', handle: 'lotta' }
 
@@ -30,27 +29,27 @@ describe('whose local content', () => {
 })
 
 describe('who you post as', () => {
-  it('a guest posts under the local guest name', () => {
-    expect(resolveIdentity('guest', GUEST, null, 'idle')).toEqual({ kind: 'guest', author: GUEST })
+  it('a guest has no author identity: they read, and are invited to sign in', () => {
+    expect(resolveIdentity('guest', null, 'idle')).toEqual({ kind: 'guest' })
   })
 
-  it('a signed-in supporter posts under their profile, never the guest name', () => {
-    const id = resolveIdentity('account:aaaa-1', GUEST, HASSE, 'ready')
+  it('a signed-in supporter posts under their own profile', () => {
+    const id = resolveIdentity('account:aaaa-1', HASSE, 'ready')
     expect(id).toEqual({ kind: 'member', author: { name: 'Hasse på Söder', handle: 'hasse' } })
   })
 
   it('without a complete profile, a signed-in supporter can\'t post yet', () => {
-    expect(resolveIdentity('account:aaaa-1', GUEST, null, 'missing')).toEqual({ kind: 'needs-profile' })
-    expect(resolveIdentity('account:aaaa-1', GUEST, null, 'error')).toEqual({ kind: 'needs-profile' })
-    expect(resolveIdentity('account:aaaa-1', GUEST, null, 'loading')).toEqual({ kind: 'pending' })
-    expect(resolveIdentity('account:aaaa-1', GUEST, null, 'idle')).toEqual({ kind: 'pending' })
-    expect(resolveIdentity(null, GUEST, null, 'idle')).toEqual({ kind: 'pending' })
+    expect(resolveIdentity('account:aaaa-1', null, 'missing')).toEqual({ kind: 'needs-profile' })
+    expect(resolveIdentity('account:aaaa-1', null, 'error')).toEqual({ kind: 'needs-profile' })
+    expect(resolveIdentity('account:aaaa-1', null, 'loading')).toEqual({ kind: 'pending' })
+    expect(resolveIdentity('account:aaaa-1', null, 'idle')).toEqual({ kind: 'pending' })
+    expect(resolveIdentity(null, null, 'idle')).toEqual({ kind: 'pending' })
   })
 
   it('never shows one account\'s profile on another account\'s content', () => {
     // E.g. mid-switch: Lotta's bucket is loaded, but Hasse's profile hasn't been replaced yet.
-    expect(resolveIdentity('account:bbbb-2', GUEST, HASSE, 'ready')).toEqual({ kind: 'pending' })
-    expect(resolveIdentity('account:bbbb-2', GUEST, LOTTA, 'ready').author?.handle).toBe('lotta')
+    expect(resolveIdentity('account:bbbb-2', HASSE, 'ready')).toEqual({ kind: 'pending' })
+    expect(resolveIdentity('account:bbbb-2', LOTTA, 'ready').author?.handle).toBe('lotta')
   })
 })
 

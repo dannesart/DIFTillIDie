@@ -1,7 +1,7 @@
 import type { Sport } from '#shared/types/domain'
 
 /**
- * The moment demo content is anchored to. Created once on the server and
+ * The page's fixed "now" (e.g. for countdowns and relative times). Created once on the server and
  * serialized to the client, so relative timestamps line up after hydration.
  */
 export function useDemoNow() {

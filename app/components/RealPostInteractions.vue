@@ -3,9 +3,9 @@ import type { ReactionKey } from '#shared/types/domain'
 import { REACTIONS } from '~/composables/useSnacket'
 
 /*
- * Reactions and comments on a real post, stored in Supabase. Same look as
- * Demo-snack, but honest: counts are everyone's, your highlight is yours,
- * and nothing changes until Supabase has confirmed it.
+ * Reactions and comments on a post, stored in Supabase. Counts are
+ * everyone's, your highlight is yours, and nothing changes until Supabase
+ * has confirmed it.
  */
 const props = defineProps<{ postId: string }>()
 

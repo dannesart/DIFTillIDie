@@ -109,30 +109,10 @@ export interface PodcastsResponse {
 
 export type ReactionKey = 'hjarta' | 'eld' | 'stjarna' | 'tarar'
 
+/** How a supporter appears on a post: their own chosen name and handle. */
 export interface PostAuthor {
   name: string
   handle: string
-  /** e.g. "Säsongskort sedan 1998" */
-  flair?: string
-}
-
-export interface PostComment {
-  id: string
-  author: PostAuthor
-  body: string
-  createdAt: string
-}
-
-export interface Post {
-  id: string
-  author: PostAuthor
-  body: string
-  createdAt: string
-  sport?: Sport
-  storyId?: string
-  reactions: Record<ReactionKey, number>
-  comments: PostComment[]
-  demo: boolean
 }
 
 export type FixtureTeam = 'herr' | 'dam'

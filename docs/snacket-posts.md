@@ -6,12 +6,7 @@ One shared journey: a signed-in supporter publishes a post, Supabase stores it, 
 
 ## What a visitor sees
 
-Snacket på stan now has two clearly separate parts:
-
-| Part | Content | Order | Stored |
-|---|---|---|---|
-| **Från läktaren**, marked "På riktigt" | Posts published by signed-in supporters | Newest first, no ranking | Supabase, visible to everyone |
-| **Demo-snack**, marked "Påhittat" | The fictional supporters (each card marked "påhittad"), plus any posts this browser kept locally before | Hetast / Nyast, as before | Fictional data; local posts, reactions and comments only in this browser |
+Snacket på stan is one feed: posts published by signed-in supporters, stored in Supabase, visible to everyone, newest first, with no ranking. Hashtags, filters and Story counts come only from these posts. (Until [Mission #14](#retired-demo-snack) a separate, labelled Demo-snack with fictional supporters sat below it.)
 
 - **The composer publishes for real, or it isn't offered.**
   - Signed out, there's no text box. Instead: "Vill du snacka? Logga in…".
@@ -27,7 +22,36 @@ Snacket på stan now has two clearly separate parts:
 - **Deleting your own post:** "Ta bort" → "Ja, ta bort för alla", confirmed by Supabase. Posts can't be edited.
 - **Reactions and comments** on real posts arrived later; see [snacket-interactions.md](snacket-interactions.md). Follows, notifications and algorithms are still out of scope.
 
-### Honesty decisions
+### Retired: Demo-snack
+
+Mission #14 removed the fictional Snacket. That meant removing:
+
+- the invented supporters and their posts;
+- their seeded reactions and comments;
+- the Hetast/Nyast ranking;
+- the guest's local name;
+- every "påhittad" or "demo" label, now that nothing is invented.
+
+The banner became a short **Pilot** banner: "Allt här är på riktigt…".
+
+**Old browser-local posts.** Some visitors wrote posts before real publishing existed. Those were only ever saved in their own browser, under `djurgarn:snacket:v1` (or `…:account:<id>`).
+
+- **Never uploaded or attributed.** Uploading would publish words written as private, and attributing guest posts to an account would be guesswork.
+- **Never silently deleted.** No storage key is removed or rewritten on load.
+- **Shown only to their owner, on that device.** Each owner's own posts appear in a collapsed panel below the feed, "🔒 Dina N gamla inlägg · Bara på den här enheten", together with any local comments written on them. The panel is shown only when there's something in it.
+- **Not in the feed.** They aren't in the feed, its hashtags or its Story counts.
+- **Read-only.** There's no way to publish, react or comment from the panel, so there's no second local publishing experience.
+- **Removable on request.** The writer can remove one post at a time, after "Ja, ta bort från enheten". Only that post and its comments go; the rest of the stored bucket is written back unchanged.
+
+**Tradeoffs:**
+
+- **Local reactions and comments on the fictional posts are no longer visible anywhere.** The posts they belonged to are gone, so they'd have no context. They stay in storage, untouched, rather than being deleted.
+- **The guest's local name** ("Byt namn") stays in storage too. Nothing uses it any more.
+- **There's no "publish this old post" button.** A supporter who wants to share an old post can copy its text into the composer themselves, which is an explicit act under their own name. A button for it would come close to automatic re-publishing.
+- **If a guest's browser data is cleared, the old posts are gone,** as they always would have been. They were never anywhere else.
+- **Most visitors never see the panel.** It only appears in browsers that actually hold old posts.
+
+### Honesty decisions (Mission #12)
 
 1. **Old local posts are never uploaded.** Posts written before Snacket became real stay in this browser, in the demo part, labelled "🔒 bara här". Uploading them would publish things their author wrote believing they were private, and attributing guest posts to an account would be guesswork.
 2. **No local-only posting any more.** With both kinds of "post", nobody could tell what was published. Reactions and comments on the fictional posts remain local, inside the labelled demo part.
@@ -88,7 +112,8 @@ Posts need visible authors, which the profiles migration anticipated ("public di
 |---|---|
 | Migration | [`supabase/migrations/20261103144226_posts.sql`](../supabase/migrations/20261103144226_posts.sql) |
 | Store: read, publish, delete, error messages | [`app/lib/posts.ts`](../app/lib/posts.ts), provided by [`app/plugins/auth.client.ts`](../app/plugins/auth.client.ts), used via `useCommunity()` |
-| Feeds and Story counts | [`app/composables/useSnacket.ts`](../app/composables/useSnacket.ts): `realFeed` (real) and `feed` (demo) |
+| Feed, filters and Story counts | [`app/composables/useSnacket.ts`](../app/composables/useSnacket.ts): `feed` (filtered) and `all` |
+| Old browser-local posts (read-only) | [`app/lib/legacyLocal.ts`](../app/lib/legacyLocal.ts), [`LegacyLocalPosts.vue`](../app/components/LegacyLocalPosts.vue) |
 | UI | `SnacketSection`, `PostComposer`, `PostCard`, `StoryComposeDialog` |
 
 - **Posts are fetched in the browser.** The server never renders them, so the CDN-cached homepage stays identical for everyone and the feed is always fresh.
@@ -150,7 +175,7 @@ Use two physically separate devices or browsers: **A** (signed in, with a profil
 7. **Profile edit:** on A, change the display name. A's posts show the new name at once, and on B after fetching again.
 8. **Delete:** on A, choose "Ta bort" → "Ja, ta bort för alla". On B, the post is gone after fetching again.
 9. **Ownership:** sign in on B as a different supporter (an existing account, since registrations are off). B gets no "Ta bort" on A's posts, and B's own post shows B's name.
-10. **Unaffected:** signed out on both devices, Stories, the match card, podcasts with the mini-player, and the demo part all work as before.
+10. **Unaffected:** signed out on both devices, Stories, the match card and podcasts with the mini-player all work as before.
 
 ## Not verified (yet)
 

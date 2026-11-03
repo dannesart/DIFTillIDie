@@ -2,13 +2,12 @@
 
 A digital home for Djurgården supporters, covering football and hockey: stories with their sources kept intact, the supporter feed *Snacket på stan*, and podcasts and videos.
 
-> **Partly real, partly demo.**
-> - **Real:** Stories, fetched from the publishers' own RSS feeds, and *Djurgårn by night* episodes.
-> - **Real, too:** the next match, from the clubs' official schedules (see [Fixtures](#fixtures)).
-> - **Real, too:** posts under *Från läktaren* in Snacket på stan, published by signed-in supporters and stored in Supabase (see [Real posts](docs/snacket-posts.md)).
-> - **Invented:** the people and posts under *Demo-snack*. Each card is marked "påhittad".
+> **All real, in pilot.**
+> - **Stories** come from the publishers' own RSS feeds, and **podcast episodes** from the shows' own feeds.
+> - **The next match** comes from the clubs' official schedules (see [Fixtures](#fixtures)).
+> - **Snacket på stan** has posts, reactions and comments by signed-in supporters, stored in Supabase (see [Real posts](docs/snacket-posts.md)). There is no fictional content.
 >
-> Reactions and comments on the demo posts, and any posts written before Snacket became real, are saved only in the visitor's own browser (`localStorage`) and are never uploaded. Search engines are kept out for now: a `noindex` meta tag plus an `X-Robots-Tag` header.
+> Some visitors wrote posts before Snacket became real; those were only ever saved in their own browser. They stay there, read-only and visible only to their writer ("Bara på den här enheten"), and are never uploaded. Search engines are kept out for now: a `noindex` meta tag plus an `X-Robots-Tag` header.
 
 ## Stack
 
@@ -35,9 +34,9 @@ The vocabulary is kept small, in [`shared/types/domain.ts`](shared/types/domain.
 
 - **Story**: an event, as one or more SourceArticles. It has no headline of its own: it shows the earliest source's original headline, credited to that source. `sharedNames` lists the names that caused the sources to be grouped.
 - **SourceArticle**: one outlet's article. It keeps its own publisher, original headline, the publisher's own teaser, URL and publication date, and is never merged with other sources.
-- **Post**: a supporter's post in Snacket, with @mentions, #tags and an optional attached Story. Real posts live in Supabase (`public.posts`); demo posts also have reactions and comments, kept locally.
+- **Post**: a supporter's post in Snacket, with @mentions, #tags, an optional attached Story, reactions and comments. Everything is stored in Supabase (`public.posts`, `post_comments`, `post_reactions`).
 
-Demo content (the posts) lives in [`app/data/`](app/data/). The timestamps are relative and are fixed once on the server (`useDemoNow`), so SSR and hydration agree.
+Times shown relative to "now" use one moment fixed on the server (`useDemoNow`, named from its demo days), so SSR and hydration agree.
 
 ## Things to try
 
@@ -45,7 +44,7 @@ Demo content (the posts) lives in [`app/data/`](app/data/). The timestamps are r
 - **Allt / Fotboll / Hockey** in the header filters the whole page: stories, feed and next match.
 - **Source pills** link straight to each original article.
 - **"Snackas om i N inlägg"** on a Story filters the feed to posts about it. An attached Story inside a post scrolls back to that Story and highlights it.
-- **Hetast / Nyast** in Demo-snack. "Hetast" is engagement cooled by age, so the order changes as you react. The real feed is simply newest first.
+- **Newest first.** Snacket på stan is a plain, chronological feed of real posts: no ranking.
 - **"Snacka om detta"** on any Story opens a dialog (a bottom sheet on phones) for writing about it, with the Story attached. Drafts survive closing it by accident. Signed in with a profile, the post is published to Snacket på stan for everyone. The small "💬 N inlägg" link next to the button takes you to what's already been said.
 - **The source badge on the match card** ("dif.se" / "Verifierad …") opens details on team coverage and where the fixtures come from.
 - **Click an @handle** to mention that person in the composer. **Click a #tag** to filter the feed.
