@@ -73,6 +73,8 @@ export function commentErrorMessage(e: DataError | undefined): string {
 export function createInteractions(client: SupabaseClient | null, auth: AuthStore | null, community: CommunityStore | null) {
   const stats = ref<Record<string, PostStats>>({})
   const statsStatus = ref<LoadStatus>('idle')
+  /** When post_stats() last delivered totals (your own taps don't count). */
+  const statsLoadedAt = ref<number | null>(null)
   /** Your own reaction per post (signed in only). */
   const mine = ref<Record<string, ReactionKey | null>>({})
   /** Posts with a reaction change on its way to Supabase. */
@@ -95,6 +97,7 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
       }
       stats.value = next
       statsStatus.value = 'ready'
+      statsLoadedAt.value = Date.now()
     }
     catch {
       // Keep any totals we had; without any, say so.
@@ -240,7 +243,7 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
     })
   }
 
-  return { stats, statsStatus, mine, pending, threads, sending, loadStats, loadMine, react, loadComments, addComment, removeComment }
+  return { stats, statsStatus, statsLoadedAt, mine, pending, threads, sending, loadStats, loadMine, react, loadComments, addComment, removeComment }
 }
 
 export type InteractionsStore = ReturnType<typeof createInteractions>

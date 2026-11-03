@@ -2,6 +2,7 @@
 import type { Sport, Story } from '#shared/types/domain'
 import { createComposerOpen, focusDestination } from '~/lib/composerState'
 import { POST_MAX, postLength } from '~/lib/posts'
+import { revealPost } from '~/lib/reveal'
 
 /*
  * One composer, two homes: at the top of Snacket på stan, and in the
@@ -88,7 +89,8 @@ async function submit() {
   composerOpen.reset()
   // Focus stays on the composer's own control otherwise, now hidden.
   if (form.value?.contains(document.activeElement)) (document.activeElement as HTMLElement).blur()
-  document.getElementById('snacket-feed')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // Back on Nyast, so it's at the top: show it once the feed has rendered it.
+  void revealPost(r.post.id)
 }
 
 function mention(handle: string) {

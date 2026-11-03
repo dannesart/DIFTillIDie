@@ -1,12 +1,13 @@
 import type { NewsResponse, ReactionKey, Sport, Story } from '#shared/types/domain'
 import type { SnacketIdentity } from '~/lib/localScope'
 import { resolveIdentity } from '~/lib/localScope'
+import type { FeedSort } from '~/lib/feedSort'
 import type { CommunityPost, PublishResult } from '~/lib/posts'
 
 /*
  * Snacket på stan: real posts by signed-in supporters, from Supabase,
- * newest first. Filters (sport, #tag, Story) and Story counts come only
- * from those posts. (Posts some browsers saved locally before Snacket
+ * newest first (or Hetast, see lib/feedSort). Filters (sport, #tag, Story)
+ * and Story counts come only from those posts. (Posts some browsers saved locally before Snacket
  * became real are left dormant in localStorage: never read, published or
  * deleted.)
  */
@@ -47,6 +48,7 @@ const toFeedPost = (p: CommunityPost, me: string | null): FeedPost => ({
 export function useSnacket() {
   const loaded = useState('snacket-loaded', () => false)
   const filter = useState<FeedFilter>('snacket-filter', () => ({}))
+  const sort = useState<FeedSort>('snacket-sort', () => 'nyast')
   const { sport, matches } = useSport()
   const auth = useAuth()
   const community = useCommunity()
@@ -68,7 +70,7 @@ export function useSnacket() {
   /** All real posts, newest first, exactly as Supabase returned them. */
   const all = computed<FeedPost[]>(() => community.posts.value.map(p => toFeedPost(p, auth.userId.value)))
 
-  /** The feed: real posts through the sport, #tag and Story filters. Newest first, nothing ranked. */
+  /** Real posts through the sport, #tag and Story filters, newest first. (Hetast is applied on top, where the feed is shown.) */
   const feed = computed(() => {
     const { tag, storyId } = filter.value
     const story = storyId ? news.value?.stories.find(s => storyAnswersTo(s, storyId)) : undefined
@@ -85,16 +87,20 @@ export function useSnacket() {
 
   /**
    * Publish to Supabase as the signed-in supporter. Only a confirmed insert
-   * counts. By default the filters are cleared so the new post is in view;
+   * counts. By default the filters are cleared and the feed goes back to
+   * Nyast, so the new post is in view (at the top);
    * `keepView` leaves them, for posting from a Story.
    */
   async function publish(body: string, opts: { sport?: Sport, storyId?: string, keepView?: boolean } = {}): Promise<PublishResult> {
     const { keepView, ...attach } = opts
     if (identity.value.kind !== 'member') return { ok: false, message: 'Logga in och välj ditt läktarnamn för att publicera.' }
     const r = await community.publish({ body, ...attach })
-    if (r.ok && !keepView) filter.value = {}
+    if (r.ok && !keepView) {
+      filter.value = {}
+      sort.value = 'nyast'
+    }
     return r
   }
 
-  return { all, feed, community, filter, sport, me, identity, owner, load, publish, countForStory, postsForStory }
+  return { all, feed, community, filter, sort, sport, me, identity, owner, load, publish, countForStory, postsForStory }
 }

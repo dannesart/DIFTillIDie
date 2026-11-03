@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import type { FeedSort } from '~/lib/feedSort'
+import { createFeedSort, engagement } from '~/lib/feedSort'
+import { postAnchor } from '~/lib/reveal'
+
 /*
  * Snacket på stan: posts, reactions and comments by signed-in supporters,
- * stored in Supabase and readable by everyone. Newest first, nothing ranked.
+ * stored in Supabase and readable by everyone. Nyast by default; Hetast
+ * ranks the loaded posts by their real reactions and comments (lib/feedSort).
  * Hashtags and filters come only from these posts.
  */
-const { feed, all, community, filter, me, identity } = useSnacket()
+const { feed, all, community, filter, sort, me, identity } = useSnacket()
+const { stats, statsStatus, statsLoadedAt } = useInteractions()
 const { status: feedStatus, stale, refreshing } = community
 const { stories } = useNews()
 const { status } = useAuth()
@@ -14,6 +20,16 @@ const canSignIn = computed(() => status.value !== 'unavailable')
 const filterStory = computed(() => stories.value.find(s => storyAnswersTo(s, filter.value.storyId)))
 const hasFilter = computed(() => !!(filter.value.tag || filter.value.storyId))
 const loading = computed(() => feedStatus.value === 'idle' || feedStatus.value === 'loading')
+
+const sorts: { value: FeedSort, label: string, hint: string }[] = [
+  { value: 'hetast', label: 'Hetast', hint: 'Mest reaktioner och kommentarer, svalnar med tiden' },
+  { value: 'nyast', label: 'Nyast', hint: 'Senaste först' },
+]
+// Filters first (feed), then the order.
+const feedSort = createFeedSort({ sort, posts: all, stats, statsStatus, statsLoadedAt })
+const sortState = feedSort.state
+const shown = computed(() => feedSort.apply(feed.value))
+const anyEngagement = computed(() => all.value.some(p => engagement(stats.value[p.id]) > 0))
 
 const tags = computed(() => {
   const counts = new Map<string, number>()
@@ -51,17 +67,46 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
         <div class="min-w-0">
           <PostComposer ref="composer" />
 
-          <div v-if="hasFilter" class="mt-6 flex flex-wrap items-center gap-2 text-sm">
-            <span class="text-krita-dim">Visar</span>
-            <button class="chip border-guld/50 bg-guld/10 text-guld hover:bg-guld/20" @click="filter = {}">
-              <template v-if="filter.tag">#{{ filter.tag }}</template>
-              <template v-else-if="filterStory">Story: {{ leadOf(filterStory).headline }}</template>
-              <span aria-hidden="true" class="ml-1">✕</span>
-              <span class="sr-only">Rensa filter</span>
-            </button>
+          <div v-if="hasFilter || all.length" class="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <div v-if="hasFilter" class="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+              <span class="text-krita-dim">Visar</span>
+              <button class="chip border-guld/50 bg-guld/10 text-guld hover:bg-guld/20" @click="filter = {}">
+                <template v-if="filter.tag">#{{ filter.tag }}</template>
+                <template v-else-if="filterStory">Story: {{ leadOf(filterStory).headline }}</template>
+                <span aria-hidden="true" class="ml-1">✕</span>
+                <span class="sr-only">Rensa filter</span>
+              </button>
+            </div>
+            <div v-if="all.length" class="relative ml-auto grid grid-cols-2 rounded-full border border-white/10 bg-navy-900 p-1" role="tablist" aria-label="Sortera snacket">
+              <span
+                aria-hidden="true"
+                class="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-krita transition-transform duration-500 ease-spring"
+                :class="sort === 'nyast' && 'translate-x-full'"
+              />
+              <button
+                v-for="m in sorts"
+                :key="m.value"
+                role="tab"
+                :aria-selected="sort === m.value"
+                aria-controls="snacket-feed"
+                :title="m.hint"
+                class="relative z-10 rounded-full px-4 py-1.5 text-sm font-bold transition-colors duration-300"
+                :class="sort === m.value ? 'text-navy-950' : 'text-krita-dim hover:text-krita'"
+                @click="sort = m.value"
+              >
+                {{ m.label }}
+              </button>
+            </div>
           </div>
+          <!-- Hetast is only ever about what's loaded here, and says so -->
+          <p v-if="sortState !== 'newest' && all.length" class="mt-2 text-right text-xs leading-relaxed text-krita-dim" role="status">
+            <template v-if="sortState === 'waiting'">Hämtar reaktioner och kommentarer… nyast först så länge.</template>
+            <template v-else-if="sortState === 'unavailable'">Kunde inte hämta reaktioner och kommentarer – visar nyast först.</template>
+            <template v-else-if="!anyEngagement">Inga reaktioner eller kommentarer än – nyast först.</template>
+            <template v-else>Bland de {{ all.length }} senaste inläggen: reaktioner och kommentarer, nyare väger tyngre.</template>
+          </p>
 
-          <section id="snacket-feed" class="mt-6 scroll-mt-24" aria-label="Inlägg, nyast först" :aria-busy="loading || refreshing">
+          <section id="snacket-feed" class="scroll-below-header mt-6" :aria-label="sortState === 'ranked' ? 'Inlägg, hetast först' : 'Inlägg, nyast först'" :aria-busy="loading || refreshing">
             <p v-if="feedStatus === 'unavailable'" class="card p-5 text-sm text-krita-dim">Snacket är inte påslaget här.</p>
 
             <template v-else>
@@ -87,11 +132,11 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
                   leave-to-class="opacity-0"
                   leave-active-class="transition duration-200 absolute inset-x-0"
                 >
-                  <li v-for="post in feed" :key="post.id">
+                  <li v-for="post in shown" :id="postAnchor(post.id)" :key="post.id" class="scroll-below-header">
                     <PostCard :post="post" @mention="composer?.mention($event)" />
                   </li>
                 </TransitionGroup>
-                <div v-if="!feed.length" class="card p-6 text-center">
+                <div v-if="!shown.length" class="card p-6 text-center">
                   <template v-if="all.length">
                     <p class="font-semibold">Tyst på stan just här.</p>
                     <p class="mt-1 text-sm text-krita-dim">Inga inlägg om det här än.</p>

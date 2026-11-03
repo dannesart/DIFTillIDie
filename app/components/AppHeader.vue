@@ -10,11 +10,23 @@ const options: { value: SportFilter, label: string }[] = [
 
 const scrolled = ref(false)
 const onScroll = () => (scrolled.value = window.scrollY > 24)
+
+// Publish the real height as --header-h, so content scrolled into view can stop below it.
+const header = useTemplateRef<HTMLElement>('header')
+let resize: ResizeObserver | undefined
 onMounted(() => {
   onScroll()
   window.addEventListener('scroll', onScroll, { passive: true })
+  if (header.value && 'ResizeObserver' in window) {
+    const el = header.value
+    resize = new ResizeObserver(() => document.documentElement.style.setProperty('--header-h', `${el.offsetHeight}px`))
+    resize.observe(el)
+  }
 })
-onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
+  resize?.disconnect()
+})
 
 const nav = [
   { href: '#stories', label: 'Stories' },
@@ -25,6 +37,7 @@ const nav = [
 
 <template>
   <header
+    ref="header"
     class="sticky top-[env(safe-area-inset-top)] z-40 transition-[background-color,border-color,backdrop-filter] duration-300"
     :class="scrolled ? 'border-b border-white/8 bg-navy-950/85 backdrop-blur-xl' : 'border-b border-transparent'"
   >

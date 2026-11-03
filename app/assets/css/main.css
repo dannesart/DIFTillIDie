@@ -30,11 +30,21 @@
  */
 :root {
   --nav-h: calc(4rem + env(safe-area-inset-bottom));
+  /* The sticky header's height; AppHeader keeps it measured. */
+  --header-h: 3.5rem;
 }
 @media (min-width: 1024px) {
   :root {
     --nav-h: 0px;
   }
+}
+
+/*
+ * Something scrolled into view (a just-published post) stops below the
+ * sticky header, which itself sits below the safe area on phones.
+ */
+.scroll-below-header {
+  scroll-margin-top: calc(env(safe-area-inset-top) + var(--header-h) + 1rem);
 }
 
 @layer base {

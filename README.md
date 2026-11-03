@@ -44,7 +44,7 @@ Times shown relative to "now" use one moment fixed on the server (`useDemoNow`, 
 - **Allt / Fotboll / Hockey** in the header filters the whole page: stories, feed and next match.
 - **Source pills** link straight to each original article.
 - **"Snackas om i N inlägg"** on a Story filters the feed to posts about it. An attached Story inside a post scrolls back to that Story and highlights it.
-- **Newest first.** Snacket på stan is a plain, chronological feed of real posts: no ranking.
+- **Nyast / Hetast.** Snacket på stan is newest first by default. Hetast ranks only the loaded posts, by real reactions and comments cooled by age, and never re-sorts while you interact ([details](docs/snacket-posts.md#hetast--nyast)).
 - **"Snacka om detta"** on any Story opens a dialog (a bottom sheet on phones) for writing about it, with the Story attached. Drafts survive closing it by accident. Signed in with a profile, the post is published to Snacket på stan for everyone. The small "💬 N inlägg" link next to the button takes you to what's already been said.
 - **The source badge on the match card** ("dif.se" / "Verifierad …") opens details on team coverage and where the fixtures come from.
 - **Click an @handle** to mention that person in the composer. **Click a #tag** to filter the feed.

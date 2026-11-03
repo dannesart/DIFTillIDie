@@ -6,7 +6,7 @@ One shared journey: a signed-in supporter publishes a post, Supabase stores it, 
 
 ## What a visitor sees
 
-Snacket på stan is one feed: posts published by signed-in supporters, stored in Supabase, visible to everyone, newest first, with no ranking. Hashtags, filters and Story counts come only from these posts. (Until [Mission #14](#retired-demo-snack) a separate, labelled Demo-snack with fictional supporters sat below it.)
+Snacket på stan is one feed: posts published by signed-in supporters, stored in Supabase, visible to everyone. It shows **Nyast** (newest first) by default, or **Hetast** ([below](#hetast--nyast)). Hashtags, filters and Story counts come only from these posts. (Until [Mission #14](#retired-demo-snack) a separate, labelled Demo-snack with fictional supporters sat below it.)
 
 - **The composer publishes for real, or it isn't offered.**
   - Signed out, there's no text box. Instead: "Vill du snacka? Logga in…".
@@ -14,13 +14,30 @@ Snacket på stan is one feed: posts published by signed-in supporters, stored in
   - Signed in with a profile, "Publicera". Under the button: *"Syns för alla i Snacket på stan, även för den som inte är inloggad."*
 - **Publishing states:**
   - **While publishing:** "Publicerar…", the text is read-only, and a second click does nothing.
-  - **Success:** only when Supabase returns the stored row. Then the post appears at the top of "Från läktaren" and the text box clears. There's no optimistic insert.
+  - **Success:** only when Supabase returns the stored row. Then the composer clears and collapses, the feed goes back to Nyast with any filters cleared, and the page scrolls to the new post once it has rendered, stopping below the sticky header. There's no optimistic insert.
   - **Failure:** a calm message, and **the text stays exactly as typed**. In the "Snacka om detta" dialog the text is the Story's saved draft, so it also survives closing the dialog. That dialog only shows "Ute på stan!" after confirmation.
 - **Feed states:** loading placeholders (never invented content), an empty state ("Bli den första Djurgårdaren som skriver här!"), an error with "Försök igen", and "Hämta nya inlägg".
   - If a refresh fails while posts are shown, they stay with a note that they may be stale.
   - The feed also refetches when you return to the tab after more than a minute, which is handy for the two-device test.
 - **Deleting your own post:** "Ta bort" → "Ja, ta bort för alla", confirmed by Supabase. Posts can't be edited.
-- **Reactions and comments** on real posts arrived later; see [snacket-interactions.md](snacket-interactions.md). Follows, notifications and algorithms are still out of scope.
+- **Reactions and comments** on real posts arrived later; see [snacket-interactions.md](snacket-interactions.md). Follows, notifications and any ranking beyond Hetast are still out of scope.
+
+### Hetast / Nyast
+
+The familiar two-tab control sits above the feed. **Nyast** is the default: newest first, exactly as Supabase returns them.
+
+**Hetast** is a simple ranking in [`app/lib/feedSort.ts`](../app/lib/feedSort.ts). It's computed in the browser from the totals `post_stats()` already returns, with no database changes:
+
+    heat = (reactions + 2 × comments + 1) / (hours since posted + 2) ^ 1.4
+
+- **Only the loaded posts.** It ranks the newest 50 posts the feed loads, and the note under the tabs says so ("Bland de N senaste inläggen…"). It never implies all-time popularity.
+- **Filters first.** The sport, #tag and Story filters apply, then the order.
+- **No engagement means newest first.** The formula reduces to that, ties fall back to it, and the note says "Inga reaktioner eller kommentarer än – nyast först."
+- **No totals, no ranking.** While `post_stats()` is loading, or if it failed, Hetast stays newest first and says why.
+- **No jumping.** The order is a snapshot. It's taken when Hetast is chosen and when Supabase delivers fresh totals (`statsLoadedAt`, after posts load or refresh).
+  - Your own reaction or comment updates the counts in place but never re-sorts, so a post doesn't move away from under you.
+  - Posts newer than the snapshot go first.
+- **Publishing** from the main composer switches back to Nyast and reveals the new post. Posting from a Story's dialog leaves the feed as it is.
 
 ### Retired: Demo-snack
 
@@ -28,7 +45,7 @@ Mission #14 removed the fictional Snacket. That meant removing:
 
 - the invented supporters and their posts;
 - their seeded reactions and comments;
-- the Hetast/Nyast ranking;
+- the Hetast/Nyast ranking of fictional posts (since restored for real posts, above);
 - the guest's local name;
 - every "påhittad" or "demo" label, now that nothing is invented.
 
