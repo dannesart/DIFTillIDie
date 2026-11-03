@@ -45,3 +45,15 @@ begin
   return case when n = 0 then 'ok - ' || descr else 'not ok - ' || descr || ' (' || n || ' rows)' end;
 end $$;
 `
+
+/** Run one supabase/tests/*.test.sql file through the shim; returns its 'ok'/'not ok' lines and its plan. */
+export async function runPgTapFile(db: { exec: (sql: string) => Promise<{ rows: Record<string, unknown>[] }[]> }, file: string) {
+  const { readFileSync } = await import('node:fs')
+  const { fileURLToPath } = await import('node:url')
+  await db.exec(PGTAP_SHIM)
+  const sql = readFileSync(fileURLToPath(new URL(`../../supabase/tests/${file}`, import.meta.url)), 'utf8')
+    .replace(/create extension if not exists pgtap[^;]*;/, '')
+  const results = await db.exec(sql)
+  const lines = results.flatMap(r => r.rows.flatMap(row => Object.values(row))).filter((v): v is string => typeof v === 'string' && /^(not )?ok - /.test(v))
+  return { lines, planned: Number(sql.match(/select plan\((\d+)\)/)![1]) }
+}

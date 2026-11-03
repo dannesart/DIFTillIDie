@@ -38,15 +38,15 @@ reset role;
 select set_config('request.jwt.claims', '', true);
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
-select lives_ok($$ insert into public.profiles (id, display_name, handle) values ('22222222-2222-4222-8222-222222222222', 'Hovet-Hasse', 'hovethasse') $$, 'Hasse can create his own profile');
+select lives_ok($$ insert into public.profiles (id, display_name, handle) values ('22222222-2222-4222-8222-222222222222', 'Hovet-Hasse', 'rlstest_hasse') $$, 'Hasse can create his own profile');
 
 -- ── Lotta: own profile ───────────────────────────────────────────────────
 reset role;
 select set_config('request.jwt.claims', '', true);
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
-select lives_ok($$ insert into public.profiles (id, display_name, handle) values ('11111111-1111-4111-8111-111111111111', 'Lotta från Gärdet', 'kaminen81') $$, 'Lotta can create her own profile');
-select results_eq($$ select handle from public.profiles $$, array['kaminen81'], 'Lotta sees only her own profile');
+select lives_ok($$ insert into public.profiles (id, display_name, handle) values ('11111111-1111-4111-8111-111111111111', 'Lotta från Gärdet', 'rlstest_lotta') $$, 'Lotta can create her own profile');
+select results_eq($$ select handle from public.profiles where id in ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222') $$, array['rlstest_lotta'], 'Of the two test users, Lotta sees only her own profile');
 select results_eq($$ update public.profiles set display_name = 'Lotta' where id = '11111111-1111-4111-8111-111111111111' returning display_name $$, array['Lotta'], 'Lotta can update her own profile');
 select throws_ok($$ update public.profiles set id = '22222222-2222-4222-8222-222222222222' $$, '42501', null, 'Lotta cannot change her id');
 select throws_ok($$ update public.profiles set created_at = now() - interval '10 years' $$, '42501', null, 'Lotta cannot rewrite created_at');
@@ -59,8 +59,8 @@ select results_eq($$ update public.profiles set display_name = 'Lotta G' returni
 select throws_ok($$ insert into public.profiles (id, display_name, handle) values ('22222222-2222-4222-8222-222222222222', 'Fake Hasse', 'fake_hasse') $$, '42501', null, 'Lotta cannot create a profile for Hasse');
 
 -- ── Rules ────────────────────────────────────────────────────────────────
-select throws_ok($$ update public.profiles set handle = 'hovethasse' where id = '11111111-1111-4111-8111-111111111111' $$, '23505', null, 'Handles are unique');
-select throws_ok($$ update public.profiles set handle = 'Kaminen81' where id = '11111111-1111-4111-8111-111111111111' $$, '23514', null, 'Handles must be lowercase');
+select throws_ok($$ update public.profiles set handle = 'rlstest_hasse' where id = '11111111-1111-4111-8111-111111111111' $$, '23505', null, 'Handles are unique');
+select throws_ok($$ update public.profiles set handle = 'RLStest_lotta' where id = '11111111-1111-4111-8111-111111111111' $$, '23514', null, 'Handles must be lowercase');
 select throws_ok($$ update public.profiles set handle = 'dif' where id = '11111111-1111-4111-8111-111111111111' $$, '23514', null, 'Reserved handles are rejected');
 
 -- ── Hasse's profile is untouched ─────────────────────────────────────────

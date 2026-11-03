@@ -1,8 +1,7 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Db } from './db/supabase-harness'
-import { as, codeOf, createSupabaseLikeDb } from './db/supabase-harness'
+import { runPgTapFile } from './db/pgtap-shim'
+import { as, codeOf, createSupabaseLikeDb, realDataSnapshot, seedRealData } from './db/supabase-harness'
 
 /*
  * Database authorization for public.posts and the public author names it
@@ -170,18 +169,16 @@ describe('grants', () => {
 })
 
 describe('the pgTAP suite for the real database (supabase/tests)', () => {
-  it('runs green against the migrations', async () => {
-    const { PGTAP_SHIM } = await import('./db/pgtap-shim')
-    await db.exec(PGTAP_SHIM)
+  // Hosted databases aren't empty: the suite must pass around existing supporters and posts, and leave them alone.
+  it.each([['an empty database', false], ['a database with a real supporter and post', true]])('runs green against %s', async (_label, withRealData) => {
     // The suite creates its own users.
     await db.exec('delete from auth.users')
-    const sql = readFileSync(fileURLToPath(new URL('../supabase/tests/posts_rls.test.sql', import.meta.url)), 'utf8')
-      .replace(/create extension if not exists pgtap[^;]*;/, '')
-    const results = await db.exec(sql)
-    const lines = results.flatMap(r => r.rows.flatMap(row => Object.values(row))).filter((v): v is string => typeof v === 'string' && /^(not )?ok - /.test(v))
-    const planned = Number(sql.match(/select plan\((\d+)\)/)![1])
+    if (withRealData) await seedRealData(db)
+    const before = await realDataSnapshot(db)
+    const { lines, planned } = await runPgTapFile(db, 'posts_rls.test.sql')
     expect(lines.filter(l => l.startsWith('not ok'))).toEqual([])
     expect(lines).toHaveLength(planned)
-    expect((await db.query('select count(*)::int as n from auth.users')).rows).toEqual([{ n: 0 }])
+    // Rolled back: nothing from the suite is left behind, and existing data is untouched.
+    expect(await realDataSnapshot(db)).toEqual(before)
   })
 })

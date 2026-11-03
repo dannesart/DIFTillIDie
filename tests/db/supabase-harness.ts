@@ -58,6 +58,25 @@ export async function as<T>(db: Db, role: 'anon' | 'authenticated' | 'service_ro
   }
 }
 
+/**
+ * Data a hosted database already has: a real supporter with a profile and a
+ * published post. The pgTAP suites must pass around it and leave it alone.
+ */
+export const REAL_SUPPORTER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+export async function seedRealData(db: Db) {
+  await db.exec(`
+    insert into auth.users (id, email) values ('${REAL_SUPPORTER}', 'jarnmannen@example.test');
+    insert into public.profiles (id, display_name, handle) values ('${REAL_SUPPORTER}', 'Järnmannen', 'jarnmannen');
+    insert into public.posts (author_id, body) values ('${REAL_SUPPORTER}', 'Första riktiga inlägget! 💙');
+  `)
+}
+export async function realDataSnapshot(db: Db) {
+  const users = await db.query<{ id: string }>('select id from auth.users order by id')
+  const profiles = await db.query('select id, display_name, handle from public.profiles order by id')
+  const posts = await db.query('select author_id, body from public.posts order by body')
+  return { users: users.rows.map(r => r.id), profiles: profiles.rows, posts: posts.rows }
+}
+
 /** The Postgres error code of a failed query (e.g. 42501 permission denied), or 'ok'. */
 export async function codeOf(p: Promise<unknown>): Promise<string> {
   try {

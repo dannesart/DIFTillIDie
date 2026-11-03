@@ -2,7 +2,7 @@
 
 One shared journey: a signed-in supporter publishes a post, Supabase stores it, and another visitor on another device sees it, signed in or not.
 
-> **Status:** the migration [`20261103120000_posts.sql`](../supabase/migrations/20261103120000_posts.sql) is in the repository and **not applied** to the hosted project. Review it, apply it, then run [`supabase/tests/posts_rls.test.sql`](../supabase/tests/posts_rls.test.sql) **and the updated** [`supabase/tests/profiles_rls.test.sql`](../supabase/tests/profiles_rls.test.sql) (see [What changes for profiles](#what-changes-for-profiles)).
+> **Status:** the migration [`20261103144226_posts.sql`](../supabase/migrations/20261103144226_posts.sql) is **applied** to the hosted project (djurgarn-dev) under that version. There, [`posts_rls.test.sql`](../supabase/tests/posts_rls.test.sql) passed 32/32 and the updated [`profiles_rls.test.sql`](../supabase/tests/profiles_rls.test.sql) passed 22/22. `posts_author_id_fkey` exists, and the grants and policies match the model below.
 
 ## What a visitor sees
 
@@ -86,7 +86,7 @@ Posts need visible authors, which the profiles migration anticipated ("public di
 
 | Part | Where |
 |---|---|
-| Migration | [`supabase/migrations/20261103120000_posts.sql`](../supabase/migrations/20261103120000_posts.sql) |
+| Migration | [`supabase/migrations/20261103144226_posts.sql`](../supabase/migrations/20261103144226_posts.sql) |
 | Store: read, publish, delete, error messages | [`app/lib/posts.ts`](../app/lib/posts.ts), provided by [`app/plugins/auth.client.ts`](../app/plugins/auth.client.ts), used via `useCommunity()` |
 | Feeds and Story counts | [`app/composables/useSnacket.ts`](../app/composables/useSnacket.ts): `realFeed` (real) and `feed` (demo) |
 | UI | `SnacketSection`, `PostComposer`, `PostCard`, `StoryComposeDialog` |
@@ -98,8 +98,8 @@ Posts need visible authors, which the profiles migration anticipated ("public di
 
 | File | What |
 |---|---|
-| [`tests/posts-db.test.ts`](../tests/posts-db.test.ts) | 14 database authorization tests on the real migrations in PGlite (Supabase-like roles and `auth.uid()`), and the pgTAP suite through the local shim |
-| [`supabase/tests/posts_rls.test.sql`](../supabase/tests/posts_rls.test.sql) | 32 pgTAP assertions for the **real** database, in a transaction that is rolled back |
+| [`tests/posts-db.test.ts`](../tests/posts-db.test.ts) | 15 database authorization tests (the pgTAP suite runs on an empty and a non-empty database) on the real migrations in PGlite (Supabase-like roles and `auth.uid()`), and the pgTAP suite through the local shim |
+| [`supabase/tests/posts_rls.test.sql`](../supabase/tests/posts_rls.test.sql) | 32 pgTAP assertions for the **real** database, in a transaction that is rolled back. Every assertion is scoped to the suite's own test users and rows, so it also runs on a database that already has real supporters and posts |
 | [`tests/posts.test.ts`](../tests/posts.test.ts) | 17 store tests against a fake Supabase client |
 
 **The database tests cover:**
@@ -128,6 +128,8 @@ Posts need visible authors, which the profiles migration anticipated ("public di
 
 **Mutation check:** making the insert policy, the delete policy or the profile policy `true` makes the database tests fail (2, 3 and 2 failures respectively).
 
+**Non-empty database check:** the local runs of both pgTAP suites happen twice: once on an empty database, and once with a seeded real supporter ("Järnmannen") who has a profile and a published post. The suites must pass both times and leave that data untouched. Before the scoping fix, the seeded run failed 7 posts assertions and 1 profiles assertion.
+
 **Browser run:** a headless run against the dev server used two isolated browser contexts and an in-memory stand-in for Supabase. No request reached the hosted project. It covered:
 
 - **Device A, signed out:** a sign-in prompt and no text box; an old local post stays in the demo part and isn't uploaded.
@@ -152,7 +154,6 @@ Use two physically separate devices or browsers: **A** (signed in, with a profil
 
 ## Not verified (yet)
 
-- **The migration on the hosted project, and the two pgTAP files there.** They were run locally in PGlite only.
-- **That PostgREST resolves the embedded author on the hosted project** with the constraint name `posts_author_id_fkey`. It's Postgres's default name; check it after applying.
+- **A genuine post through the hosted Data API**, including that PostgREST embeds the author via `posts_author_id_fkey`. The key exists; the embed itself is still unexercised.
 - **The real two-device journey**, the plan above.
 - **The exact error codes the live Data API returns** for refused inserts and expired sessions. They're mapped by code and by message; recheck once live.
