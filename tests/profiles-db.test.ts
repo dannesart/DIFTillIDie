@@ -177,7 +177,7 @@ describe('grants', () => {
 
 describe('client rules match the database', () => {
   it('the reserved handle list is the same in TypeScript and SQL', () => {
-    const sql = readFileSync(fileURLToPath(new URL('../supabase/migrations/20261102180000_profiles.sql', import.meta.url)), 'utf8')
+    const sql = readFileSync(fileURLToPath(new URL('../supabase/migrations/20261102234401_profiles.sql', import.meta.url)), 'utf8')
     const list = sql.match(/handle <> all \(array\[([\s\S]*?)\]\)/)![1]!.match(/'([^']+)'/g)!.map(s => s.slice(1, -1))
     expect([...list].sort()).toEqual([...RESERVED_HANDLES].sort())
   })

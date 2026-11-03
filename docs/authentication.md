@@ -12,7 +12,7 @@ We first tried Google OAuth. Google's consent screen showed the random Supabase 
 | Supabase client, browser only | [`app/plugins/auth.client.ts`](../app/plugins/auth.client.ts) |
 | UI | `AccountDialog`, `SignInWithCode`, `ProfileForm`, `AccountButton` (desktop header), "Du" tab in `MobileNav` |
 | Profile rules (shared with the database) | [`shared/utils/profile.ts`](../shared/utils/profile.ts) |
-| Database | [`supabase/migrations/20261102180000_profiles.sql`](../supabase/migrations/20261102180000_profiles.sql) |
+| Database | [`supabase/migrations/20261102234401_profiles.sql`](../supabase/migrations/20261102234401_profiles.sql) |
 | E-mail template | [`supabase/templates/otp-code.html`](../supabase/templates/otp-code.html) |
 
 1. **Address:** the supporter types an e-mail address, and `signInWithOtp({ email, options: { shouldCreateUser } })` sends the code.
@@ -77,7 +77,7 @@ Snacket på stan has no posts backend yet. Everything a visitor writes, reacts t
   - The section is labelled demo.
   - Signing out keeps an account's local content in this browser, as before, so it returns when the supporter signs in again. It's never shown to anyone else on the page.
 
-Tests: [`tests/local-scope.test.ts`](../tests/local-scope.test.ts) covers owners, keys and identity, including a profile that doesn't match the bucket. The browser test is described under [Manual test plan](#manual-test-plan-real-devices-once-a-sender-is-configured).
+Tests: [`tests/local-scope.test.ts`](../tests/local-scope.test.ts) covers owners, keys and identity, including a profile that doesn't match the bucket. The browser test is described under [Manual test plan](#manual-test-plan-real-devices).
 
 ## Registration modes (future): signing in is not permission
 
@@ -133,8 +133,8 @@ The migration has been **applied to the hosted project** (djurgarn-dev) after re
 ### Supabase dashboard (djurgarn-dev)
 
 1. **Authentication → Sign In / Providers → Email:** enabled. Leave **Confirm email** on: the code itself is the confirmation.
-2. **Email OTP length: 6.** The app expects six digits (`CODE_LENGTH`).
-3. **Email OTP expiration:** shorter than the default hour is kinder to security, e.g. **600 s (10 min)**. The app forgets a pending code after an hour regardless.
+2. **Email OTP length: 6** (configured). The app expects six digits (`CODE_LENGTH`).
+3. **Email OTP expiration: 600 s / 10 min** (configured). Shorter than the default hour is kinder to security. The app forgets a pending code after an hour regardless.
 4. **Authentication → Emails → Templates:** paste [`supabase/templates/otp-code.html`](../supabase/templates/otp-code.html) into **both "Magic link" and "Confirm signup"**.
    - New supporters may get the latter.
    - Subject: *Din inloggningskod till Djurgår’n*.
@@ -142,13 +142,14 @@ The migration has been **applied to the hosted project** (djurgarn-dev) after re
 5. **Allow new users to sign up:** on, for open registration.
 6. **Google provider:** can be disabled again. It isn't used.
 7. Redirect URLs are **not** needed for code sign-in. The Site URL only appears in templates that use links, and ours doesn't.
-8. The migration: applied.
+8. The migration: applied, as version `20261102234401` (the repository file carries the same version, so `supabase db push` sees no pending migration).
 
-### E-mail delivery (SMTP): required before inviting supporters
+### E-mail delivery (SMTP): a production sender is still needed before inviting supporters
 
-- **Supabase's built-in sender is for development only.** It delivers only to members of the Supabase organisation's team, and it's heavily rate-limited.
-- **No custom SMTP is configured, and none is included here.**
-- **Before external supporters can sign in,** configure **Authentication → Emails → SMTP Settings** with a real provider, and raise the e-mail rate limit under **Authentication → Rate Limits** to match.
+- **Today: temporary development SMTP through Gmail.** It's configured in the Supabase dashboard only. No SMTP credentials are in this repository, in `.env.example` or in Netlify.
+- **It's a stopgap, not the launch sender.** A personal or dedicated Gmail mailbox has daily sending limits, sends as that mailbox, and its deliverability for a public audience isn't something we control.
+- **Supabase's built-in sender** isn't an alternative: it delivers only to members of the Supabase organisation's team, and it's heavily rate-limited.
+- **Before external supporters are invited,** choose the production sender under **Authentication → Emails → SMTP Settings**, and raise the e-mail rate limit under **Authentication → Rate Limits** to match.
 - **Options:**
   - Providers that verify a sending domain (Resend, Brevo, Postmark, …) need a domain we control, which a `*.netlify.app` address isn't.
   - A dedicated mailbox's SMTP (e.g. a Gmail app password) needs no domain, but has daily sending limits and sends as that mailbox.
@@ -164,7 +165,7 @@ They're read at runtime by the SSR function and sent to browsers, which is fine 
 
 Locally, copy [`.env.example`](../.env.example) to `.env`. If those variables are missing, the account UI hides itself and the rest of the site works as before.
 
-## Manual test plan (real devices, once a sender is configured)
+## Manual test plan (real devices)
 
 1. **Safari tab:** Du/Logga in → address → Skicka kod → the e-mail arrives with the code, styled, with no link → type the code (or tap the iOS suggestion) → "Välkommen in!" → choose name and handle → saved.
 2. **Wrong code** → "Koden stämmer inte…", the field clears and you can try again.
@@ -194,9 +195,16 @@ The equivalent of step 11 was run in a headless browser against the dev server, 
 - reloading;
 - switching back.
 
+## Verified against the hosted project
+
+- **Migration:** applied to djurgarn-dev as `20261102234401_profiles`. All 22 pgTAP authorization checks passed there, run independently.
+- **Real sign-in on desktop:** a real six-digit code arrived by e-mail (Gmail development SMTP) and signed in, and creating a profile worked.
+- **Settings:** OTP length 6 and expiry 600 s are configured.
+
 ## Not verified (yet)
 
-- **Real e-mail delivery and real `signInWithOtp` / `verifyOtp` against Supabase.** All Supabase calls in the browser tests were intercepted, and the hosted project hasn't been touched.
-  - The exact error texts the live Auth server returns for rate limits and closed sign-ups are matched by code and by message. Recheck them once live.
+- **The installed iPhone app on a real device:** sign-in, switching to Mail and back, reloads and session restore. Use steps 5–7 of the plan above.
+- **Android**, in a tab and installed.
+- **The exact live error texts** for rate limits, expired codes and closed sign-ups. They're matched by error code and by message, but have only been exercised against intercepted responses.
 - **Whether new users get the "Magic link" or the "Confirm signup" template.** Configure both.
-- **The installed iPhone app on a real device:** Mail switching, reloads and restore. Use the plan above.
+- **Production e-mail delivery** to external supporters' inboxes. It needs the production sender above.
