@@ -27,7 +27,11 @@ export interface RealComment {
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
-interface CommentThread { status: LoadStatus, list: RealComment[] }
+/** At most this many comments are fetched per thread, oldest first. */
+export const COMMENT_LIMIT = 200
+
+/** `more`: the thread hit COMMENT_LIMIT, so older-first, later comments are not shown. */
+interface CommentThread { status: LoadStatus, list: RealComment[], more: boolean }
 
 const COMMENT_COLUMNS = 'id, post_id, body, created_at, author:profiles!post_comments_author_id_fkey(id, display_name, handle)'
 
@@ -143,18 +147,19 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
   async function loadComments(postId: string) {
     if (!client) return
     const prev = threads.value[postId]
-    threads.value = { ...threads.value, [postId]: { status: prev?.list.length ? 'ready' : 'loading', list: prev?.list ?? [] } }
+    threads.value = { ...threads.value, [postId]: { status: prev?.list.length ? 'ready' : 'loading', list: prev?.list ?? [], more: prev?.more ?? false } }
     try {
       const { data, error: e } = await client.from('post_comments').select(COMMENT_COLUMNS)
-        .eq('post_id', postId).order('created_at', { ascending: true }).order('id', { ascending: true }).limit(200)
+        .eq('post_id', postId).order('created_at', { ascending: true }).order('id', { ascending: true }).limit(COMMENT_LIMIT)
       if (e) throw e
-      const list = (data as unknown as CommentRow[]).map(toRealComment).filter((c): c is RealComment => !!c)
-      threads.value = { ...threads.value, [postId]: { status: 'ready', list } }
-      const s = stats.value[postId]
-      if (s && s.comments !== list.length) stats.value = { ...stats.value, [postId]: { ...s, comments: list.length } }
+      const rows = data as unknown as CommentRow[]
+      const list = rows.map(toRealComment).filter((c): c is RealComment => !!c)
+      // The total stays post_stats()'s: this list is a capped page (and skips
+      // rows without a visible author), so its length is not a count.
+      threads.value = { ...threads.value, [postId]: { status: 'ready', list, more: rows.length >= COMMENT_LIMIT } }
     }
     catch {
-      threads.value = { ...threads.value, [postId]: { status: prev?.list.length ? 'ready' : 'error', list: prev?.list ?? [] } }
+      threads.value = { ...threads.value, [postId]: { status: prev?.list.length ? 'ready' : 'error', list: prev?.list ?? [], more: prev?.more ?? false } }
     }
   }
 
@@ -172,8 +177,8 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
       if (e) throw e
       const c = toRealComment(data as unknown as CommentRow)
       if (!c) throw new Error('no author')
-      const t = threads.value[postId] ?? { status: 'ready' as const, list: [] }
-      threads.value = { ...threads.value, [postId]: { status: 'ready', list: [...t.list.filter(x => x.id !== c.id), c] } }
+      const t = threads.value[postId] ?? { status: 'ready' as const, list: [], more: false }
+      threads.value = { ...threads.value, [postId]: { status: 'ready', list: [...t.list.filter(x => x.id !== c.id), c], more: t.more } }
       const s = stats.value[postId] ?? emptyStats()
       stats.value = { ...stats.value, [postId]: { ...s, comments: s.comments + 1 } }
       return { ok: true }

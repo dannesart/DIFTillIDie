@@ -2,14 +2,17 @@
 
 Järnmannen publishes something. Mattias reacts and comments. Both of them, and anyone signed out, see the same interaction on any device.
 
-> **Status:** the migrations below are in the repository and **not applied** to the hosted project.
+> **Status:** both migrations are **applied** to the hosted project (djurgarn-dev), under the versions Supabase recorded:
 >
-> 1. [`20261104100000_post_comments.sql`](../supabase/migrations/20261104100000_post_comments.sql)
-> 2. [`20261104100100_post_reactions.sql`](../supabase/migrations/20261104100100_post_reactions.sql)
+> 1. [`20261103160756_post_comments.sql`](../supabase/migrations/20261103160756_post_comments.sql)
+> 2. [`20261103160759_post_reactions.sql`](../supabase/migrations/20261103160759_post_reactions.sql)
 >
-> Apply them in that order: `post_stats()` in the second counts comments from the first. Then run [`supabase/tests/interactions_rls.test.sql`](../supabase/tests/interactions_rls.test.sql), and rerun the posts and profiles suites. If Supabase records different versions, rename the files to match, as before.
+> **Hosted results:**
+> - The pgTAP suites passed: [interactions](../supabase/tests/interactions_rls.test.sql) 39/39, posts 32/32, profiles 22/22.
+> - Existing posts and profiles were unchanged, and no temporary test accounts remain.
+> - Anonymous `post_stats()` works on real posts, and `post_comments_author_id_fkey` exists.
 >
-> **Apply before deploying this code.** Until then the live site can't load totals; it shows "?" counts rather than wrong ones.
+> Any other database must apply them in that order, because `post_stats()` in the second counts comments from the first.
 
 ## What supporters see
 
@@ -50,6 +53,41 @@ Järnmannen publishes something. Mattias reacts and comments. Both of them, and 
 - **Unchanged:** owner-only profile editing and private profile fields.
 - **Future approval-required participation:** comments and reactions use the same "has a profile" rule in their insert policies as posts, so an approval check goes in those three places.
 
+### `post_stats()` and the security advisor (intentional warnings)
+
+Supabase's security advisor warns that `public.post_stats(uuid[])` is a **security definer function that anon and authenticated may execute**. That's intended, and it's the only such function in this project. `set_post_reaction()` is security invoker, so it isn't flagged.
+
+**Why it needs elevated privileges.** Reaction rows are private by design: anon can't read `post_reactions` at all, and a signed-in supporter sees only their own rows. Any query running with the caller's rights therefore counts only what the caller may see: zero for anon, and your own reaction for you. A public total needs to count every row, so the counting runs as the function's owner, which RLS doesn't apply to.
+
+**Exactly what it exposes.** Per requested post that exists:
+
+- the number of 💙, 🔥, ⭐ and 😭 reactions;
+- the number of comments.
+
+That's all. No user IDs, no rows, no timestamps, nothing about posts that don't exist. Comments and posts are public anyway, so the comment count adds nothing new. What *is* new is the reaction totals, which is the purpose.
+
+- **Inherent, accepted:** a total of 1 reveals that *someone* reacted, and someone watching a count change at the moment a known person acts could guess it was them. Any public count has this.
+
+**Why it's bounded:**
+
+- **Fixed output.** It returns six columns per post. It takes no column names, filters or SQL from the caller, and runs no dynamic SQL, so there's nothing to inject and no way to widen it.
+- **Fixed lookup path.** `set search_path = ''` and fully qualified table names mean it can't be redirected to look-alike objects.
+- **At most 100 post IDs per call.** Extra IDs are ignored (`p_post_ids[1:100]`). Each post costs five indexed counts: `post_reactions`'s primary key starts with `post_id`, and `post_comments` has a `(post_id, …)` index.
+- **Read-only.** It's `stable`, writes nothing, and only reads `posts`, `post_reactions` and `post_comments`.
+- **Explicit execute grants.** Supabase's default "everyone may execute" is revoked first; then anon and authenticated (and service_role) are granted execute explicitly.
+
+**Alternatives considered:**
+
+| Approach | Why not |
+|---|---|
+| A view or function with the caller's rights (security invoker) | Counts only rows the caller can see: zero for anon. |
+| Make reaction rows readable but withhold the `user_id` column | Column grants are per role, not per row. Signed-in supporters need `user_id` to find their own reaction, so they'd see everyone's. |
+| PostgREST aggregates (`select=…,count()`) | Off by default on Supabase, and they'd still need readable rows. Counting rows in the browser downloads every reaction, unbounded. |
+| Counter columns on `posts`, kept up to date by triggers | Exposes the same totals with one request fewer, but the trigger must also run with elevated privileges, since users may not update posts. It adds drift risk, a reconciliation job and row-lock contention on popular posts. Not simpler. |
+| A materialized view of totals | Stale between refreshes, needs a scheduled job, and an exposed materialized view has its own advisor warning. |
+
+**Conclusion:** a small, bounded, counts-only security-definer function is the simplest design that keeps *who* reacted private while showing totals to everyone. If the feed ever needs the totals in the same request as the posts, the counter columns are the upgrade path. Keep the warnings as acknowledged, and recheck them if `post_stats()` changes.
+
 ### Assumptions challenged
 
 - **"Anyone can read the reactions table" would leak who reacted.** So the table is owner-only and totals go through a counting function. A post with exactly one reaction still reveals *that* someone reacted, but not who.
@@ -61,7 +99,7 @@ Järnmannen publishes something. Mattias reacts and comments. Both of them, and 
 
 - **No rate limiting or moderation.** Registrations are closed. Before opening them, add database throttles for posts, comments and reactions, plus a report/hide path.
 - **No real-time updates:** other people's interactions show up on refresh or when you return to the tab.
-- **Each thread shows at most 200 comments.**
+- **Each thread shows at most 200 comments**, oldest first, and says so ("Visar de 200 äldsta av N kommentarer"). The 💬 total always comes from `post_stats()`, never from the loaded list.
 
 ## Tests
 
@@ -117,9 +155,7 @@ Järnmannen publishes something. Mattias reacts and comments. Both of them, and 
 
 ## Not verified (yet)
 
-- **The migrations and the pgTAP suite on the hosted project**, and the posts and profiles suites rerun after them.
-- **Through the live Data API:**
-  - that PostgREST embeds comment authors via `post_comments_author_id_fkey`;
-  - that it calls `set_post_reaction` and `post_stats`;
+- **From the browser, through the live Data API:**
+  - a real reaction via `set_post_reaction`, and a real comment with its embedded author;
   - which error codes it returns for refused writes.
 - **The real multi-device journey**, the plan above.

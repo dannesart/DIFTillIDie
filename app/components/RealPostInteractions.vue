@@ -118,6 +118,8 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
     </p>
     <template v-else>
       <p v-if="!thread.list.length" class="text-sm text-krita-dim">Inga kommentarer än.</p>
+      <!-- Capped thread: say so rather than imply the list is complete -->
+      <p v-if="thread.more" class="text-xs text-krita-dim">Visar de {{ thread.list.length }} äldsta av {{ s ? s.comments : 'fler' }} kommentarer.</p>
       <div v-for="c in thread.list" :key="c.id" class="flex gap-2.5">
         <Avatar :name="c.author.name" size="sm" />
         <div class="min-w-0 flex-1 rounded-2xl rounded-tl-sm bg-white/[0.04] px-3.5 py-2.5">

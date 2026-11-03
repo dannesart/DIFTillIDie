@@ -3,7 +3,7 @@ import { nextTick, ref } from 'vue'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AuthStore } from '../app/lib/auth'
 import type { CommunityStore } from '../app/lib/posts'
-import { commentErrorMessage, createInteractions, reactErrorMessage, toRealComment } from '../app/lib/interactions'
+import { COMMENT_LIMIT, commentErrorMessage, createInteractions, reactErrorMessage, toRealComment } from '../app/lib/interactions'
 
 const MATTIAS = '55555555-5555-4555-8555-555555555555'
 const JARN = '44444444-4444-4444-8444-444444444444'
@@ -173,6 +173,20 @@ describe('comments', () => {
     await i.loadComments(P1)
     expect(i.threads.value[P1]!.status).toBe('ready')
     expect(i.threads.value[P1]!.list.map(c => c.body)).toEqual(['Först', 'Sen'])
+  })
+
+  it('loading a thread never overwrites the total: the list is a capped page, post_stats() is the count', async () => {
+    const page = Array.from({ length: COMMENT_LIMIT }, (_, n) => comment(`c${n}`, `Kommentar ${n}`))
+    const i = createInteractions(fakeClient({ comments: { data: page } }).client, null, null)
+    i.stats.value = { [P1]: { reactions: { hjarta: 0, eld: 0, stjarna: 0, tarar: 0 }, comments: 350 } }
+    await i.loadComments(P1)
+    expect([i.threads.value[P1]!.list.length, i.threads.value[P1]!.more, i.stats.value[P1]!.comments]).toEqual([COMMENT_LIMIT, true, 350])
+
+    // A complete thread doesn't rewrite it either (e.g. a row without a visible author is skipped).
+    const j = createInteractions(fakeClient({ comments: { data: [comment('a', 'Hej'), { ...comment('b', 'Spöke'), author: null }] } }).client, null, null)
+    j.stats.value = { [P1]: { reactions: { hjarta: 0, eld: 0, stjarna: 0, tarar: 0 }, comments: 2 } }
+    await j.loadComments(P1)
+    expect([j.threads.value[P1]!.list.length, j.threads.value[P1]!.more, j.stats.value[P1]!.comments]).toEqual([1, false, 2])
   })
 
   it('a failed load is an error that can be retried', async () => {
