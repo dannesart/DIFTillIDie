@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { FeedMode } from '~/composables/useSnacket'
 
-const { feed, all, mode, filter, me, setName } = useSnacket()
+const { feed, all, mode, filter, me, identity, guestPostCount, setName } = useSnacket()
 const { stories } = useNews()
+const { status } = useAuth()
+const accountOpen = useAccountDialog()
+const canSignIn = computed(() => status.value !== 'unavailable')
 
 const modes: { value: FeedMode, label: string, hint: string }[] = [
   { value: 'hetast', label: 'Hetast på stan', hint: 'Mest kärlek, svalnar med tiden' },
@@ -25,7 +28,7 @@ const tags = computed(() => {
 const editingName = ref(false)
 const nameDraft = ref('')
 function startEditName() {
-  nameDraft.value = me.value.name === 'Du' ? '' : me.value.name
+  nameDraft.value = me.value && me.value.name !== 'Du' ? me.value.name : ''
   editingName.value = true
 }
 function saveName() {
@@ -102,19 +105,51 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
         <aside class="space-y-5 lg:sticky lg:top-24 lg:self-start">
           <div class="card p-5">
             <p class="kicker text-krita-dim">Du på läktaren</p>
-            <form v-if="editingName" class="mt-3 flex gap-2" @submit.prevent="saveName">
-              <input v-model="nameDraft" maxlength="32" autofocus placeholder="Ditt läktarnamn" class="min-w-0 flex-1 rounded-full border border-white/12 bg-navy-950 px-4 py-2 text-sm outline-none focus:border-himmel">
-              <button class="rounded-full bg-himmel px-4 text-sm font-bold text-navy-950">Spara</button>
-            </form>
-            <div v-else class="mt-3 flex items-center gap-3">
-              <Avatar :name="me.name" />
-              <div class="min-w-0 flex-1">
-                <p class="truncate font-semibold">{{ me.name }}</p>
-                <p class="truncate text-xs text-krita-dim">@{{ me.handle }}</p>
+            <!-- Signed in with a profile: that's who you are here -->
+            <template v-if="identity.kind === 'member' && me">
+              <div class="mt-3 flex items-center gap-3">
+                <Avatar :name="me.name" />
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-semibold">{{ me.name }}</p>
+                  <p class="truncate text-xs text-krita-dim">@{{ me.handle }}</p>
+                </div>
+                <button class="text-xs font-semibold text-himmel hover:underline" @click="accountOpen = true">Din profil</button>
               </div>
-              <button class="text-xs font-semibold text-himmel hover:underline" @click="startEditName">Byt namn</button>
-            </div>
-            <p class="mt-3 text-xs leading-relaxed text-krita-dim">Inget konto behövs än. Allt du gör sparas bara i den här webbläsaren.</p>
+              <p class="mt-3 text-xs leading-relaxed text-krita-dim">
+                Du är inloggad, men Snacket är fortfarande demo: det du skriver sparas bara i den här webbläsaren och syns inte för någon annan.
+              </p>
+              <p v-if="guestPostCount" class="mt-2 text-xs leading-relaxed text-krita-dim">
+                {{ guestPostCount === 1 ? 'Ditt inlägg' : `Dina ${guestPostCount} inlägg` }} som gäst ligger kvar och syns igen när du loggar ut.
+              </p>
+            </template>
+
+            <!-- Signed in, but no name chosen yet -->
+            <template v-else-if="identity.kind === 'needs-profile'">
+              <p class="mt-3 text-sm leading-relaxed">Välj ditt läktarnamn, så snackar du med det här.</p>
+              <button class="mt-3 rounded-full bg-guld px-4 py-2 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="accountOpen = true">Välj läktarnamn</button>
+            </template>
+
+            <!-- Guest: a local name, just like before -->
+            <template v-else-if="identity.kind === 'guest' && me">
+              <form v-if="editingName" class="mt-3 flex gap-2" @submit.prevent="saveName">
+                <input v-model="nameDraft" maxlength="32" autofocus placeholder="Ditt läktarnamn" class="min-w-0 flex-1 rounded-full border border-white/12 bg-navy-950 px-4 py-2 text-sm outline-none focus:border-himmel">
+                <button class="rounded-full bg-himmel px-4 text-sm font-bold text-navy-950">Spara</button>
+              </form>
+              <div v-else class="mt-3 flex items-center gap-3">
+                <Avatar :name="me.name" />
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-semibold">{{ me.name }}</p>
+                  <p class="truncate text-xs text-krita-dim">@{{ me.handle }}</p>
+                </div>
+                <button class="text-xs font-semibold text-himmel hover:underline" @click="startEditName">Byt namn</button>
+              </div>
+              <p class="mt-3 text-xs leading-relaxed text-krita-dim">
+                Du snackar som gäst. Allt du gör sparas bara i den här webbläsaren.
+                <button v-if="canSignIn" class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Logga in</button><template v-if="canSignIn"> för att snacka med en egen profil.</template>
+              </p>
+            </template>
+
+            <p v-else class="mt-3 text-sm text-krita-dim" aria-live="polite">Ett ögonblick…</p>
           </div>
 
           <div class="card p-5">

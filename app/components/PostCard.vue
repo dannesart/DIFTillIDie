@@ -6,7 +6,8 @@ import { REACTIONS } from '~/composables/useSnacket'
 const props = defineProps<{ post: FeedPost }>()
 const emit = defineEmits<{ mention: [handle: string] }>()
 
-const { toggleReaction, addComment, remove, filter } = useSnacket()
+const { toggleReaction, addComment, remove, filter, me, identity, owner } = useSnacket()
+const accountOpen = useAccountDialog()
 const { show } = useStorySpotlight()
 const { stories } = useNews()
 
@@ -22,6 +23,8 @@ function react(key: ReactionKey) {
 
 const open = ref(false)
 const draft = ref('')
+// A half-typed reply belongs to whoever typed it.
+watch(owner, (_next, prev) => { if (prev) draft.value = '' })
 function sendComment() {
   addComment(props.post.id, draft.value)
   draft.value = ''
@@ -41,6 +44,7 @@ function sendComment() {
           <span v-if="post.author.flair">{{ post.author.flair }} · </span>
           <TimeAgo :at="post.createdAt" />
           <span v-if="post.sport" class="capitalize"> · {{ post.sport }}</span>
+          <span v-if="post.own" title="Sparat bara i den här webbläsaren – ingen annan ser det"> · <span aria-hidden="true">🔒</span> bara här</span>
         </p>
       </div>
       <button v-if="post.own" class="text-xs text-krita-dim hover:text-rod" @click="remove(post.id)">Ta bort</button>
@@ -96,9 +100,12 @@ function sendComment() {
           </p>
         </div>
       </div>
-      <form class="flex gap-2" @submit.prevent="sendComment">
+      <p v-if="identity.kind === 'needs-profile'" class="text-sm text-krita-dim">
+        <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Välj ditt läktarnamn</button> för att svara.
+      </p>
+      <form v-else class="flex gap-2" @submit.prevent="sendComment">
         <input v-model="draft" maxlength="280" placeholder="Svara…" aria-label="Skriv en kommentar" class="min-w-0 flex-1 rounded-full border border-white/12 bg-navy-950 px-4 py-2 text-sm outline-none focus:border-himmel">
-        <button class="rounded-full bg-krita px-4 text-sm font-bold text-navy-950 disabled:opacity-40" :disabled="!draft.trim()">Skicka</button>
+        <button class="rounded-full bg-krita px-4 text-sm font-bold text-navy-950 disabled:opacity-40" :disabled="!me || !draft.trim()">Skicka</button>
       </form>
     </div>
   </article>

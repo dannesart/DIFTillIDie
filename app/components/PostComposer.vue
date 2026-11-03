@@ -10,8 +10,9 @@ const props = defineProps<{ story?: Story, autofocus?: boolean }>()
 const body = defineModel<string>('body', { default: '' })
 const emit = defineEmits<{ published: [postId: string, text: string] }>()
 
-const { me, publish, filter } = useSnacket()
+const { me, identity, owner, publish, filter } = useSnacket()
 const { stories } = useNews()
+const accountOpen = useAccountDialog()
 const { sport: sportFilter } = useSport()
 
 const MAX = 280
@@ -45,8 +46,12 @@ if (!props.story) {
 const left = computed(() => MAX - body.value.length)
 const expanded = computed(() => inline.value || focused.value || body.value.length > 0)
 
+// Text typed as one person is never posted as the next. (The Story composer's
+// text is that Story's draft, which is already kept per person.)
+if (!props.story) watch(owner, (_next, prev) => { if (prev) body.value = '' })
+
 function submit() {
-  if (!body.value.trim() || left.value < 0) return
+  if (!me.value || !body.value.trim() || left.value < 0) return
   const text = body.value.trim()
   const id = publish(text, {
     sport: sport.value,
@@ -80,7 +85,7 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
     @submit.prevent="submit"
   >
     <div class="flex gap-3">
-      <Avatar :name="me.name" :size="inline ? 'sm' : undefined" />
+      <Avatar :name="me?.name ?? 'Du'" :size="inline ? 'sm' : undefined" />
       <label class="min-w-0 flex-1">
         <span class="sr-only">{{ inline ? 'Skriv om den här Storyn' : 'Skriv ett inlägg' }}</span>
         <textarea
@@ -121,10 +126,20 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
         </select>
       </template>
       <span class="ml-auto text-xs tabular-nums" :class="left < 0 ? 'text-rod font-bold' : left < 40 ? 'text-guld' : 'text-krita-dim'">{{ left }}</span>
+      <!-- Signed in without a name yet: choose one first, the text waits -->
       <button
+        v-if="identity.kind === 'needs-profile'"
+        type="button"
+        class="rounded-full bg-guld px-5 py-2 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5"
+        @click="accountOpen = true"
+      >
+        Välj läktarnamn först
+      </button>
+      <button
+        v-else
         type="submit"
         class="rounded-full bg-himmel px-5 py-2 text-sm font-bold text-navy-950 transition enabled:hover:-translate-y-0.5 enabled:hover:bg-himmel-300 disabled:opacity-40"
-        :disabled="!body.trim() || left < 0"
+        :disabled="!me || !body.trim() || left < 0"
       >
         Släng ut det
       </button>

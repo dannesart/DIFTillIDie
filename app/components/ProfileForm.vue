@@ -44,7 +44,7 @@ async function submit() {
         aria-describedby="name-help"
       >
       <span id="name-help" class="mt-1 block text-xs" :class="errors.displayName ? 'text-rod' : 'text-krita-dim'">
-        {{ errors.displayName ?? 'Ditt eget val – inte ditt Google-namn. 2–40 tecken.' }}
+        {{ errors.displayName ?? 'Ditt eget val – din e-postadress visas aldrig. 2–40 tecken.' }}
       </span>
     </label>
 

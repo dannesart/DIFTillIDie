@@ -151,7 +151,9 @@ The card then shows a click-to-load player. Nothing is loaded from Spotify or Yo
 
 ## Supporter accounts (e-mail code)
 
-Supporters sign in with a six-digit code sent by e-mail (Supabase `signInWithOtp` / `verifyOtp`), without ever leaving the page, and choose a display name and handle. Nothing public requires an account, and Snacket på stan's demo posts are unchanged.
+Supporters sign in with a six-digit code sent by e-mail (Supabase `signInWithOtp` / `verifyOtp`), without ever leaving the page, and choose a display name and handle. Nothing public requires an account, and Snacket på stan's fictional posts are unchanged.
+
+Signed in with a profile, you post, comment and draft in Snacket under that name and handle, and edits to the profile show everywhere at once. Posts are still **local only**: nothing is sent to a server. Each account, and the guest, has its own local posts, reactions, comments and drafts, so a shared browser never shows one supporter's content to another or re-attributes guest posts.
 
 - **Docs:** setup, the security model, the caching review, the e-mail template, SMTP requirements, future registration modes and a device test plan are in [`docs/authentication.md`](docs/authentication.md).
 - **Migration:** [`supabase/migrations/`](supabase/migrations/), with pgTAP authorization tests in [`supabase/tests/`](supabase/tests/).
