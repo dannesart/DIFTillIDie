@@ -74,8 +74,9 @@ watch(body, () => (error.value = null))
 /*
  * Attaching a Story (one per post), from the Stories already loaded:
  *  - "Bifoga" opens a search (StoryPicker);
- *  - `#` + text suggests Stories as you type. It stays a plain hashtag
- *    unless you pick one; then the `#text` makes way for the attachment.
+ *  - `#` shows the latest Stories at once, and the text after it narrows
+ *    them down. It stays a plain hashtag unless you pick one; then the
+ *    `#text` makes way for the attachment.
  * Not in a Story's own dialog (that Story is the attachment), and quiet
  * while a Story is attached, so hashtags are just hashtags.
  */
@@ -144,9 +145,9 @@ const lookupStatus = computed(() => {
   if (!lookup.open.value) return attachNews.value
   const q = lookup.trigger.value?.query
   const n = lookup.results.value.length
-  return n
-    ? `${n} ${n === 1 ? 'Story matchar' : 'Stories matchar'} ”${q}”. Pil ned och Enter för att bifoga, eller skriv vidare.`
-    : `Ingen Story matchar ”${q}”. Det blir en vanlig hashtagg.`
+  if (!n) return q ? `Ingen Story matchar ”${q}”. Det blir en vanlig hashtagg.` : 'Inga Stories att bifoga just nu.'
+  const found = q ? `${n} ${n === 1 ? 'Story matchar' : 'Stories matchar'} ”${q}”.` : `${n} senaste Stories.`
+  return `${found} Pil ned och Enter för att bifoga, eller skriv vidare.`
 })
 
 // Text typed as one person is never posted as the next. (The Story composer's
@@ -250,6 +251,7 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
           @input="syncLookup"
           @click="syncLookup"
           @keyup.left.right.home.end="syncLookup"
+          @selectionchange="syncLookup"
         />
       </label>
     </div>
@@ -269,7 +271,8 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
         />
       </template>
       <p v-else class="px-3 py-2.5 text-xs text-krita-dim">
-        Ingen Story matchar ”{{ lookup.trigger.value?.query }}”. Det blir en vanlig hashtagg.
+        <template v-if="lookup.trigger.value?.query">Ingen Story matchar ”{{ lookup.trigger.value.query }}”. Det blir en vanlig hashtagg.</template>
+        <template v-else>Inga Stories att bifoga just nu.</template>
       </p>
     </div>
     <p class="sr-only" aria-live="polite">{{ lookupStatus }}</p>

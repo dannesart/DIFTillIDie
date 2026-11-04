@@ -60,7 +60,7 @@ async function remove() {
     <button v-if="story" class="group mt-4 flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-navy-950/60 p-3 text-left transition hover:border-himmel/50" @click="show(story.id)">
       <span class="h-10 w-1.5 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 5px, var(--color-navy-700) 5px 10px)" />
       <span class="min-w-0 flex-1">
-        <span class="kicker block text-krita-dim">Story · {{ story.sources.length }} källor</span>
+        <span class="kicker block text-krita-dim">Story · {{ story.sources.length }} {{ story.sources.length === 1 ? 'källa' : 'källor' }}</span>
         <span class="block truncate font-display text-base font-semibold">{{ leadOf(story).headline }}</span>
       </span>
       <span class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel">→</span>

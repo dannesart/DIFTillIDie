@@ -35,9 +35,18 @@ describe('finding the `#word` at the caret', () => {
     expect(findTrigger('#ny_tränare2', 12)?.query).toBe('ny_tränare2')
   })
 
-  it('nothing for a bare `#`, a finished word, mid-word `#`, or a selection', () => {
-    expect(findTrigger('Heja #', 6)).toBeNull()
+  it('a bare `#` is a lookup with an empty query', () => {
+    expect(findTrigger('#', 1)).toEqual({ start: 0, end: 1, query: '' })
+    expect(findTrigger('Heja #', 6)).toEqual({ start: 5, end: 6, query: '' })
+    // Caret right after the `#`, a word already following it
+    expect(findTrigger('#derby', 1)).toEqual({ start: 0, end: 6, query: 'derby' })
+  })
+
+  it('nothing for a finished word, a `#` after a space, mid-word `#`, `##`, or a selection', () => {
     expect(findTrigger('#derby ', 7)).toBeNull()
+    expect(findTrigger('# ', 2)).toBeNull()
+    expect(findTrigger('C#', 2)).toBeNull()
+    expect(findTrigger('##', 2)).toBeNull()
     expect(findTrigger('abc#derby', 9)).toBeNull()
     expect(findTrigger('#derby', 2, 5)).toBeNull()
     expect(findTrigger('@derby', 6)).toBeNull()
@@ -56,6 +65,11 @@ describe('removing the `#query` once a Story is chosen (caret)', () => {
 
   it('in the middle: no double space, caret where the token was', () => {
     expect(removeTrigger('Vilken #derb match', { start: 7, end: 12 })).toEqual({ text: 'Vilken match', caret: 7 })
+  })
+
+  it('a bare `#` goes on its own', () => {
+    expect(removeTrigger('Heja #', { start: 5, end: 6 })).toEqual({ text: 'Heja ', caret: 5 })
+    expect(removeTrigger('Heja # nu', { start: 5, end: 6 })).toEqual({ text: 'Heja nu', caret: 5 })
   })
 
   it('at the start, and alone', () => {
@@ -117,6 +131,60 @@ function inline(attached = false) {
 }
 
 describe('the `#` suggestions', () => {
+  it('a bare `#` opens at once with the latest Stories, nothing active', () => {
+    const t = inline()
+    t.type('Heja #')
+    expect(t.l.open.value).toBe(true)
+    expect(t.l.results.value.map(s => s.id)).toEqual(['story-b', 'story-a', 'story-c'])
+    expect(t.l.active.value).toBe(-1)
+    // Enter is still a new line: nothing is attached without a choice.
+    expect(t.l.key('Enter')).toBe(false)
+  })
+
+  it('`#` then `#word`: typing narrows the same suggestions and resets the active one', () => {
+    const t = inline()
+    t.type('#')
+    t.l.key('ArrowDown')
+    expect(t.l.active.value).toBe(0)
+    t.type('d')
+    expect([t.l.open.value, t.l.active.value, t.l.results.value.map(s => s.id)]).toEqual([true, -1, ['story-a', 'story-c']])
+    t.type('erby')
+    expect(t.l.results.value.map(s => s.id)).toEqual(['story-a', 'story-c'])
+    t.type(' ')
+    expect(t.l.open.value).toBe(false)
+    expect(tokenize(t.text)).toContainEqual({ type: 'tag', value: 'derby' })
+  })
+
+  it('a bare `#` then a space or Escape closes it; the `#` stays in the text', () => {
+    const t = inline()
+    t.type('#')
+    t.type(' ')
+    expect([t.l.open.value, t.text]).toEqual([false, '# '])
+    t.type('#')
+    expect(t.l.key('Escape')).toBe(true)
+    expect([t.l.open.value, t.text]).toEqual([false, '# #'])
+    // Typing on after dismissing the bare `#` stays quiet for that word.
+    t.type('derb')
+    expect(t.l.open.value).toBe(false)
+  })
+
+  it('choosing from a bare `#` removes just the `#` and puts the caret there', () => {
+    const t = inline()
+    t.type('Heja #')
+    t.l.key('ArrowDown')
+    const picked = t.l.key('Enter') as Story
+    expect(t.l.choose(t.text, picked)).toEqual({ text: 'Heja ', caret: 5, storyId: 'story-b' })
+  })
+
+  it('moving the caret back into an earlier `#word` reopens it', () => {
+    const l = createInlineLookup({ stories: () => STORIES, enabled: () => true })
+    const text = '#derby i kväll'
+    l.sync(text, text.length)
+    expect(l.open.value).toBe(false)
+    l.sync(text, 4) // a click or arrow key inside "#derby"
+    expect([l.open.value, l.trigger.value?.query]).toEqual([true, 'derby'])
+  })
+
   it('typing #derby and carrying on stays an ordinary hashtag', () => {
     const t = inline()
     t.type('Vilket #derby')
@@ -166,7 +234,9 @@ describe('the `#` suggestions', () => {
 
   it('quiet while a Story is attached: one Story per post, and hashtags stay hashtags', () => {
     const t = inline(true)
-    t.type('#derb')
+    t.type('#')
+    expect(t.l.open.value).toBe(false)
+    t.type('derb')
     expect(t.l.open.value).toBe(false)
     expect(t.l.key('ArrowDown')).toBe(false)
   })

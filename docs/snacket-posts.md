@@ -44,11 +44,11 @@ The familiar two-tab control sits above the feed. **Nyast** is the default: newe
 A post can be about one Story. It's stored as the post's `story_id`, which is a structured reference, never parsed from the text. The old "Koppla till en Story…" dropdown is gone. There are now two ways to attach a Story, both searching only the Stories already loaded on the page ([`app/lib/storyLookup.ts`](../app/lib/storyLookup.ts)). Nothing is fetched and nothing is invented. If nothing matches, it says so.
 
 - **📎 Bifoga Story** opens a search field. It lists the latest Stories when empty, and works before a word is written. Arrow keys and Enter, or a tap, attach a Story. Escape closes the search and returns focus to the button.
-- **`#` + text in the post** suggests matching Stories under the text box, showing each outlet's own headline, outlet, publisher and age.
+- **`#` in the post** lists the latest Stories under the text box straight away, showing each outlet's own headline, outlet, publisher and age. Typing after it (`#derb…`) narrows the list. The suggestions follow the caret: they reopen when you click or arrow back into a `#word`, and the text box listens to `input`, `click`, caret keys and `selectionchange`, so phone keyboards that insert text without key events work too.
   - **It stays an ordinary hashtag unless you choose a Story.** Keep typing and the suggestions disappear. Enter is still a new line unless the arrow keys picked a suggestion first. If nothing matches, it says "Det blir en vanlig hashtagg."
   - **Choosing** (arrow keys + Enter, or a tap) removes the `#text`, keeps the rest of the draft, puts the caret where the word was, and shows the Story as the removable "Om: …" chip.
   - **Escape** hides the suggestions for that word and keeps the text and the composer.
-  - **When suggestions are off:** in a Story's own "Snacka om detta" dialog, which already has its Story, and while a Story is attached. One Story per post, so hashtags are just hashtags there.
+  - **When suggestions are off:** in a Story's own "Snacka om detta" dialog, which already has its Story, and while a Story is attached. One Story per post, so hashtags are just hashtags there. A Story counts as attached when it was attached automatically too: browsing one Story's posts ("Snackas om i N inlägg") attaches that Story in the composer, as before. ✕ on the chip turns the suggestions back on.
 - **Matching:** the start of each word in the original headlines, outlets and publishers, ignoring case and accents ("malmo" finds "Malmö"). A match in the lead headline ranks first.
 - **Accessibility and touch:**
   - Focus stays in the text field or search field, which point at the suggestion you're on (`aria-activedescendant`).

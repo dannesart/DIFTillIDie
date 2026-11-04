@@ -7,7 +7,8 @@ import type { Story } from '#shared/types/domain'
  *
  * Two ways in, one list:
  *  - "Bifoga": a button with a search field. No syntax to know.
- *  - Typing `#` plus text in the post suggests matching Stories. The text
+ *  - Typing `#` in the post shows the latest Stories at once; the text
+ *    after it narrows them down. The text
  *    stays an ordinary hashtag unless a suggestion is actively chosen
  *    (arrow keys + Enter, or a tap). Enter on its own is still a new line,
  *    so writing #derby and carrying on never attaches anything by accident.
@@ -37,7 +38,8 @@ export function findTrigger(text: string, caret: number, selectionEnd = caret): 
   let end = caret
   while (end < text.length && WORD.test(text[end]!)) end++
   const query = text.slice(start + 1, end)
-  return query ? { start, end, query } : null
+  // A bare `#` counts too: it lists the latest Stories straight away.
+  return { start, end, query }
 }
 
 /**
