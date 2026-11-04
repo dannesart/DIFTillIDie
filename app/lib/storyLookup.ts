@@ -64,17 +64,16 @@ function leadOf(story: Story) {
   return story.sources.find(s => s.id === story.leadId) ?? story.sources[0]!
 }
 
-export const LOOKUP_LIMIT = 6
-/** The `#` suggestions: a few, so they float at the caret without a long scroll. */
-export const INLINE_LIMIT = 4
+/** The `#` suggestions: three at most, so the popup at the caret never needs to scroll. */
+export const INLINE_LIMIT = 3
 
 /**
  * Stories whose own headlines or outlets contain every word of the query
  * (word starts: "derb" finds "Derbyt"). The lead headline matching ranks
  * first; otherwise the most recently updated first. An empty query lists
- * the latest Stories.
+ * the latest Stories. No limit by default: "Bifoga" searches them all.
  */
-export function matchStories(stories: Story[], query: string, limit = LOOKUP_LIMIT): Story[] {
+export function matchStories(stories: Story[], query: string, limit = Infinity): Story[] {
   const newest = [...stories].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   const want = terms(query)
   if (!want.length) return newest.slice(0, limit)

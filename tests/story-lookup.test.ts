@@ -256,11 +256,15 @@ describe('the `#` suggestions', () => {
     expect(l.open.value).toBe(false)
   })
 
-  it('a bare `#` offers only a few of the latest', () => {
+  it('three suggestions at most, for a bare `#` and a query alike', () => {
     const many = Array.from({ length: 9 }, (_, i) => story(`m${i}`, `Rubrik ${i}`, 'Sportbladet', `2026-11-0${i + 1}T10:00:00Z`))
     const l = createInlineLookup({ stories: () => many, enabled: () => true })
     l.sync('#', 1)
-    expect(l.results.value.map(s => s.id)).toEqual(['story-m8', 'story-m7', 'story-m6', 'story-m5'])
+    expect(l.results.value.map(s => s.id)).toEqual(['story-m8', 'story-m7', 'story-m6'])
+    l.sync('#rubrik', 7)
+    expect(l.results.value).toHaveLength(3)
+    // "Bifoga" searches the whole list.
+    expect(matchStories(many, 'rubrik', 20)).toHaveLength(9)
   })
 
   it('quiet while a Story is attached: one Story per post, and hashtags stay hashtags', () => {

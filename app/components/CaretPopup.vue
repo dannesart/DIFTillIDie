@@ -75,7 +75,10 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="#teleports">
-    <!-- mousedown.prevent: focus (and the phone keyboard) stays in the textarea -->
+    <!--
+      mousedown.prevent: focus (and the phone keyboard) stays in the textarea.
+      The one scrolling area, and only when a phone keyboard leaves too little room for three.
+    -->
     <div
       ref="el"
       class="fixed z-[60] overflow-y-auto overscroll-contain rounded-2xl border border-white/12 bg-navy-950/95 p-1 shadow-[0_24px_60px_-20px_rgb(3_9_21/0.95)] backdrop-blur-xl"
