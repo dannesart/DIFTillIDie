@@ -74,9 +74,10 @@ watch(body, () => (error.value = null))
 /*
  * Attaching a Story (one per post), from the Stories already loaded:
  *  - "Bifoga" opens a search (StoryPicker);
- *  - `#` shows the latest Stories at once, and the text after it narrows
- *    them down. It stays a plain hashtag unless you pick one; then the
- *    `#text` makes way for the attachment.
+ *  - `#` offers a few of the latest Stories at once, and the text after it
+ *    narrows them down; when none match, the suggestions just go. It stays
+ *    a plain hashtag unless you pick one; then the `#text` makes way for
+ *    the attachment.
  * Not in a Story's own dialog (that Story is the attachment), and quiet
  * while a Story is attached, so hashtags are just hashtags.
  */
@@ -145,7 +146,6 @@ const lookupStatus = computed(() => {
   if (!lookup.open.value) return attachNews.value
   const q = lookup.trigger.value?.query
   const n = lookup.results.value.length
-  if (!n) return q ? `Ingen Story matchar ”${q}”. Det blir en vanlig hashtagg.` : 'Inga Stories att bifoga just nu.'
   const found = q ? `${n} ${n === 1 ? 'Story matchar' : 'Stories matchar'} ”${q}”.` : `${n} senaste Stories.`
   return `${found} Pil ned och Enter för att bifoga, eller skriv vidare.`
 })
@@ -256,25 +256,23 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
       </label>
     </div>
 
-    <!-- `#` + text: Stories it could be about. Picking one is a choice; carrying on writing keeps a plain hashtag. -->
-    <div v-if="lookup.open.value" class="mt-3 rounded-2xl border border-white/10 bg-navy-950/80 p-1">
-      <template v-if="lookup.results.value.length">
-        <p class="px-3 pt-2 text-xs text-krita-dim">Bifoga en Story? Välj en, eller skriv vidare för en vanlig #hashtagg.</p>
-        <StoryOptions
-          :id="lookupId"
-          ref="lookupList"
-          :stories="lookup.results.value"
-          :active="lookup.active.value"
-          label="Stories att bifoga"
-          @choose="chooseInline"
-          @hover="lookup.active.value = $event"
-        />
-      </template>
-      <p v-else class="px-3 py-2.5 text-xs text-krita-dim">
-        <template v-if="lookup.trigger.value?.query">Ingen Story matchar ”{{ lookup.trigger.value.query }}”. Det blir en vanlig hashtagg.</template>
-        <template v-else>Inga Stories att bifoga just nu.</template>
-      </p>
-    </div>
+    <!--
+      `#` + text: Stories it could be about, floating at the `#` so nothing
+      below moves. Picking one is a choice; carrying on writing keeps a plain hashtag.
+    -->
+    <CaretPopup v-if="lookup.open.value && lookup.trigger.value" :textarea="textarea" :at="lookup.trigger.value.start" :text="body">
+      <p class="px-3 pt-2 text-xs text-krita-dim">Bifoga en Story? Eller skriv vidare.</p>
+      <StoryOptions
+        :id="lookupId"
+        ref="lookupList"
+        :stories="lookup.results.value"
+        :active="lookup.active.value"
+        label="Stories att bifoga"
+        compact
+        @choose="chooseInline"
+        @hover="lookup.active.value = $event"
+      />
+    </CaretPopup>
     <p class="sr-only" aria-live="polite">{{ lookupStatus }}</p>
 
     <div v-show="expanded" class="mt-3 flex flex-wrap items-center gap-2 border-t border-white/8 pt-3">

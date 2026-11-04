@@ -225,11 +225,42 @@ describe('the `#` suggestions', () => {
     expect(t.l.open.value).toBe(true)
   })
 
-  it('no match: open, with an empty list (shown as "it stays a hashtag")', () => {
+  it('no match: the suggestions quietly go, the hashtag and its keys stay untouched', () => {
     const t = inline()
-    t.type('#zlatan')
-    expect([t.l.open.value, t.l.results.value]).toEqual([true, []])
+    t.type('#zl')
+    expect([t.l.open.value, t.l.results.value]).toEqual([false, []])
+    // Nothing unrelated fills the gap, and every key does its usual thing.
     expect(t.l.key('ArrowDown')).toBe(false)
+    expect(t.l.key('Enter')).toBe(false)
+    expect(t.l.key('Escape')).toBe(false)
+    t.type('atan!')
+    expect(tokenize(t.text)).toContainEqual({ type: 'tag', value: 'zlatan' })
+  })
+
+  it('narrowing to nothing and back: hidden in between, open again on a match', () => {
+    const t = inline()
+    t.type('#')
+    expect(t.l.open.value).toBe(true)
+    t.type('k')
+    expect(t.l.results.value.map(s => s.id)).toEqual(['story-b', 'story-c'])
+    t.type('x')
+    expect(t.l.open.value).toBe(false)
+    const l = createInlineLookup({ stories: () => STORIES, enabled: () => true })
+    l.sync('#klar', 5)
+    expect([l.open.value, l.results.value.map(s => s.id)]).toEqual([true, ['story-c']])
+  })
+
+  it('no Stories loaded: a bare `#` shows nothing', () => {
+    const l = createInlineLookup({ stories: () => [], enabled: () => true })
+    l.sync('#', 1)
+    expect(l.open.value).toBe(false)
+  })
+
+  it('a bare `#` offers only a few of the latest', () => {
+    const many = Array.from({ length: 9 }, (_, i) => story(`m${i}`, `Rubrik ${i}`, 'Sportbladet', `2026-11-0${i + 1}T10:00:00Z`))
+    const l = createInlineLookup({ stories: () => many, enabled: () => true })
+    l.sync('#', 1)
+    expect(l.results.value.map(s => s.id)).toEqual(['story-m8', 'story-m7', 'story-m6', 'story-m5'])
   })
 
   it('quiet while a Story is attached: one Story per post, and hashtags stay hashtags', () => {

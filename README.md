@@ -45,7 +45,7 @@ Times shown relative to "now" use one moment fixed on the server (`useDemoNow`, 
 - **Source pills** link straight to each original article.
 - **"Snackas om i N inlägg"** on a Story filters the feed to posts about it. An attached Story inside a post scrolls back to that Story and highlights it.
 - **Nyast / Hetast.** Snacket på stan is newest first by default. Hetast ranks only the loaded posts, by real reactions and comments cooled by age, and never re-sorts while you interact ([details](docs/snacket-posts.md#hetast--nyast)).
-- **Attaching a Story to a post:** "📎 Bifoga Story" searches the Stories on the page. Typing `#` lists the latest Stories, and the text after it narrows them down, but it stays an ordinary hashtag unless you choose one ([details](docs/snacket-posts.md#attaching-a-story)).
+- **Attaching a Story to a post:** "📎 Bifoga Story" searches the Stories on the page. Typing `#` floats a few matching Stories at the caret, starting with the latest. With no match they quietly go, and it stays an ordinary hashtag unless you choose one ([details](docs/snacket-posts.md#attaching-a-story)).
 - **"Snacka om detta"** on any Story opens a dialog (a bottom sheet on phones) for writing about it, with the Story attached. Drafts survive closing it by accident. Signed in with a profile, the post is published to Snacket på stan for everyone. The small "💬 N inlägg" link next to the button takes you to what's already been said.
 - **The source badge on the match card** ("dif.se" / "Verifierad …") opens details on team coverage and where the fixtures come from.
 - **Click an @handle** to mention that person in the composer. **Click a #tag** to filter the feed.

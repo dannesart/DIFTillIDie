@@ -7,11 +7,12 @@ import type { Story } from '#shared/types/domain'
  *
  * Two ways in, one list:
  *  - "Bifoga": a button with a search field. No syntax to know.
- *  - Typing `#` in the post shows the latest Stories at once; the text
- *    after it narrows them down. The text
- *    stays an ordinary hashtag unless a suggestion is actively chosen
- *    (arrow keys + Enter, or a tap). Enter on its own is still a new line,
- *    so writing #derby and carrying on never attaches anything by accident.
+ *  - `#` in the post is a hashtag first. A bare `#` offers a few of the
+ *    latest Stories; the text after it narrows them down, and when no
+ *    Story matches the suggestions simply go away. The text stays an
+ *    ordinary hashtag unless a suggestion is actively chosen (arrow keys +
+ *    Enter, or a tap). Enter on its own is still a new line, so writing
+ *    #derby and carrying on never attaches anything by accident.
  */
 
 /** The `#word` around the caret that the suggestions are for. */
@@ -64,6 +65,8 @@ function leadOf(story: Story) {
 }
 
 export const LOOKUP_LIMIT = 6
+/** The `#` suggestions: a few, so they float at the caret without a long scroll. */
+export const INLINE_LIMIT = 4
 
 /**
  * Stories whose own headlines or outlets contain every word of the query
@@ -106,8 +109,9 @@ export function createInlineLookup(opts: { stories: () => Story[], enabled: () =
   /** The `#` (by position) Escape was pressed on; it stays quiet until the caret leaves it. */
   let dismissed: number | null = null
 
-  const results = computed(() => (trigger.value ? matchStories(opts.stories(), trigger.value.query, 5) : []))
-  const open = computed(() => !!trigger.value && opts.enabled())
+  const results = computed(() => (trigger.value ? matchStories(opts.stories(), trigger.value.query, INLINE_LIMIT) : []))
+  /** Only with something to suggest: a hashtag that matches nothing is just a hashtag. */
+  const open = computed(() => !!trigger.value && opts.enabled() && results.value.length > 0)
 
   function sync(text: string, caret: number, selectionEnd = caret) {
     const t = findTrigger(text, caret, selectionEnd)
@@ -145,7 +149,6 @@ export function createInlineLookup(opts: { stories: () => Story[], enabled: () =
     if (!open.value) return false
     const n = results.value.length
     if (k === 'ArrowDown' || k === 'ArrowUp') {
-      if (!n) return false
       active.value = moveActive(active.value, k === 'ArrowDown' ? 1 : -1, n)
       return true
     }
