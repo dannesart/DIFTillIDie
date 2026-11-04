@@ -3,8 +3,8 @@ import { ref } from 'vue'
 /*
  * Whether the post composer is open. Opening is an interaction: focus
  * arriving anywhere in the composer. Using its own controls (the sport
- * chips, the native "Koppla till en Story…" select, the attached Story's ✕)
- * never closes it, whatever the browser does with focus on the way.
+ * chips, "Bifoga Story" and its search, the Story suggestions, the attached
+ * Story's ✕) never closes it, whatever the browser does with focus on the way.
  *
  * It closes only when:
  *  - the post is published (reset),

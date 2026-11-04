@@ -45,6 +45,7 @@ Times shown relative to "now" use one moment fixed on the server (`useDemoNow`, 
 - **Source pills** link straight to each original article.
 - **"Snackas om i N inlägg"** on a Story filters the feed to posts about it. An attached Story inside a post scrolls back to that Story and highlights it.
 - **Nyast / Hetast.** Snacket på stan is newest first by default. Hetast ranks only the loaded posts, by real reactions and comments cooled by age, and never re-sorts while you interact ([details](docs/snacket-posts.md#hetast--nyast)).
+- **Attaching a Story to a post:** "📎 Bifoga Story" searches the Stories on the page. Typing `#` plus text also suggests matching Stories, but it stays an ordinary hashtag unless you choose one ([details](docs/snacket-posts.md#attaching-a-story)).
 - **"Snacka om detta"** on any Story opens a dialog (a bottom sheet on phones) for writing about it, with the Story attached. Drafts survive closing it by accident. Signed in with a profile, the post is published to Snacket på stan for everyone. The small "💬 N inlägg" link next to the button takes you to what's already been said.
 - **The source badge on the match card** ("dif.se" / "Verifierad …") opens details on team coverage and where the fixtures come from.
 - **Click an @handle** to mention that person in the composer. **Click a #tag** to filter the feed.
@@ -82,7 +83,7 @@ Bollsvenskan summarises other outlets' reporting: its articles end with "Läs he
 
 A Story's id is `story-<id of its earliest article>`. Article ids come from the publisher plus the canonical URL (tracking parameters removed), so they don't change when an article reaches us through another feed. A Story also answers to the id of **any** of its articles (`storyAnswersTo` in [`shared/utils/story.ts`](shared/utils/story.ts)), so a post's reference survives when Stories merge or when a newer article takes the lead.
 
-**Known limitation:** feeds only hold their latest 20–40 items. Once the referenced article has left every feed, the reference can't be resolved. Stories can also split again when the article that linked them drops out. If supporter posts are ever stored permanently, store the referenced **SourceArticle** (URL, headline, outlet, date) with the post, rather than only a Story id.
+**Known limitation:** feeds only hold their latest 20–40 items. Once the referenced article has left every feed, the reference can't be resolved. Stories can also split again when the article that linked them drops out. Supporter posts are now stored permanently with only that id, so an older post loses its Story card once the articles are gone. The fix is to store a snapshot of the referenced **SourceArticle** (URL, headline, outlet, date) with the post; that needs a migration and isn't done yet ([details](docs/snacket-posts.md#attaching-a-story)).
 
 How it works, in [`server/lib/`](server/lib/) (plain, testable functions) and [`server/utils/feeds.ts`](server/utils/feeds.ts) (caching):
 

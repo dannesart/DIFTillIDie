@@ -39,6 +39,30 @@ The familiar two-tab control sits above the feed. **Nyast** is the default: newe
   - Posts newer than the snapshot go first.
 - **Publishing** from the main composer switches back to Nyast and reveals the new post. Posting from a Story's dialog leaves the feed as it is.
 
+### Attaching a Story
+
+A post can be about one Story. It's stored as the post's `story_id`, which is a structured reference, never parsed from the text. The old "Koppla till en Story…" dropdown is gone. There are now two ways to attach a Story, both searching only the Stories already loaded on the page ([`app/lib/storyLookup.ts`](../app/lib/storyLookup.ts)). Nothing is fetched and nothing is invented. If nothing matches, it says so.
+
+- **📎 Bifoga Story** opens a search field. It lists the latest Stories when empty, and works before a word is written. Arrow keys and Enter, or a tap, attach a Story. Escape closes the search and returns focus to the button.
+- **`#` + text in the post** suggests matching Stories under the text box, showing each outlet's own headline, outlet, publisher and age.
+  - **It stays an ordinary hashtag unless you choose a Story.** Keep typing and the suggestions disappear. Enter is still a new line unless the arrow keys picked a suggestion first. If nothing matches, it says "Det blir en vanlig hashtagg."
+  - **Choosing** (arrow keys + Enter, or a tap) removes the `#text`, keeps the rest of the draft, puts the caret where the word was, and shows the Story as the removable "Om: …" chip.
+  - **Escape** hides the suggestions for that word and keeps the text and the composer.
+  - **When suggestions are off:** in a Story's own "Snacka om detta" dialog, which already has its Story, and while a Story is attached. One Story per post, so hashtags are just hashtags there.
+- **Matching:** the start of each word in the original headlines, outlets and publishers, ignoring case and accents ("malmo" finds "Malmö"). A match in the lead headline ranks first.
+- **Accessibility and touch:**
+  - Focus stays in the text field or search field, which point at the suggestion you're on (`aria-activedescendant`).
+  - A polite live region announces the number of matches, the attachment, and that the suggestions closed.
+  - Suggestions don't take focus when tapped, so the phone keyboard stays up. The search field uses 16px text, so iOS doesn't zoom.
+
+**Known limitation: a Story reference can outlive its Story.** `story_id` is only an id such as `story-<article id>`. The headline, outlet and link are not stored with the post: they come from the live RSS feeds, which keep only each outlet's latest items, and no database. So once every article of a Story has left the feeds, typically within days:
+
+- the post keeps its `story_id` but loses its "Om: …" card;
+- it drops out of that Story's count and filter;
+- nothing tells the reader it was ever about a Story.
+
+`storyAnswersTo()` already covers Stories merging or changing their lead article. It can't bring back articles that are gone. Fixing this would mean storing a small snapshot (outlet, headline, URL) with the post. That needs a migration and a decision about trusting client-supplied headlines, so it isn't part of this change.
+
 ### Retired: Demo-snack
 
 Mission #14 removed the fictional Snacket. That meant removing:
