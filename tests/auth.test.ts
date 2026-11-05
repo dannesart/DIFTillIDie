@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
-  AUTH_STORAGE_KEY, PENDING_KEY, RESEND_COOLDOWN_S, createAuth, normalizeCode, normalizeEmail, profileErrorMessage,
+  AUTH_STORAGE_KEY, PENDING_KEY, PROFILE_DESIGN_UNAVAILABLE, RESEND_COOLDOWN_S, createAuth, normalizeCode, normalizeEmail, profileErrorMessage,
   retryAfterSeconds, sendErrorMessage, validateEmail, verifyErrorMessage,
 } from '../app/lib/auth'
 import { normalizeHandle, validateDisplayName, validateHandle } from '../shared/utils/profile'
@@ -16,7 +16,7 @@ function fakeClient(opts: {
   signOutThrows?: unknown
   profile?: unknown
   profileError?: unknown
-  save?: { data?: unknown, error?: unknown }
+  save?: { data?: unknown, error?: unknown } | (() => { data?: unknown, error?: unknown })
 } = {}) {
   const calls: { method: string, args: unknown[] }[] = []
   let listener: ((event: string, session: unknown) => void) | undefined
@@ -40,7 +40,12 @@ function fakeClient(opts: {
     from: (table: string) => {
       rec('from', table)
       let isWrite = false
-      const result = () => isWrite ? { data: opts.save?.data ?? null, error: opts.save?.error ?? null } : { data: opts.profile ?? null, error: opts.profileError ?? null }
+      const saved = () => (typeof opts.save === 'function' ? opts.save() : opts.save)
+      const result = () => {
+        if (!isWrite) return { data: opts.profile ?? null, error: opts.profileError ?? null }
+        const s = saved() // once per request
+        return { data: s?.data ?? null, error: s?.error ?? null }
+      }
       const q: Record<string, unknown> = {}
       for (const m of ['select', 'eq']) q[m] = (...a: unknown[]) => (rec(`db.${m}`, ...a), q)
       q.insert = (...a: unknown[]) => (isWrite = true, rec('db.insert', ...a), q)
@@ -350,6 +355,37 @@ describe('saving the profile', () => {
     expect(auth.profile.value).toEqual({ id: 'user-lotta', displayName: 'Lotta från Gärdet', handle: 'kaminen81', bio: 'Sektion A sedan -98.', avatar: 'halsduk' })
     await auth.saveProfile({ displayName: 'Lotta från Gärdet', handle: 'kaminen81', bio: '   ', avatar: null })
     expect(calls.filter(c => c.method === 'db.update').at(-1)!.args).toEqual([{ display_name: 'Lotta från Gärdet', handle: 'kaminen81', bio: null, avatar: null }])
+  })
+
+  it('only what changed is sent: an unchanged bio and avatar are left out', async () => {
+    const current = { ...row, bio: 'Sektion A.', avatar: 'halsduk' }
+    const { auth, calls } = await signedIn({ profile: current, save: { data: { ...current, display_name: 'Lotta G' } } })
+    await auth.saveProfile({ displayName: 'Lotta G', handle: 'kaminen81', bio: 'Sektion A.', avatar: 'halsduk' })
+    expect(calls.find(c => c.method === 'db.update')!.args).toEqual([{ display_name: 'Lotta G', handle: 'kaminen81' }])
+  })
+
+  describe('a database without bio and avatar yet (before the supporter-profiles migration)', () => {
+    const before = (code: string) => { let n = 0; return () => (n++ ? { data: row } : { error: { code, message: 'column does not exist' } }) }
+
+    it('a new bio or avatar: says plainly it can’t be saved here yet, nothing saved, no retry', async () => {
+      for (const [code, change] of [['42703', { bio: 'Sektion A.' }], ['PGRST204', { avatar: 'stjarna' as const }]] as const) {
+        const { auth, calls } = await signedIn({ profile: row, save: before(code) })
+        const r = await auth.saveProfile({ displayName: 'Lotta från Gärdet', handle: 'kaminen81', ...change })
+        expect(r).toEqual({ ok: false, errors: { form: PROFILE_DESIGN_UNAVAILABLE } })
+        expect(PROFILE_DESIGN_UNAVAILABLE).toMatch(/Inget har sparats/)
+        expect(calls.filter(c => c.method === 'db.update')).toHaveLength(1)
+        // Not pretended: the profile is as it was.
+        expect(auth.profile.value).toEqual({ id: 'user-lotta', displayName: 'Lotta från Gärdet', handle: 'kaminen81', bio: null, avatar: null })
+      }
+    })
+
+    it('a name or handle change alone still saves, reading back the columns it has', async () => {
+      const { auth, calls } = await signedIn({ profile: row, save: before('42703') })
+      expect(await auth.saveProfile({ displayName: 'Lotta från Gärdet', handle: 'kaminen81', bio: '', avatar: null })).toEqual({ ok: true })
+      const selects = calls.filter(c => c.method === 'db.select').map(c => String(c.args[0])).slice(-2)
+      expect(selects).toEqual(['id, display_name, handle, bio, avatar', 'id, display_name, handle'])
+      expect(calls.filter(c => c.method === 'db.update').map(c => c.args[0])).toEqual([{ display_name: 'Lotta från Gärdet', handle: 'kaminen81' }, { display_name: 'Lotta från Gärdet', handle: 'kaminen81' }])
+    })
   })
 
   it('a bio that is too long is caught before any request', async () => {

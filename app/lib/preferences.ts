@@ -10,7 +10,10 @@ import type { AuthStore } from './auth'
  * shown on their own profile and never used to hide anything.
  */
 
-export type PreferencesStatus = 'idle' | 'loading' | 'ready' | 'error'
+/** 'unavailable': a database without the supporter-profiles migration (no such table). Retrying can't help. */
+export type PreferencesStatus = 'idle' | 'loading' | 'ready' | 'error' | 'unavailable'
+
+const missingTable = (e: unknown) => ['42P01', 'PGRST205'].includes((e as { code?: string } | null)?.code ?? '')
 
 /** Stable order for display and saving: as TEAM_INTERESTS lists them. */
 const ordered = (teams: Iterable<string>) => {
@@ -37,8 +40,8 @@ export function createPreferences(client: SupabaseClient | null, auth: AuthStore
       teams.value = ordered(((data as { teams?: string[] } | null)?.teams ?? []).filter(isTeamInterest))
       status.value = 'ready'
     }
-    catch {
-      if (mine === request) status.value = 'error'
+    catch (e) {
+      if (mine === request) status.value = missingTable(e) ? 'unavailable' : 'error'
     }
   }
 

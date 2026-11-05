@@ -165,7 +165,12 @@ export function createCommunity(client: SupabaseClient | null, auth: AuthStore |
     try {
       // No author: the database takes it from the session.
       const args = { p_body: body, p_sport: input.sport ?? null, p_story: input.story?.capture?.data ?? null, p_story_sig: input.story?.capture?.sig ?? null }
-      const { data, error: e } = await client.rpc('publish_post', args).select(COLUMNS).single()
+      const call = (cols: string) => client.rpc('publish_post', args).select(cols).single()
+      let { data, error: e } = await call(COLUMNS)
+      // A database without the avatar column yet. publish_post() and the
+      // columns read back are one SQL statement, so that error means nothing
+      // was published: asking again with the columns it has can't post twice.
+      if ((e as DataError | null)?.code === '42703') ({ data, error: e } = await call(COLUMNS_BEFORE_DESIGN))
       if (e) throw e
       const post = toCommunityPost(data as unknown as PostRow)
       if (!post) throw new Error('no author')

@@ -99,7 +99,12 @@ There is **one** profile form, in the account dialog. "Ändra profil" on your ow
 2. Run `supabase/tests/supporter_profiles_rls.test.sql`, `handle_aliases_rls.test.sql` and the other `supabase/tests/*.test.sql` files. `posts_rls.test.sql` now expects `bio` and `avatar` among the public columns, so it only passes after step 1.
 3. Deploy the app.
 
-If the app is deployed before step 1, it still works: reading posts, comments, your profile or a wall falls back to the columns without `avatar` and `bio` (`42703`), and a missing alias table means no aliases. Saving a profile and team interests needs the migration.
+If the app runs against a database without these migrations (as on `djurgarn-dev` today), it still works:
+
+- **Reading** posts, comments, your profile or a wall falls back to the columns without `avatar` and `bio` (`42703`). A missing alias table means no aliases.
+- **Publishing and commenting** ask for the author's `avatar` in what they read back. On `42703` they ask once more without it. The write and what it returns are one SQL statement, so the failed attempt saved nothing and nothing can be posted twice. Any other error is not retried, and your text stays.
+- **Saving your profile** sends a bio or avatar only when you changed one. A name or handle change saves as before. A new bio or avatar gets a plain "can't be saved here yet; nothing has been saved", and your choices stay in the form. Nothing is dropped, and nothing pretends to be saved.
+- **Mina lag** says it can't be used here yet, instead of "try again".
 
 ## Tests
 

@@ -118,6 +118,15 @@ export function profileErrorMessage(e: { code?: string, message?: string } | unk
 }
 
 
+/**
+ * Saving a new avatar or bio to a database without the supporter-profiles
+ * migration (no such columns). Retrying can't help, and nothing was saved.
+ */
+export const PROFILE_DESIGN_UNAVAILABLE = 'Avatar och ”Om dig” kan inte sparas här än – databasen har inte stöd för dem ännu. Inget har sparats. Vill du ändra namn eller handle nu: ångra ändringarna i avatar och text först.'
+
+/** The database doesn't have a column we asked for: in what we read back (42703) or what we sent (PGRST204). */
+const missingColumn = (e: unknown) => ['42703', 'PGRST204'].includes((e as { code?: string } | null)?.code ?? '')
+
 interface Pending { email: string, sentAt: number }
 
 export function createAuth(client: SupabaseClient | null, options: AuthOptions = {}) {
@@ -301,13 +310,24 @@ export function createAuth(client: SupabaseClient | null, options: AuthOptions =
     if (input.avatar != null && !isAvatarKey(input.avatar)) errors.form = 'Välj en av avatarerna.'
     if (Object.keys(errors).length) return { ok: false, errors }
     try {
+      const current = profile.value
       const values: Record<string, string | null> = { display_name: displayName, handle }
-      if (bio?.ok) values.bio = bio.bio
-      if (input.avatar !== undefined) values.avatar = input.avatar
-      const query = profile.value
+      // Only what actually changes: a name or handle edit then needs nothing more of the database.
+      if (bio?.ok && bio.bio !== (current?.bio ?? null)) values.bio = bio.bio
+      if (input.avatar !== undefined && (input.avatar ?? null) !== (current?.avatar ?? null)) values.avatar = input.avatar
+      const design = 'bio' in values || 'avatar' in values
+      const save = (cols: string) => (current
         ? client.from('profiles').update(values).eq('id', id)
-        : client.from('profiles').insert({ id, ...values })
-      const { data, error: e } = await query.select(PROFILE_COLUMNS).single()
+        : client.from('profiles').insert({ id, ...values })).select(cols).single()
+      let { data, error: e } = await save(PROFILE_COLUMNS)
+      // A database without bio and avatar yet. The write and what it returns
+      // are one SQL statement, so nothing was saved. A new bio or avatar
+      // can't be stored there: say so, rather than drop it or pretend. Without
+      // one, save the rest and read back the columns it has.
+      if (missingColumn(e)) {
+        if (design) return { ok: false, errors: { form: PROFILE_DESIGN_UNAVAILABLE } }
+        ;({ data, error: e } = await save(PROFILE_COLUMNS_BEFORE_DESIGN))
+      }
       if (e) throw e
       profile.value = toProfile(data as unknown as ProfileRow)
       profileStatus.value = 'ready'

@@ -36,6 +36,9 @@ export const COMMENT_LIMIT = 200
 interface CommentThread { status: LoadStatus, list: RealComment[], more: boolean }
 
 const COMMENT_COLUMNS = 'id, post_id, body, created_at, author:profiles!post_comments_author_id_fkey(id, display_name, handle, avatar)'
+/** A database without the supporter-profiles migration yet (42703: no avatar column): read what it has. */
+export const COMMENT_COLUMNS_BEFORE_DESIGN = COMMENT_COLUMNS.replace(', avatar)', ')')
+const missingColumn = (e: unknown) => (e as { code?: string } | null)?.code === '42703'
 
 interface CommentRow {
   id: string
@@ -159,8 +162,7 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
       const list = (cols: string) => client.from('post_comments').select(cols)
         .eq('post_id', postId).order('created_at', { ascending: true }).order('id', { ascending: true }).limit(COMMENT_LIMIT)
       let { data, error: e } = await list(COMMENT_COLUMNS)
-      // A database without the supporter-profiles migration yet: read what it has.
-      if ((e as DataError | null)?.code === '42703') ({ data, error: e } = await list(COMMENT_COLUMNS.replace(', avatar)', ')')))
+      if (missingColumn(e)) ({ data, error: e } = await list(COMMENT_COLUMNS_BEFORE_DESIGN))
       if (e) throw e
       const rows = data as unknown as CommentRow[]
       const comments = rows.map(toRealComment).filter((c): c is RealComment => !!c)
@@ -183,7 +185,12 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
     sending.value = { ...sending.value, [postId]: true }
     try {
       // No author_id: the database sets it from the session and checks it.
-      const { data, error: e } = await client!.from('post_comments').insert({ post_id: postId, body }).select(COMMENT_COLUMNS).single()
+      const insert = (cols: string) => client!.from('post_comments').insert({ post_id: postId, body }).select(cols).single()
+      let { data, error: e } = await insert(COMMENT_COLUMNS)
+      // A database without the avatar column yet. The insert and the columns it
+      // returns are one SQL statement, so that error means nothing was saved:
+      // asking again with the columns it has can't comment twice.
+      if (missingColumn(e)) ({ data, error: e } = await insert(COMMENT_COLUMNS_BEFORE_DESIGN))
       if (e) throw e
       const c = toRealComment(data as unknown as CommentRow)
       if (!c) throw new Error('no author')

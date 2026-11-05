@@ -235,6 +235,14 @@ describe('team interests (only yours)', () => {
     expect([prefs.teams.value, prefs.status.value]).toEqual([[], 'idle'])
   })
 
+  it('a database without the table yet: unavailable, not "try again"', async () => {
+    const { client } = fakeClient(() => ({ error: { code: 'PGRST205', message: 'Could not find the table public.profile_preferences in the schema cache' } }))
+    const prefs = createPreferences(client, fakeAuth(LOTTA))
+    await prefs.load()
+    expect(prefs.status.value).toBe('unavailable')
+    expect(await prefs.toggle('fotboll:herr')).toBe(false)
+  })
+
   it('signed out: nothing is asked for', async () => {
     const { client, calls } = fakeClient(() => ({ data: null }))
     await createPreferences(client, fakeAuth(null)).load()

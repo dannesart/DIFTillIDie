@@ -14,7 +14,7 @@ const row = (id: string, body: string, author = { id: HASSE, display_name: 'Hove
 /* A fake Supabase client: just the Data API calls the store makes, all recorded. */
 function fakeClient(opts: {
   list?: { data?: unknown, error?: unknown } | (() => { data?: unknown, error?: unknown })
-  insert?: { data?: unknown, error?: unknown } | ((values: Record<string, unknown>) => { data?: unknown, error?: unknown })
+  insert?: { data?: unknown, error?: unknown } | ((values: Record<string, unknown>, cols: string) => { data?: unknown, error?: unknown })
   remove?: { data?: unknown, error?: unknown }
   throwOnInsert?: unknown
 } = {}) {
@@ -29,7 +29,7 @@ function fakeClient(opts: {
           single: async () => {
             calls.push({ op: 'rpc.select', args: [cols] })
             if (opts.throwOnInsert) throw opts.throwOnInsert
-            const r = typeof opts.insert === 'function' ? opts.insert(args) : opts.insert ?? { data: row('new-1', String(args.p_body)) }
+            const r = typeof opts.insert === 'function' ? opts.insert(args, cols) : opts.insert ?? { data: row('new-1', String(args.p_body)) }
             return { data: r.data ?? null, error: r.error ?? null }
           },
         }),
@@ -147,6 +147,25 @@ describe('reading the real feed (public, no sign-in needed)', () => {
 const STORY = { id: 'story-x', sport: 'fotboll', sources: [], leadId: 'x', sharedNames: [], updatedAt: '', capture: { data: '{"storyId":"story-x"}', sig: 'ab12' } } satisfies Story
 
 describe('publishing', () => {
+  it('a database without the avatar column yet (regression): published once, under its author', async () => {
+    const { client, calls } = fakeClient({
+      // publish_post() and what it returns are one statement, so the 42703 published nothing.
+      insert: (args, cols) => (cols.includes('avatar') ? { error: { code: '42703', message: 'column profiles_1.avatar does not exist' } } : { data: row('new-1', String(args.p_body)) }),
+    })
+    const c = createCommunity(client, fakeAuth())
+    const r = await c.publish({ body: 'Snyggt!' })
+    expect(r.ok).toBe(true)
+    expect(calls.filter(x => x.op === 'rpc.select').map(x => String(x.args[0]).includes('avatar'))).toEqual([true, false])
+    expect(c.posts.value.map(p => [p.body, p.author.handle, p.author.avatar])).toEqual([['Snyggt!', 'hovethasse', null]])
+  })
+
+  it('any other failure is not retried', async () => {
+    const { client, calls } = fakeClient({ insert: { error: { code: '42501', message: 'permission denied' } } })
+    const r = await createCommunity(client, fakeAuth()).publish({ body: 'Hej' })
+    expect(r.ok).toBe(false)
+    expect(calls.filter(x => x.op === 'rpc')).toHaveLength(1)
+  })
+
   it('a Story without a signed capture is never sent, and the text stays', async () => {
     const { client, calls } = fakeClient()
     const r = await createCommunity(client, fakeAuth()).publish({ body: 'Hej', story: { ...STORY, capture: undefined } })

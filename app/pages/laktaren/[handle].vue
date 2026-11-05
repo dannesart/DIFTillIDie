@@ -152,7 +152,10 @@ const postsLabel = computed(() => {
           <p class="mt-1 text-sm leading-relaxed text-krita-dim">
             Vilka Djurgården följer du? Ingen annan ser ditt val, och vi gömmer aldrig något i flödet för att du gjort det.
           </p>
-          <p v-if="preferences.status.value === 'error'" class="mt-4 text-sm text-krita-dim" role="alert">
+          <p v-if="preferences.status.value === 'unavailable'" class="mt-4 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm text-krita-dim">
+            Mina lag går inte att använda här än – databasen har inte stöd för det ännu.
+          </p>
+          <p v-else-if="preferences.status.value === 'error'" class="mt-4 text-sm text-krita-dim" role="alert">
             Kunde inte hämta dina lag.
             <button class="font-semibold text-himmel hover:underline" @click="preferences.load()">Försök igen</button>
           </p>

@@ -19,7 +19,7 @@ function fakeClient(o: {
   setReaction?: (args: { p_post_id: string, p_reaction: string | null }) => R | Promise<R>
   mine?: R
   comments?: R | (() => R)
-  insertComment?: R | ((v: Record<string, unknown>) => R)
+  insertComment?: R | ((v: Record<string, unknown>, cols: string) => R)
   deleteComment?: R
 } = {}) {
   const calls: { op: string, args: unknown }[] = []
@@ -43,7 +43,7 @@ function fakeClient(o: {
         },
         insert: (v: Record<string, unknown>) => {
           calls.push({ op: 'insertComment', args: v })
-          return { select: () => ({ single: async () => done(typeof o.insertComment === 'function' ? o.insertComment(v) : o.insertComment ?? { data: comment('c-new', String(v.body)) }) }) }
+          return { select: (cols: string) => ({ single: async () => { calls.push({ op: 'insertComment.select', args: cols }); return done(typeof o.insertComment === 'function' ? o.insertComment(v, cols) : o.insertComment ?? { data: comment('c-new', String(v.body)) }) } }) }
         },
         delete: () => ({ eq: (_c: string, id: string) => ({ select: async () => { calls.push({ op: 'deleteComment', args: id }); return done(o.deleteComment ?? { data: [{ id }] }) } }) }),
       }
@@ -214,6 +214,35 @@ describe('comments', () => {
     const r = await i.addComment(P1, 'Hej')
     expect(r).toEqual({ ok: false, message: expect.stringMatching(/Din kommentar finns kvar/) })
     expect(i.threads.value[P1]).toBeUndefined()
+  })
+
+  it('a database without the avatar column yet (regression): the comment is saved once, under its author', async () => {
+    const { client, calls } = fakeClient({
+      // As PostgREST answers: the insert and what it returns are one statement, so the 42703 saved nothing.
+      insertComment: (v, cols) => (cols.includes('avatar')
+        ? { error: { code: '42703', message: 'column profiles_1.avatar does not exist' } }
+        : { data: comment('c-new', String(v.body), { id: MATTIAS, display_name: 'Mattias', handle: 'mattias' }) }),
+    })
+    const i = createInteractions(client, fakeAuth(), null)
+    i.stats.value = { [P1]: { reactions: { hjarta: 0, eld: 0, stjarna: 0, tarar: 0 }, comments: 0 } }
+    expect(await i.addComment(P1, 'Snyggt!')).toEqual({ ok: true })
+    const selects = calls.filter(c => c.op === 'insertComment.select').map(c => String(c.args))
+    expect(selects.map(s => s.includes('avatar'))).toEqual([true, false])
+    // The same post and body both times; never an author.
+    expect(calls.filter(c => c.op === 'insertComment').map(c => c.args)).toEqual([{ post_id: P1, body: 'Snyggt!' }, { post_id: P1, body: 'Snyggt!' }])
+    expect(i.threads.value[P1]!.list).toEqual([expect.objectContaining({ body: 'Snyggt!', author: { id: MATTIAS, name: 'Mattias', handle: 'mattias', avatar: null } })])
+    expect(i.stats.value[P1]!.comments).toBe(1)
+  })
+
+  it('a genuine failure is not retried, and the comment is kept', async () => {
+    for (const error of [{ code: '42501', message: 'new row violates row-level security policy' }, { code: '', message: 'TypeError: Failed to fetch' }]) {
+      const { client, calls } = fakeClient({ insertComment: { error } })
+      const i = createInteractions(client, fakeAuth(), null)
+      const r = await i.addComment(P1, 'Hej')
+      expect(r.ok).toBe(false)
+      expect(calls.filter(c => c.op === 'insertComment')).toHaveLength(1)
+      expect(i.threads.value[P1]).toBeUndefined()
+    }
   })
 
   it('validates and checks the profile before any request', async () => {
