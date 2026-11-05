@@ -33,7 +33,7 @@ const textarea = useTemplateRef<HTMLTextAreaElement>('textarea')
 const hintId = useId()
 
 const inline = computed(() => !!props.story)
-const attached = computed(() => props.story ?? stories.value.find(s => storyAnswersTo(s, storyId.value)))
+const attached = computed(() => props.story ?? findStory(stories.value, storyId.value))
 /** Guests can't publish, so they aren't handed a text box that would only pretend to. */
 const canWrite = computed(() => identity.value.kind !== 'guest')
 
@@ -52,7 +52,7 @@ else watch(sportFilter, s => (sport.value = s === 'alla' ? undefined : s), { imm
 // Browsing Snacket for one Story? Then a new post is most likely about it.
 if (!props.story) {
   watch(() => filter.value.storyId, (id) => {
-    if (id && stories.value.some(s => storyAnswersTo(s, id))) storyId.value = id
+    if (id && findStory(stories.value, id)) storyId.value = id
   }, { immediate: true })
 }
 

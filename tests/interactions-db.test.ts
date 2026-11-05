@@ -25,7 +25,7 @@ beforeEach(async () => {
     await as(db, 'authenticated', id, () => db.query('insert into public.profiles (id, display_name, handle) values ($1, $2, $3)', [id, name, handle]))
   }
   post = await as(db, 'authenticated', JARN, async () =>
-    (await db.query<{ id: string }>(`insert into public.posts (body) values ('Järnkaminen brinner!') returning id`)).rows[0]!.id)
+    (await db.query<{ id: string }>(`select id from public.publish_post('Järnkaminen brinner!')`)).rows[0]!.id)
 })
 
 const react = (reaction: string | null, postId = post) =>
@@ -120,7 +120,7 @@ describe('reactions', () => {
 
   it('post_stats returns only the posts asked for, at most 100, and zeros for none', async () => {
     const other = await as(db, 'authenticated', LOTTA, async () =>
-      (await db.query<{ id: string }>(`insert into public.posts (body) values ('Annat') returning id`)).rows[0]!.id)
+      (await db.query<{ id: string }>(`select id from public.publish_post('Annat')`)).rows[0]!.id)
     await as(db, 'anon', null, async () => {
       expect((await stats([other])).map(r => r.post_id)).toEqual([other])
       expect(await stats([])).toEqual([])

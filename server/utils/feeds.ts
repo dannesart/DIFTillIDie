@@ -2,6 +2,7 @@ import type { NewsResponse, PodcastResponse, PodcastsResponse } from '#shared/ty
 import type { NewsSource, SourceResult } from '../lib/news'
 import { NEWS_SOURCES, loadSource } from '../lib/news'
 import { groupIntoStories } from '../lib/grouping'
+import { captureKeyFrom, withCaptures } from '../lib/capture'
 import type { PodcastShowConfig } from '../lib/podcast'
 import { loadPodcast, loadPodcasts } from '../lib/podcast'
 import type { FixturesState } from '../lib/fixtures'
@@ -38,9 +39,13 @@ const cachedSource = defineCachedFunction(
 
 export async function getNews(): Promise<NewsResponse> {
   const results = await Promise.all(NEWS_SOURCES.map(s => cachedSource(s)))
+  const sources = results.map(r => r.status)
+  // Signed per response, so a CDN-cached /api/news still carries valid
+  // captures: there's no background job that has to have run.
+  const key = captureKeyFrom(useRuntimeConfig().storyCapture)
   return {
-    stories: groupIntoStories(results.flatMap(r => r.articles)),
-    sources: results.map(r => r.status),
+    stories: withCaptures(groupIntoStories(results.flatMap(r => r.articles)), key, sources),
+    sources,
     generatedAt: new Date().toISOString(),
   }
 }

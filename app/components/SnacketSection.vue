@@ -17,7 +17,7 @@ const { status } = useAuth()
 const accountOpen = useAccountDialog()
 const canSignIn = computed(() => status.value !== 'unavailable')
 
-const filterStory = computed(() => stories.value.find(s => storyAnswersTo(s, filter.value.storyId)))
+const filterStory = computed(() => findStory(stories.value, filter.value.storyId))
 const hasFilter = computed(() => !!(filter.value.tag || filter.value.storyId))
 const loading = computed(() => feedStatus.value === 'idle' || feedStatus.value === 'loading')
 

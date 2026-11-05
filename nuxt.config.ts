@@ -12,6 +12,9 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // Server-only: signs Story captures (see server/lib/capture.ts). Set
+    // NUXT_STORY_CAPTURE_KEY_ID / NUXT_STORY_CAPTURE_KEY; never under `public`.
+    storyCapture: { keyId: '', key: '' },
     public: {
       // Set NUXT_PUBLIC_SUPABASE_URL / NUXT_PUBLIC_SUPABASE_KEY (see .env.example).
       // Only the *publishable* key belongs here — it's meant for browsers.

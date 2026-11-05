@@ -10,7 +10,13 @@
 export type Sport = 'fotboll' | 'hockey'
 
 export interface SourceArticle {
+  /** Publisher + a 96-bit hash of the canonical URL. Stable while the article is in a feed. */
   id: string
+  /**
+   * The id this article had before (publisher + a 32-bit hash). Posts from
+   * that time refer to Stories by it, so Stories still answer to it.
+   */
+  legacyId?: string
   /** Which configured feed it came from, e.g. "sportbladet-fotboll". */
   sourceId: string
   /** Outlet name as shown to readers, e.g. "Sportbladet". */
@@ -49,6 +55,53 @@ export interface Story {
   /** Names (from the sources' own headlines/teasers) that linked the grouped sources. Empty for single-source Stories. */
   sharedNames: string[]
   updatedAt: string
+  /**
+   * The Story as this server read it from the feeds, signed so the database
+   * can tell it apart from anything a browser made up. Attaching the Story
+   * to a post sends this along, and the post keeps it for good. Absent when
+   * the server has no signing key: then a Story can't be attached.
+   */
+  capture?: StoryCapture
+}
+
+export interface StoryCapture {
+  /** The exact JSON of a FrozenStory that was signed. Sent as-is, never re-serialised. */
+  data: string
+  /** HMAC-SHA256 of `data`, hex. */
+  sig: string
+}
+
+/**
+ * One source of a Story, as it stood in the publisher's feed when our
+ * server read it. Only what's needed to show and find the reference
+ * again: no article text.
+ */
+export interface FrozenSource {
+  /** SHA-256 of the canonical URL, hex: the article's durable identity. */
+  key: string
+  id: string
+  legacyId?: string
+  sourceId: string
+  outlet: string
+  publisher: string
+  headline: string
+  url: string
+  publishedAt: string
+  /** When our server read this from the publisher's feed. Not necessarily the article's first version. */
+  capturedAt: string | null
+  reporting: SourceArticle['reporting']
+  sport: Sport
+}
+
+/** A Story frozen at publication time: exactly the sources the supporter attached. */
+export interface FrozenStory {
+  v: 1
+  /** Which signing key; lets keys rotate. */
+  kid: string
+  storyId: string
+  /** `key` of the source whose headline the Story showed. */
+  leadKey: string
+  sources: FrozenSource[]
 }
 
 export interface FeedStatus {

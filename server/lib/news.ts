@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { FeedStatus, SourceArticle, Sport } from '../../shared/types/domain'
 import type { RssChannel, RssItem } from './rss'
 import { fetchFeed } from './rss'
@@ -105,12 +106,29 @@ export function canonicalUrl(url: string): string {
   }
 }
 
+/** An article's durable identity: SHA-256 of its canonical URL, hex. */
+export function articleKey(url: string): string {
+  return createHash('sha256').update(canonicalUrl(url)).digest('hex')
+}
+
+const publisherSlug = (publisher: string) => fold(publisher).replace(/[^a-z0-9]+/g, '')
+
 /**
- * Stable article id: publisher + canonical URL. The same article reached
- * through two feeds (or with new tracking params) keeps the same id.
+ * Stable article id: publisher + canonical URL (96 bits of its SHA-256).
+ * The same article reached through two feeds (or with new tracking params)
+ * keeps the same id.
  */
 export function articleId(publisher: string, url: string): string {
-  return `${fold(publisher).replace(/[^a-z0-9]+/g, '')}-${hashId(canonicalUrl(url))}`
+  return `${publisherSlug(publisher)}-${articleKey(url).slice(0, 24)}`
+}
+
+/**
+ * The id articles had until November 2026: a 32-bit hash, so two articles
+ * can share one. Only for finding the Stories older posts refer to; see
+ * findStory() for what happens when it's ambiguous.
+ */
+export function legacyArticleId(publisher: string, url: string): string {
+  return `${publisherSlug(publisher)}-${hashId(canonicalUrl(url))}`
 }
 
 function hashId(s: string): string {
@@ -136,6 +154,7 @@ export function toSourceArticles(source: NewsSource, channel: RssChannel): { art
     if (!publishedAt) continue
     articles.push({
       id: articleId(source.publisher, item.link),
+      legacyId: legacyArticleId(source.publisher, item.link),
       sourceId: source.id,
       outlet: source.outlet,
       publisher: source.publisher,

@@ -12,7 +12,7 @@ const { postsForStory, filter, identity } = useSnacket()
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const composer = useTemplateRef<{ focus: () => void }>('composer')
 
-const story = computed(() => (activeId.value ? stories.value.find(s => storyAnswersTo(s, activeId.value!)) : undefined))
+const story = computed(() => (activeId.value ? findStory(stories.value, activeId.value!) : undefined))
 const lead = computed(() => (story.value ? leadOf(story.value) : undefined))
 const earlier = computed(() => (story.value ? postsForStory(story.value) : []))
 

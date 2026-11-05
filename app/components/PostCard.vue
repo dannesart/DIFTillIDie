@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { FeedPost } from '~/composables/useSnacket'
+import { frozenLead } from '~/lib/posts'
 
 /* One post in Snacket på stan, with its real reactions and comments. */
 const props = defineProps<{ post: FeedPost }>()
@@ -7,9 +8,21 @@ const emit = defineEmits<{ mention: [handle: string] }>()
 
 const { filter, community } = useSnacket()
 const { show } = useStorySpotlight()
-const { stories } = useNews()
+const { stories, status: newsStatus } = useNews()
 
-const story = computed(() => stories.value.find(s => storyAnswersTo(s, props.post.storyId)))
+/*
+ * The Story a post is about:
+ *  - frozen: kept with the post when it was published (exactly the sources
+ *    attached then, as read from the feeds), shown for good;
+ *  - live: a post from before frozen Stories, while its Story is in the feeds;
+ *  - gone: such a post after that. Said plainly; nothing is guessed.
+ */
+const live = computed(() => findStory(stories.value, props.post.storyId))
+const frozen = computed(() => props.post.storyRef)
+const lead = computed(() => frozen.value && frozenLead(frozen.value))
+const gone = computed(() => !!props.post.storyId && !frozen.value && !live.value && newsStatus.value !== 'pending' && newsStatus.value !== 'idle')
+const sourcesLabel = (n: number) => `${n} ${n === 1 ? 'källa' : 'källor'}`
+const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 const tokens = computed(() => tokenize(props.post.body))
 
 // Deleting a post is for everyone, so it asks first and waits for Supabase.
@@ -57,14 +70,49 @@ async function remove() {
       </template>
     </p>
 
-    <button v-if="story" class="group mt-4 flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-navy-950/60 p-3 text-left transition hover:border-himmel/50" @click="show(story.id)">
+    <!-- Frozen at publication: the outlets' own headlines and links, as they stood in their feeds -->
+    <div v-if="frozen && lead" class="mt-4 rounded-2xl border border-white/10 bg-navy-950/60 p-3">
+      <component
+        :is="live ? 'button' : 'div'"
+        class="group flex w-full items-center gap-3 text-left"
+        v-bind="live ? { type: 'button', title: 'Visa Storyn' } : {}"
+        @click="live && show(live.id)"
+      >
+        <span class="h-10 w-1.5 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 5px, var(--color-navy-700) 5px 10px)" />
+        <span class="min-w-0 flex-1">
+          <span class="kicker block text-krita-dim">Story · {{ sourcesLabel(frozen.sources.length) }}</span>
+          <span class="block truncate font-display text-base font-semibold">{{ lead.headline }}</span>
+        </span>
+        <span v-if="live" class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel">→</span>
+      </component>
+      <p class="mt-2 text-xs text-krita-dim">
+        Ur flödet från {{ lead.outlet }}<template v-if="lead.publisher && lead.publisher !== lead.outlet"> ({{ lead.publisher }})</template><template v-if="lead.capturedAt">, {{ day(lead.capturedAt) }}</template>.
+        <a :href="lead.url" target="_blank" rel="noopener noreferrer" class="font-semibold text-krita underline-offset-2 hover:text-himmel hover:underline">Läs hos {{ lead.outlet }} ↗</a>
+      </p>
+      <details v-if="frozen.sources.length > 1" class="mt-1 text-xs text-krita-dim">
+        <summary class="cursor-pointer hover:text-krita">Alla {{ sourcesLabel(frozen.sources.length) }}</summary>
+        <ul class="mt-1.5 space-y-1.5">
+          <li v-for="s in frozen.sources" :key="s.key">
+            <a :href="s.url" target="_blank" rel="noopener noreferrer" class="hover:text-himmel"><span class="font-semibold text-krita">{{ s.outlet }}:</span> {{ s.headline }} ↗</a>
+          </li>
+        </ul>
+      </details>
+    </div>
+
+    <!-- From before frozen Stories, while its Story is still in the feeds -->
+    <button v-else-if="live" class="group mt-4 flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-navy-950/60 p-3 text-left transition hover:border-himmel/50" @click="show(live.id)">
       <span class="h-10 w-1.5 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 5px, var(--color-navy-700) 5px 10px)" />
       <span class="min-w-0 flex-1">
-        <span class="kicker block text-krita-dim">Story · {{ story.sources.length }} {{ story.sources.length === 1 ? 'källa' : 'källor' }}</span>
-        <span class="block truncate font-display text-base font-semibold">{{ leadOf(story).headline }}</span>
+        <span class="kicker block text-krita-dim">Story · {{ sourcesLabel(live.sources.length) }}</span>
+        <span class="block truncate font-display text-base font-semibold">{{ leadOf(live).headline }}</span>
       </span>
       <span class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel">→</span>
     </button>
+
+    <!-- …and after it has left them: we never kept a copy, so we don't guess -->
+    <p v-else-if="gone" class="mt-4 rounded-2xl border border-dashed border-white/12 px-3 py-2.5 text-xs text-krita-dim">
+      Inlägget handlade om en Story som inte längre finns i nyhetsflödena. Den sparades inte när inlägget skrevs.
+    </p>
 
     <RealPostInteractions :post-id="post.id" />
   </article>

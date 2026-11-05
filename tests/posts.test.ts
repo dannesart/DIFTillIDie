@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { nextTick, ref } from 'vue'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AuthStore } from '../app/lib/auth'
-import { POST_MAX, createCommunity, normalizePostBody, postLength, publishErrorMessage, toCommunityPost, validatePostBody } from '../app/lib/posts'
+import type { Story } from '../shared/types/domain'
+import { POST_MAX, STORY_UNVERIFIED, createCommunity, frozenLead, normalizePostBody, postLength, publishErrorMessage, toCommunityPost, validatePostBody } from '../app/lib/posts'
 
 const HASSE = '22222222-2222-4222-8222-222222222222'
 const LOTTA = '11111111-1111-4111-8111-111111111111'
@@ -20,6 +21,20 @@ function fakeClient(opts: {
   const calls: { op: string, args: unknown[] }[] = []
   const settle = <T>(v: T) => Promise.resolve(v)
   const client = {
+    // publish_post(): the one way to publish.
+    rpc(fn: string, args: Record<string, unknown>) {
+      calls.push({ op: 'rpc', args: [fn, args] })
+      return {
+        select: (cols: string) => ({
+          single: async () => {
+            calls.push({ op: 'rpc.select', args: [cols] })
+            if (opts.throwOnInsert) throw opts.throwOnInsert
+            const r = typeof opts.insert === 'function' ? opts.insert(args) : opts.insert ?? { data: row('new-1', String(args.p_body)) }
+            return { data: r.data ?? null, error: r.error ?? null }
+          },
+        }),
+      }
+    },
     from(table: string) {
       calls.push({ op: 'from', args: [table] })
       return {
@@ -129,28 +144,58 @@ describe('reading the real feed (public, no sign-in needed)', () => {
   })
 })
 
+const STORY = { id: 'story-x', sport: 'fotboll', sources: [], leadId: 'x', sharedNames: [], updatedAt: '', capture: { data: '{"storyId":"story-x"}', sig: 'ab12' } } satisfies Story
+
 describe('publishing', () => {
-  it('sends only body, sport and story — never an author — and shows the post only once Supabase confirms it', async () => {
+  it('a Story without a signed capture is never sent, and the text stays', async () => {
+    const { client, calls } = fakeClient()
+    const r = await createCommunity(client, fakeAuth()).publish({ body: 'Hej', story: { ...STORY, capture: undefined } })
+    expect(r).toEqual({ ok: false, message: STORY_UNVERIFIED })
+    expect(calls.some(x => x.op === 'rpc')).toBe(false)
+  })
+
+  it('a capture the database won’t verify: says so, and the text stays', async () => {
+    const c = createCommunity(fakeClient({ insert: { error: { code: '22023', message: 'story capture not verified' } } }).client, fakeAuth())
+    expect(await c.publish({ body: 'Hej', story: STORY })).toEqual({ ok: false, message: STORY_UNVERIFIED })
+    expect(STORY_UNVERIFIED).toMatch(/finns kvar/)
+  })
+
+  it('a database without the frozen-Story column yet: the feed still loads, the old way', async () => {
+    let n = 0
+    const { client, calls } = fakeClient({ list: () => (n++ ? { data: [row('a', 'Hej')] } : { error: { code: '42703', message: 'column posts.story_ref does not exist' } }) })
+    const c = createCommunity(client, fakeAuth())
+    await c.refresh()
+    expect([c.status.value, c.posts.value.map(p => p.body)]).toEqual(['ready', ['Hej']])
+    const selects = calls.filter(x => x.op === 'select').map(x => String(x.args[0]))
+    expect([selects[0]!.includes('story_ref'), selects[1]!.includes('story_ref')]).toEqual([true, false])
+  })
+
+  it('reads the frozen Story back, and ignores one it can’t show', () => {
+    const frozen = { v: 1, kid: 'k', storyId: 'story-x', leadKey: 'b', sources: [{ key: 'a', headline: 'Ett', url: 'https://e.se/1', outlet: 'X' }, { key: 'b', headline: 'Två', url: 'https://e.se/2', outlet: 'Y' }] }
+    const p = toCommunityPost(row('a', 'Hej', undefined, { story_id: 'story-x', story_ref: frozen }) as never)!
+    expect(p.storyRef).toEqual(frozen)
+    expect(frozenLead(p.storyRef!).headline).toBe('Två')
+    expect(toCommunityPost(row('b', 'Hej', undefined, { story_id: 'story-x', story_ref: { sources: [] } }) as never)!.storyRef).toBeUndefined()
+    expect(toCommunityPost(row('c', 'Hej', undefined, { story_id: 'story-x' }) as never)!.storyRef).toBeUndefined()
+  })
+
+  it('sends only body, sport and the Story’s signed capture — never an author — and shows the post only once Supabase confirms it', async () => {
     let resolveInsert!: () => void
     const gate = new Promise<void>(r => (resolveInsert = r))
     const { client, calls } = fakeClient()
     const c = createCommunity(client, fakeAuth())
-    // Hold the insert until we've checked nothing was shown early.
-    const orig = client.from
-    ;(client as unknown as { from: typeof orig }).from = (t: string) => {
-      const q = orig.call(client, t) as unknown as { insert: (v: Record<string, unknown>) => { select: (c: string) => { single: () => Promise<unknown> } } }
-      const ins = q.insert
-      q.insert = v => ({ select: cols => ({ single: async () => { await gate; return ins(v).select(cols).single() } }) })
-      return q as never
-    }
-    const pending = c.publish({ body: '  Järnkaminen brinner!  ', sport: 'hockey', storyId: 'story-x' })
+    // Hold the call until we've checked nothing was shown early.
+    const orig = client.rpc
+    ;(client as unknown as { rpc: typeof orig }).rpc = (fn: string, args: Record<string, unknown>) =>
+      ({ select: (cols: string) => ({ single: async () => { await gate; return orig.call(client, fn, args).select(cols).single() } }) }) as never
+    const pending = c.publish({ body: '  Järnkaminen brinner!  ', sport: 'hockey', story: STORY })
     await nextTick()
     expect(c.publishing.value).toBe(true)
     expect(c.posts.value).toEqual([])
     resolveInsert()
     const r = await pending
     expect(r.ok).toBe(true)
-    expect(calls.find(x => x.op === 'insert')!.args[0]).toEqual({ body: 'Järnkaminen brinner!', sport: 'hockey', story_id: 'story-x' })
+    expect(calls.find(x => x.op === 'rpc')!.args).toEqual(['publish_post', { p_body: 'Järnkaminen brinner!', p_sport: 'hockey', p_story: '{"storyId":"story-x"}', p_story_sig: 'ab12' }])
     expect(c.posts.value.map(p => p.body)).toEqual(['Järnkaminen brinner!'])
     expect(c.publishing.value).toBe(false)
   })
@@ -175,7 +220,7 @@ describe('publishing', () => {
       const { client, calls } = fakeClient()
       const r = await createCommunity(client, auth).publish({ body: 'Hej' })
       expect(r.ok).toBe(false)
-      expect(calls.some(x => x.op === 'insert')).toBe(false)
+      expect(calls.some(x => x.op === 'rpc')).toBe(false)
     }
   })
 
@@ -183,7 +228,7 @@ describe('publishing', () => {
     const { client, calls } = fakeClient()
     const c = createCommunity(client, fakeAuth())
     for (const body of ['', '   \n ', 'x'.repeat(POST_MAX + 1)]) expect((await c.publish({ body })).ok).toBe(false)
-    expect(calls.some(x => x.op === 'insert')).toBe(false)
+    expect(calls.some(x => x.op === 'rpc')).toBe(false)
     expect((await c.publish({ body: '💙'.repeat(POST_MAX) })).ok).toBe(true)
   })
 
@@ -192,7 +237,7 @@ describe('publishing', () => {
     const c = createCommunity(client, fakeAuth())
     const [a, b] = await Promise.all([c.publish({ body: 'Ett' }), c.publish({ body: 'Två' })])
     expect([a.ok, b.ok]).toEqual([true, false])
-    expect(calls.filter(x => x.op === 'insert')).toHaveLength(1)
+    expect(calls.filter(x => x.op === 'rpc')).toHaveLength(1)
   })
 
   it('own posts follow a profile edit at once', async () => {

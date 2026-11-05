@@ -9,5 +9,8 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
+    // The database tests build a migrated PGlite (with pgcrypto) once per file: seconds, more on a slow machine.
+    hookTimeout: 90_000,
+    testTimeout: 30_000,
   },
 })

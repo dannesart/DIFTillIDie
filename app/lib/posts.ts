@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ref, watch } from 'vue'
-import type { Sport } from '#shared/types/domain'
+import type { FrozenStory, Sport, Story } from '#shared/types/domain'
 import type { AuthStore } from './auth'
 
 /*
@@ -18,18 +18,23 @@ export interface CommunityPost {
   body: string
   sport?: Sport
   storyId?: string
+  /** The Story frozen when it was published. Absent for posts from before 2026-11-05. */
+  storyRef?: FrozenStory
   createdAt: string
 }
 
 export type FeedStatus = 'unavailable' | 'idle' | 'loading' | 'ready' | 'error'
 
-const COLUMNS = 'id, body, sport, story_id, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle)'
+const COLUMNS = 'id, body, sport, story_id, story_ref, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle)'
+/** A database without the frozen-Story migration yet (42703: no such column): read what it has. */
+const COLUMNS_BEFORE_REFS = COLUMNS.replace(' story_ref,', '')
 
 interface PostRow {
   id: string
   body: string
   sport: string | null
   story_id: string | null
+  story_ref?: unknown
   created_at: string
   author: { id: string, display_name: string, handle: string } | { id: string, display_name: string, handle: string }[] | null
 }
@@ -44,9 +49,21 @@ export function toCommunityPost(r: PostRow): CommunityPost | null {
     body: r.body,
     sport: r.sport === 'fotboll' || r.sport === 'hockey' ? r.sport : undefined,
     storyId: r.story_id ?? undefined,
+    storyRef: toFrozenStory(r.story_ref),
     createdAt: r.created_at,
   }
 }
+
+/** The database verified it on the way in; this only makes sure it can be shown. */
+export function toFrozenStory(v: unknown): FrozenStory | undefined {
+  const f = v as FrozenStory | null | undefined
+  if (!f || typeof f !== 'object' || !Array.isArray(f.sources) || !f.sources.length) return undefined
+  const ok = f.sources.every(s => s && typeof s.headline === 'string' && typeof s.url === 'string' && typeof s.outlet === 'string')
+  return ok ? f : undefined
+}
+
+/** The source a frozen Story showed as its headline. */
+export const frozenLead = (f: FrozenStory) => f.sources.find(s => s.key === f.leadKey) ?? f.sources[0]!
 
 /** Length as the database counts it (characters, not UTF-16 units). */
 export const postLength = (s: string) => [...s].length
@@ -70,12 +87,15 @@ export function validatePostBody(body: string): string | null {
 interface DataError { code?: string, message?: string, status?: number }
 
 const KEPT = 'Ditt inlägg finns kvar – försök igen.'
+/** The Story couldn't be confirmed as one our server read from the feeds. */
+export const STORY_UNVERIFIED = 'Storyn gick inte att bifoga just nu. Ta bort den och publicera, eller försök igen om en stund – ditt inlägg finns kvar.'
 
 export function publishErrorMessage(e: DataError | undefined): string {
   const raw = `${e?.code ?? ''} ${e?.message ?? ''}`
   if (/fetch|network|load failed|timed? ?out/i.test(raw)) return `Ingen kontakt med servern. ${KEPT}`
   if (e?.code === 'PGRST301' || e?.code === 'PGRST303' || /jwt/i.test(raw) || e?.status === 401) return 'Du har blivit utloggad. Logga in igen – ditt inlägg finns kvar.'
   if (e?.code === '42501' || e?.code === '23503') return 'Ditt konto kan inte publicera just nu. Ditt inlägg finns kvar.'
+  if (e?.code === '22023' && /story/i.test(raw)) return STORY_UNVERIFIED
   if (e?.code === '23514') return `Inlägget måste vara 1–${POST_MAX} tecken, utan konstiga tecken.`
   return `Det gick inte att publicera. ${KEPT}`
 }
@@ -101,7 +121,9 @@ export function createCommunity(client: SupabaseClient | null, auth: AuthStore |
     refreshing.value = true
     inflight = (async () => {
       try {
-        const { data, error: e } = await client.from('posts').select(COLUMNS).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit)
+        const list = (cols: string) => client.from('posts').select(cols).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit)
+        let { data, error: e } = await list(COLUMNS)
+        if ((e as DataError | null)?.code === '42703') ({ data, error: e } = await list(COLUMNS_BEFORE_REFS))
         if (e) throw e
         posts.value = (data as unknown as PostRow[]).map(toCommunityPost).filter((p): p is CommunityPost => !!p)
         status.value = 'ready'
@@ -121,7 +143,13 @@ export function createCommunity(client: SupabaseClient | null, auth: AuthStore |
   }
 
   /** Publish as the signed-in supporter. Only Supabase's answer counts as published. */
-  async function publish(input: { body: string, sport?: Sport, storyId?: string }): Promise<PublishResult> {
+  /**
+   * `story`: the Story to attach. It goes along as our server's signed
+   * capture, and the database freezes it into the post in the same
+   * transaction: both, or neither. A Story without a capture can't be
+   * attached, and the post isn't published without it behind your back.
+   */
+  async function publish(input: { body: string, sport?: Sport, story?: Story }): Promise<PublishResult> {
     if (!client || !auth) return { ok: false, message: 'Publicering är inte påslagen här.' }
     if (auth.status.value !== 'signed-in') return { ok: false, message: 'Logga in för att publicera.' }
     if (auth.profileStatus.value !== 'ready') return { ok: false, message: 'Välj ditt läktarnamn innan du publicerar.' }
@@ -129,11 +157,12 @@ export function createCommunity(client: SupabaseClient | null, auth: AuthStore |
     const body = normalizePostBody(input.body)
     const invalid = validatePostBody(body)
     if (invalid) return { ok: false, message: invalid }
+    if (input.story && !input.story.capture) return { ok: false, message: STORY_UNVERIFIED }
     publishing.value = true
     try {
-      // No author_id: the database sets it from the session and checks it.
-      const values = { body, sport: input.sport ?? null, story_id: input.storyId ?? null }
-      const { data, error: e } = await client.from('posts').insert(values).select(COLUMNS).single()
+      // No author: the database takes it from the session.
+      const args = { p_body: body, p_sport: input.sport ?? null, p_story: input.story?.capture?.data ?? null, p_story_sig: input.story?.capture?.sig ?? null }
+      const { data, error: e } = await client.rpc('publish_post', args).select(COLUMNS).single()
       if (e) throw e
       const post = toCommunityPost(data as unknown as PostRow)
       if (!post) throw new Error('no author')

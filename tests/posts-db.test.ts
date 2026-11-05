@@ -23,9 +23,14 @@ beforeEach(async () => {
   await as(db, 'authenticated', LOTTA, () => db.query(`insert into public.profiles (id, display_name, handle) values ($1, 'Lotta från Gärdet', 'kaminen81')`, [LOTTA]))
 })
 
-const publish = (body: string, extra: Record<string, string> = {}) => {
+// How the app publishes: one call, through publish_post(). (Stories: see story-refs-db.test.ts.)
+const publish = (body: string, extra: { sport?: string } = {}) =>
+  db.query('select id, author_id from public.publish_post($1, $2)', [body, extra.sport ?? null])
+
+// What a client could try instead: writing the row itself.
+const insertDirect = (body: string, extra: Record<string, string> = {}) => {
   const cols = ['body', ...Object.keys(extra)]
-  return db.query(`insert into public.posts (${cols.join(', ')}) values (${cols.map((_, i) => `$${i + 1}`).join(', ')}) returning id, author_id`, [body, ...Object.values(extra)])
+  return db.query(`insert into public.posts (${cols.join(', ')}) values (${cols.map((_, i) => `$${i + 1}`).join(', ')}) returning id`, [body, ...Object.values(extra)])
 }
 
 // The feed query the app makes through PostgREST, as plain SQL.
@@ -66,7 +71,7 @@ describe('public reading', () => {
 
 describe('publishing', () => {
   it('a supporter with a profile publishes as themselves; the database sets author and time', async () => {
-    const r = await as(db, 'authenticated', LOTTA, () => publish('Heja Djurgår’n!', { story_id: 'story-aftonbladet-1a8xvsa' }))
+    const r = await as(db, 'authenticated', LOTTA, () => publish('Heja Djurgår’n!'))
     expect(r.rows).toEqual([{ id: expect.any(String), author_id: LOTTA }])
     const { rows } = await db.query<{ fresh: boolean }>(`select created_at > now() - interval '1 minute' as fresh from public.posts`)
     expect(rows[0]!.fresh).toBe(true)
@@ -76,6 +81,7 @@ describe('publishing', () => {
     await as(db, 'authenticated', HASSE, () => publish('Hasses inlägg'))
     await as(db, 'anon', null, async () => {
       expect(await codeOf(publish('Anonymt'))).toBe('42501')
+      expect(await codeOf(insertDirect('Anonymt'))).toBe('42501')
       expect(await codeOf(db.query(`update public.posts set body = 'Hackat'`))).toBe('42501')
       expect(await codeOf(db.query('delete from public.posts'))).toBe('42501')
     })
@@ -88,12 +94,14 @@ describe('publishing', () => {
     })
   })
 
-  it('the author can never be chosen by the client, not even as yourself', async () => {
+  it('the row can never be written directly: not the author, id, time, Story or frozen Story', async () => {
     await as(db, 'authenticated', HASSE, async () => {
-      expect(await codeOf(publish('Jag är Lotta', { author_id: LOTTA }))).toBe('42501')
-      expect(await codeOf(publish('Jag är jag', { author_id: HASSE }))).toBe('42501')
-      expect(await codeOf(publish('Mitt eget id', { id: '44444444-4444-4444-8444-444444444444' }))).toBe('42501')
-      expect(await codeOf(publish('Backdaterat', { created_at: '2000-01-01' }))).toBe('42501')
+      expect(await codeOf(insertDirect('Bara text'))).toBe('42501')
+      expect(await codeOf(insertDirect('Jag är Lotta', { author_id: LOTTA }))).toBe('42501')
+      expect(await codeOf(insertDirect('Jag är jag', { author_id: HASSE }))).toBe('42501')
+      expect(await codeOf(insertDirect('Mitt eget id', { id: '44444444-4444-4444-8444-444444444444' }))).toBe('42501')
+      expect(await codeOf(insertDirect('Backdaterat', { created_at: '2000-01-01' }))).toBe('42501')
+      expect(await codeOf(insertDirect('Påhittad story', { story_id: 'story-x', story_ref: '{"storyId":"story-x"}' }))).toBe('42501')
     })
     expect((await db.query('select count(*)::int as n from public.posts')).rows).toEqual([{ n: 0 }])
   })
@@ -104,7 +112,6 @@ describe('publishing', () => {
         expect(await codeOf(publish(bad)), JSON.stringify(bad)).toBe('23514')
       }
       expect(await codeOf(publish('Bandy', { sport: 'bandy' }))).toBe('23514')
-      expect(await codeOf(publish('Konstig story', { story_id: 'story id with spaces' }))).toBe('23514')
       // Allowed: newlines inside, emoji, exactly 280 characters, both sports.
       expect(await codeOf(publish('Rad ett\nRad två 💙'))).toBe('ok')
       expect(await codeOf(publish('x'.repeat(280)))).toBe('ok')
@@ -160,11 +167,15 @@ describe('grants', () => {
       { grantee: 'authenticated', privilege_type: 'DELETE' },
       { grantee: 'authenticated', privilege_type: 'SELECT' },
     ])
+    // No column may be inserted directly: publishing is publish_post() only.
     const insert = await db.query<{ column_name: string }>(`
       select column_name from information_schema.column_privileges
-      where table_schema = 'public' and table_name = 'posts' and grantee = 'authenticated' and privilege_type = 'INSERT'
-      order by column_name`)
-    expect(insert.rows.map(r => r.column_name)).toEqual(['body', 'sport', 'story_id'])
+      where table_schema = 'public' and table_name = 'posts' and grantee in ('anon', 'authenticated') and privilege_type in ('INSERT', 'UPDATE')`)
+    expect(insert.rows).toEqual([])
+    const fn = await db.query<{ grantee: string }>(`
+      select grantee from information_schema.role_routine_grants
+      where routine_schema = 'public' and routine_name = 'publish_post' and grantee in ('anon', 'authenticated', 'PUBLIC')`)
+    expect(fn.rows).toEqual([{ grantee: 'authenticated' }])
   })
 })
 

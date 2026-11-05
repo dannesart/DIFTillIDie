@@ -60,13 +60,52 @@ A post can be about one Story. It's stored as the post's `story_id`, which is a 
   - A polite live region announces the number of matches, the attachment, and that the suggestions closed.
   - Suggestions don't take focus when tapped, so the phone keyboard stays up. The search field uses 16px text, so iOS doesn't zoom.
 
-**Known limitation: a Story reference can outlive its Story.** `story_id` is only an id such as `story-<article id>`. The headline, outlet and link are not stored with the post: they come from the live RSS feeds, which keep only each outlet's latest items, and no database. So once every article of a Story has left the feeds, typically within days:
+### Durable Story references
 
-- the post keeps its `story_id` but loses its "Om: …" card;
-- it drops out of that Story's count and filter;
-- nothing tells the reader it was ever about a Story.
+A post keeps the Story it's about for good, frozen when it was published. The RSS feeds only hold each outlet's latest items, so `story_id` alone stops resolving within days. Migration [`20261105090000_post_story_refs.sql`](../supabase/migrations/20261105090000_post_story_refs.sql).
 
-`storyAnswersTo()` already covers Stories merging or changing their lead article. It can't bring back articles that are gone. Fixing this would mean storing a small snapshot (outlet, headline, URL) with the post. That needs a migration and a decision about trusting client-supplied headlines, so it isn't part of this change.
+**What's kept: `posts.story_ref` (jsonb).**
+- It holds exactly the sources the supporter attached (up to 20), with the lead marked.
+- Per source: the outlet's own headline, outlet, publisher, the feed's URL (unchanged), the published date, and `capturedAt`, when our server read it from the feed.
+- Its durable identity is `key`, the SHA-256 of the canonical URL. The id and legacy id are kept too.
+- No article text: no teasers, nothing from the article body.
+- It's labelled "Ur flödet från …, \<date\>", i.e. as captured from the feed. It isn't necessarily the article's first version.
+
+**Why it can be trusted: signed captures.**
+- Whenever the server builds Stories ([`server/lib/capture.ts`](../server/lib/capture.ts), called from `getNews()`), each Story gets `capture`: the FrozenStory JSON plus an HMAC-SHA256 of it.
+- The browser sends that exact text and signature to `publish_post()`.
+- The database looks up the key `story_capture_key:<kid>` in Supabase Vault and recomputes the HMAC.
+- Anything edited, re-serialised, unsigned, signed with an unknown key or malformed is refused with `22023`.
+- The browser can choose *which* signed Story to attach, but can't change a word of it.
+
+**Atomic.**
+- Publishing is `publish_post()` only, one function and one transaction. Direct inserts into `posts` are closed.
+- The post and its frozen Story are written together or not at all. A refused capture publishes nothing, and the composer keeps the text and says so.
+- A Story is never silently dropped from a post.
+
+**Frozen means frozen.**
+- Groupings change: a Story can gain or lose sources later. The post keeps what was attached.
+- Posts can't be updated, and the frozen Story can't be written directly.
+
+**No background job.**
+- Captures are made whenever `/api/news` is built, so a CDN-cached response still carries valid ones. There is no ingestion that has to have run.
+- Without a key, the server makes no captures and Stories can't be attached; publishing without one still works. The same goes when Vault has no matching key: the database refuses, and the composer says why.
+
+**Keys.**
+- The server side is `NUXT_STORY_CAPTURE_KEY_ID` and `NUXT_STORY_CAPTURE_KEY`: `runtimeConfig.storyCapture`, server-only and never under `public`.
+- The database side is `select vault.create_secret('<same secret>', 'story_capture_key:<same id>')`.
+- **Rotation:** add a new id in both places, switch the server to it, and remove the old secret from Vault once no page still holds old captures (a day is plenty). Removing it only stops new attachments signed with it; posts already published keep their frozen Story.
+
+**Posts from before 2026-11-05.**
+- These have a bare `story_id` and no `story_ref`, and nothing is invented for them.
+- While their Story is in the feeds, the card shows the live Story.
+- Afterwards it says: "Inlägget handlade om en Story som inte längre finns i nyhetsflödena. Den sparades inte när inlägget skrevs."
+- **Legacy ids are 32-bit hashes**, which can collide. `findStory()` only resolves a legacy id when exactly one live Story answers to it; otherwise nothing is shown.
+- Articles now have 96-bit ids, and `legacyId` keeps the old one for these posts.
+
+**When an original link stops working.**
+- The card still shows the headline, outlet, publisher and date as captured, which is enough to find the article.
+- We don't mirror articles, rewrite URLs, check links or link to third-party archives.
 
 ### Retired: Demo-snack
 
@@ -108,7 +147,7 @@ The banner became a short **Pilot** banner: "Allt här är på riktigt…".
 | Who | posts | profiles |
 |---|---|---|
 | anon | read all | read `id, display_name, handle` of supporters who have published at least one post |
-| authenticated | read all; **insert** `body, sport, story_id` only, with a profile, as themselves; **delete** own | the same, plus their own profile, as before |
+| authenticated | read all; **publish** only via `publish_post(body, sport, story capture, signature)`, with a profile, as themselves (no direct insert since 2026-11-05); **delete** own | the same, plus their own profile, as before |
 | nobody (via the API) | update any post; choose `author_id`, `id` or `created_at`; delete someone else's | read timestamps, read e-mail (it isn't in `profiles` at all) |
 
 - **The author can't come from the client.** `author_id` has no INSERT grant, so sending it at all, even your own ID, is "permission denied". It defaults to `auth.uid()`, and the insert policy checks `author_id = auth.uid()` again.
@@ -157,12 +196,15 @@ Posts need visible authors, which the profiles migration anticipated ("public di
 | UI | `SnacketSection`, `PostComposer`, `PostCard`, `StoryComposeDialog` |
 
 - **Posts are fetched in the browser.** The server never renders them, so the CDN-cached homepage stays identical for everyone and the feed is always fresh.
-- **The feed query is:** `posts.select('id, body, sport, story_id, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle)')`, newest first, limit 50.
+- **The feed query is:** `posts.select('id, body, sport, story_id, story_ref, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle)')`, newest first, limit 50. On a database without `story_ref` yet (`42703`), it retries without it.
+- **Publishing is:** `rpc('publish_post', { p_body, p_sport, p_story, p_story_sig }).select(…)`, with the same columns.
 
 ## Tests
 
 | File | What |
 |---|---|
+| [`tests/story-refs-db.test.ts`](../tests/story-refs-db.test.ts) | Frozen Story references in PGlite (with pgcrypto and a Vault stand-in): signed captures, forged ones (edited, re-serialised, unsigned, unknown key, malformed), changed groupings, no key, atomicity, posts from before the migration, and [`story_refs_rls.test.sql`](../supabase/tests/story_refs_rls.test.sql) on an empty and a non-empty database |
+| [`tests/story-capture.test.ts`](../tests/story-capture.test.ts) | What the server signs (no article text), article identity, legacy ids and their collisions |
 | [`tests/posts-db.test.ts`](../tests/posts-db.test.ts) | 15 database authorization tests (the pgTAP suite runs on an empty and a non-empty database) on the real migrations in PGlite (Supabase-like roles and `auth.uid()`), and the pgTAP suite through the local shim |
 | [`supabase/tests/posts_rls.test.sql`](../supabase/tests/posts_rls.test.sql) | 32 pgTAP assertions for the **real** database, in a transaction that is rolled back. Every assertion is scoped to the suite's own test users and rows, so it also runs on a database that already has real supporters and posts |
 | [`tests/posts.test.ts`](../tests/posts.test.ts) | 17 store tests against a fake Supabase client |

@@ -46,7 +46,7 @@ select ok(has_function_privilege('anon', 'public.post_stats(uuid[])', 'execute')
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"71717171-7171-4171-8171-717171717171","role":"authenticated"}', true);
 insert into public.profiles (id, display_name, handle) values ('71717171-7171-4171-8171-717171717171', 'Järnis', 'rlstest_jarnis');
-insert into public.posts (body) values ('Testinlägg för interaktioner');
+do $$ begin perform public.publish_post('Testinlägg för interaktioner'); end $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"72727272-7272-4272-8272-727272727272","role":"authenticated"}', true);

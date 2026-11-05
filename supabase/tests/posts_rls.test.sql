@@ -11,7 +11,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(34);
 
 insert into auth.users (id, email) values
   ('11111111-1111-4111-8111-111111111111', 'lotta@example.test'),
@@ -27,8 +27,9 @@ select is(
   (select array_agg(privilege_type::text order by privilege_type) from information_schema.role_table_grants where table_schema = 'public' and table_name = 'posts' and grantee = 'authenticated'),
   array['DELETE', 'SELECT'], 'authenticated may read and delete at table level (INSERT is column-level, no UPDATE)');
 select is(
-  (select array_agg(column_name::text order by column_name) from information_schema.column_privileges where table_schema = 'public' and table_name = 'posts' and grantee = 'authenticated' and privilege_type = 'INSERT'),
-  array['body', 'sport', 'story_id'], 'authenticated may only write body, sport and story_id (never author_id, id or created_at)');
+  (select count(*)::int from information_schema.column_privileges where table_schema = 'public' and table_name = 'posts' and grantee in ('anon', 'authenticated') and privilege_type in ('INSERT', 'UPDATE')),
+  0, 'no column of posts can be written directly: publishing goes through publish_post()');
+select ok(not has_function_privilege('anon', 'public.publish_post(text, text, text, text)', 'execute'), 'anon cannot execute publish_post');
 select is(
   (select array_agg(column_name::text order by column_name) from information_schema.column_privileges where table_schema = 'public' and table_name = 'profiles' and grantee = 'anon' and privilege_type = 'SELECT'),
   array['display_name', 'handle', 'id'], 'anon may read only the public profile columns');
@@ -49,7 +50,8 @@ select set_config('request.jwt.claims', '{"role":"anon"}', true);
 select lives_ok($$ select id, body from public.posts $$, 'anon can read posts');
 select is_empty($$ select id from public.profiles where id in ('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222') $$, 'anon sees neither test profile while neither has posted');
 select throws_ok($$ select created_at from public.profiles $$, '42501', null, 'anon can never read profile timestamps');
-select throws_ok($$ insert into public.posts (body) values ('Anonymt') $$, '42501', null, 'anon cannot publish');
+select throws_ok($$ insert into public.posts (body) values ('Anonymt') $$, '42501', null, 'anon cannot insert a post');
+select throws_ok($$ select public.publish_post('Anonymt') $$, '42501', null, 'anon cannot publish');
 select throws_ok($$ delete from public.posts $$, '42501', null, 'anon cannot delete posts');
 select throws_ok($$ update public.posts set body = 'x' $$, '42501', null, 'anon cannot edit posts');
 
@@ -57,13 +59,13 @@ select throws_ok($$ update public.posts set body = 'x' $$, '42501', null, 'anon 
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated"}', true);
-select throws_ok($$ insert into public.posts (body) values ('Utan profil') $$, '42501', null, 'a supporter without a profile cannot publish');
+select throws_ok($$ select public.publish_post('Utan profil') $$, '42501', null, 'a supporter without a profile cannot publish');
 
 -- ── Hasse publishes ──────────────────────────────────────────────────────
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
-select lives_ok($$ insert into public.posts (body, sport, story_id) values ('Järnkaminen brinner! #hovet', 'hockey', 'story-sportbladet-abc123') $$, 'Hasse can publish');
+select lives_ok($$ select public.publish_post('Järnkaminen brinner! #hovet', 'hockey') $$, 'Hasse can publish');
 -- now() is this transaction's start time, so created_at = now() picks out only rows this suite made.
 select results_eq($$ select author_id::text from public.posts where created_at = now() $$, array['22222222-2222-4222-8222-222222222222'], 'the database sets Hasse as the author');
 select throws_ok($$ insert into public.posts (body, author_id) values ('Jag är Lotta', '11111111-1111-4111-8111-111111111111') $$, '42501', null, 'Hasse cannot choose another author');
@@ -72,11 +74,11 @@ select throws_ok($$ insert into public.posts (body, created_at) values ('Backdat
 select throws_ok($$ update public.posts set body = 'Ändrat' $$, '42501', null, 'posts cannot be edited, not even by the author');
 
 -- ── Rules ────────────────────────────────────────────────────────────────
-select throws_ok($$ insert into public.posts (body) values ('') $$, '23514', null, 'an empty post is rejected');
-select throws_ok($$ insert into public.posts (body) values ('   ') $$, '23514', null, 'a whitespace-only post is rejected');
-select throws_ok($$ insert into public.posts (body) values (repeat('x', 281)) $$, '23514', null, 'more than 280 characters is rejected');
-select throws_ok($$ insert into public.posts (body, sport) values ('Bandy!', 'bandy') $$, '23514', null, 'an unknown sport is rejected');
-select throws_ok($$ insert into public.posts (body) values (E'Dold\x07klocka') $$, '23514', null, 'control characters are rejected');
+select throws_ok($$ select public.publish_post('') $$, '23514', null, 'an empty post is rejected');
+select throws_ok($$ select public.publish_post('   ') $$, '23514', null, 'a whitespace-only post is rejected');
+select throws_ok($$ select public.publish_post(repeat('x', 281)) $$, '23514', null, 'more than 280 characters is rejected');
+select throws_ok($$ select public.publish_post('Bandy!', 'bandy') $$, '23514', null, 'an unknown sport is rejected');
+select throws_ok($$ select public.publish_post(E'Dold\x07klocka') $$, '23514', null, 'control characters are rejected');
 
 -- ── Lotta: reads Hasse's post, can't touch it ────────────────────────────
 reset role;

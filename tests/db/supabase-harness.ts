@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { PGlite } from '@electric-sql/pglite'
+import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 
 /*
  * A small, local stand-in for a Supabase database so the real migration files
@@ -9,14 +10,36 @@ import { PGlite } from '@electric-sql/pglite'
  *  - the anon / authenticated / service_role roles (service_role bypasses RLS),
  *  - auth.users and auth.uid() (same definition as Supabase: JWT "sub" claim),
  *  - Supabase's default privileges, which grant ALL on new public tables to
- *    anon and authenticated — so the migrations' explicit revokes are tested.
+ *    anon and authenticated — so the migrations' explicit revokes are tested,
+ *  - the `extensions` schema (pgcrypto) and a stand-in for Vault's
+ *    decrypted_secrets / create_secret, readable only by the owner.
  * It is not Supabase itself; supabase/tests/*.sql runs against the real thing.
  */
 
 const migrationsDir = fileURLToPath(new URL('../../supabase/migrations/', import.meta.url))
 
-export async function createSupabaseLikeDb() {
-  const db = new PGlite()
+/*
+ * Setting up and migrating takes seconds, so each test file does it once
+ * per starting point and every test gets a fresh copy of that data dir.
+ */
+const templates = new Map<string, Promise<File | Blob>>()
+
+/** `stopBefore`: leave that migration and later ones for applyMigrations(), e.g. to seed older rows first. */
+export async function createSupabaseLikeDb(opts: { stopBefore?: string } = {}): Promise<PGlite> {
+  const id = opts.stopBefore ?? ''
+  if (!templates.has(id)) {
+    templates.set(id, (async () => {
+      const db = await buildDb(opts)
+      const dump = await db.dumpDataDir('none')
+      await db.close()
+      return dump
+    })())
+  }
+  return PGlite.create({ extensions: { pgcrypto }, loadDataDir: await templates.get(id)! })
+}
+
+async function buildDb(opts: { stopBefore?: string }) {
+  const db = new PGlite({ extensions: { pgcrypto } })
   await db.exec(`
     create role anon nologin noinherit;
     create role authenticated nologin noinherit;
@@ -36,11 +59,26 @@ export async function createSupabaseLikeDb() {
     grant usage on schema public to anon, authenticated, service_role;
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
     alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+
+    create schema extensions;
+    create schema vault;
+    create table vault.secrets (id uuid primary key default gen_random_uuid(), name text unique, secret text not null);
+    create view vault.decrypted_secrets as select id, name, secret as decrypted_secret from vault.secrets;
+    create function vault.create_secret(new_secret text, new_name text default null) returns uuid language sql as $$
+      insert into vault.secrets (name, secret) values (new_name, new_secret) returning id
+    $$;
   `)
+  await applyMigrations(db, { until: opts.stopBefore })
+  return db
+}
+
+/** Run the migrations (from `from`, before `until`), in order. */
+export async function applyMigrations(db: PGlite, range: { from?: string, until?: string } = {}) {
   for (const file of readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort()) {
+    if (range.from && file < range.from) continue
+    if (range.until && file >= range.until) continue
     await db.exec(readFileSync(`${migrationsDir}${file}`, 'utf8'))
   }
-  return db
 }
 
 export type Db = Awaited<ReturnType<typeof createSupabaseLikeDb>>
