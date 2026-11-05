@@ -104,5 +104,5 @@ export interface PublicAuthor { id: string, name: string, handle: string, avatar
 export type AuthorRow = { id: string, display_name: string, handle: string, avatar?: string | null }
 export const toAuthor = (a: AuthorRow): PublicAuthor => ({ id: a.id, name: a.display_name, handle: a.handle, avatar: isAvatarKey(a.avatar) ? a.avatar : null })
 export const authorOf = (p: SupporterProfile): PublicAuthor => ({ id: p.id, name: p.displayName, handle: p.handle, avatar: p.avatar })
-/** Before 20261105230000_supporter_profiles: a database without bio and avatar answers 42703. */
+/** Before 20261105220958_supporter_profiles: a database without bio and avatar answers 42703. */
 export const PROFILE_COLUMNS_BEFORE_DESIGN = 'id, display_name, handle'

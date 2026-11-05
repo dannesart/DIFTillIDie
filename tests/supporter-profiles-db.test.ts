@@ -10,7 +10,7 @@ import { applyMigrations, as, codeOf, createSupabaseLikeDb, realDataSnapshot, RE
  * Codes: 42501 not allowed (grant or RLS), 23514 rule broken, 23503 no profile.
  */
 
-const MIGRATION = '20261105230000_supporter_profiles.sql'
+const MIGRATION = '20261105220958_supporter_profiles.sql'
 const LOTTA = '11111111-1111-4111-8111-111111111111'
 const HASSE = '22222222-2222-4222-8222-222222222222'
 const NOBODY = '33333333-3333-4333-8333-333333333333' // signed in, no profile yet

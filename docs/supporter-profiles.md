@@ -4,7 +4,7 @@ Every supporter has a page at **`/laktaren/<handle>`**, e.g. `/laktaren/jarnmann
 
 | Part | Where |
 |---|---|
-| Migrations | [`20261105230000_supporter_profiles.sql`](../supabase/migrations/20261105230000_supporter_profiles.sql), [`20261105231000_profile_handle_aliases.sql`](../supabase/migrations/20261105231000_profile_handle_aliases.sql) |
+| Migrations | [`20261105220958_supporter_profiles.sql`](../supabase/migrations/20261105220958_supporter_profiles.sql), [`20261105221014_profile_handle_aliases.sql`](../supabase/migrations/20261105221014_profile_handle_aliases.sql) |
 | Rules shared with the database (avatars, bio, teams) | [`shared/utils/profile.ts`](../shared/utils/profile.ts) |
 | Page | [`app/pages/laktaren/[handle].vue`](../app/pages/laktaren/[handle].vue) |
 | Address resolution, profile and wall | [`app/lib/wall.ts`](../app/lib/wall.ts) |
@@ -95,11 +95,17 @@ There is **one** profile form, in the account dialog. "Ändra profil" on your ow
 
 ## Deploying
 
-1. Apply `20261105230000_supporter_profiles.sql`, then `20261105231000_profile_handle_aliases.sql`. Both are additive: the app in production selects its columns by name and keeps working.
-2. Run `supabase/tests/supporter_profiles_rls.test.sql`, `handle_aliases_rls.test.sql` and the other `supabase/tests/*.test.sql` files. `posts_rls.test.sql` now expects `bio` and `avatar` among the public columns, so it only passes after step 1.
-3. Deploy the app.
+| Step | What | Status |
+|---|---|---|
+| 1 | Apply `20261105220958_supporter_profiles.sql`, then `20261105221014_profile_handle_aliases.sql`. Both are additive: the app in production selects its columns by name and keeps working. | **Done on `djurgarn-dev`, 2026-11-05**, recorded as `20261105220958_supporter_profiles` and `20261105221014_profile_handle_aliases`. Existing supporter data preserved. |
+| 2 | Run `supporter_profiles_rls.test.sql`, `handle_aliases_rls.test.sql` and the other `supabase/tests/*.test.sql` files. `posts_rls.test.sql` expects `bio` and `avatar` among the public columns, so it only passes after step 1. | **Done:** 150/150. Handle aliases 16/16; supporter profiles 24/24 after correcting one assertion (an integer compared with a text array; see below); all existing suites passed. |
+| 3 | Check in the browser, against the hosted database: save a bio, an avatar and team interests (Järnmannen). | Pending. |
+| 4 | Deploy the app (merge to `main`). | Not yet. |
 
-If the app runs against a database without these migrations (as on `djurgarn-dev` today), it still works:
+- **The migration files are named after the versions Supabase recorded,** with their SQL unchanged byte for byte. A fresh database applies them in the same order: `…201518_close_direct_post_inserts`, `…220958_supporter_profiles`, `…221014_profile_handle_aliases`.
+- **The corrected assertion:** `results_eq` compared `cardinality(teams)`, an integer, with `array['0']`. Real pgTAP refuses that. The local runner ([`tests/db/pgtap-shim.ts`](../tests/db/pgtap-shim.ts)) used to cast everything to text and missed it. It now refuses non-text columns too, like pgTAP.
+
+If the app runs against a database without these migrations (as `djurgarn-dev` did before step 1), it still works:
 
 - **Reading** posts, comments, your profile or a wall falls back to the columns without `avatar` and `bio` (`42703`). A missing alias table means no aliases.
 - **Publishing and commenting** ask for the author's `avatar` in what they read back. On `42703` they ask once more without it. The write and what it returns are one SQL statement, so the failed attempt saved nothing and nothing can be posted twice. Any other error is not retried, and your text stays.

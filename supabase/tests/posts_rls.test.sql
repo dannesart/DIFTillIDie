@@ -32,7 +32,7 @@ select is(
 select ok(not has_function_privilege('anon', 'public.publish_post(text, text, text, text)', 'execute'), 'anon cannot execute publish_post');
 select is(
   (select array_agg(column_name::text order by column_name) from information_schema.column_privileges where table_schema = 'public' and table_name = 'profiles' and grantee = 'anon' and privilege_type = 'SELECT'),
-  -- bio and avatar since 20261105230000_supporter_profiles; never timestamps.
+  -- bio and avatar since 20261105220958_supporter_profiles; never timestamps.
   array['avatar', 'bio', 'display_name', 'handle', 'id'], 'anon may read only the public profile columns');
 
 -- ── Profiles for Hasse and Lotta, made by themselves ─────────────────────

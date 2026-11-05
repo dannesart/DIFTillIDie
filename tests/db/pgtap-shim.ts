@@ -30,10 +30,16 @@ exception when others then
   return 'not ok - ' || descr || ' (' || sqlstate || ': ' || sqlerrm || ')';
 end $$;
 
+-- Like pgTAP, the query's column must have the array's type (text here):
+-- an integer column against array['0'] fails on a real database, so here too.
 create function public.results_eq(q text, want text[], descr text) returns text language plpgsql as $$
-declare have text[];
+declare have text[]; kind text;
 begin
-  execute format('with t(x) as (%s) select array_agg(x::text) from t', q) into have;
+  -- Once only: some queries change data (returning ...).
+  execute format('with t(x) as (%s) select array_agg(x::text), (array_agg(pg_typeof(x)::text))[1] from t', q) into have, kind;
+  if kind is not null and kind <> 'text' then
+    return 'not ok - ' || descr || ' (column is ' || kind || ', not text: pgTAP would refuse to compare)';
+  end if;
   return case when coalesce(have, '{}') = want then 'ok - ' || descr
               else 'not ok - ' || descr || ' (have ' || coalesce(have::text, '{}') || ')' end;
 end $$;

@@ -68,7 +68,7 @@ select set_config('request.jwt.claims', '', true);
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
 select results_eq($$ select array_to_string(teams, ',') from public.save_team_interests(array['hockey:dam', 'fotboll:herr', 'hockey:dam']) $$, array['fotboll:herr,hockey:dam'], 'Lotta saves her teams, sorted and without repeats');
-select results_eq($$ select cardinality(teams) from public.save_team_interests(array[]::text[]) $$, array['0'], 'No teams is a valid choice');
+select results_eq($$ select cardinality(teams)::text from public.save_team_interests(array[]::text[]) $$, array['0'], 'No teams is a valid choice');
 select throws_ok($$ select public.save_team_interests(array['bandy:herr']) $$, '23514', null, 'Only the four teams');
 select lives_ok($$ select public.save_team_interests(array['fotboll:dam']) $$, 'Lotta follows fotboll:dam');
 

@@ -9,7 +9,7 @@ import { applyMigrations, as, codeOf, createSupabaseLikeDb, realDataSnapshot, RE
  * written only by the database.
  */
 
-const MIGRATION = '20261105231000_profile_handle_aliases.sql'
+const MIGRATION = '20261105221014_profile_handle_aliases.sql'
 const LOTTA = '11111111-1111-4111-8111-111111111111'
 const HASSE = '22222222-2222-4222-8222-222222222222'
 

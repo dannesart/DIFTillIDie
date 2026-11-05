@@ -251,7 +251,7 @@ describe('team interests (only yours)', () => {
 })
 
 describe('profile rules match the database', () => {
-  const sql = readFileSync(fileURLToPath(new URL('../supabase/migrations/20261105230000_supporter_profiles.sql', import.meta.url)), 'utf8')
+  const sql = readFileSync(fileURLToPath(new URL('../supabase/migrations/20261105220958_supporter_profiles.sql', import.meta.url)), 'utf8')
   const quoted = (s: string) => s.match(/'([^']+)'/g)!.map(x => x.slice(1, -1))
 
   it('the avatar designs', () => {
