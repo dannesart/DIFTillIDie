@@ -5,7 +5,7 @@ import { nextTick, ref } from 'vue'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AuthStore } from '../app/lib/auth'
 import { createPreferences } from '../app/lib/preferences'
-import { createWall, isUserId } from '../app/lib/wall'
+import { createWall, isUserId, parseAddress } from '../app/lib/wall'
 import { AVATARS, BIO_MAX, cleanBio, TEAM_INTERESTS, toAuthor } from '../shared/utils/profile'
 
 /* A supporter's page (profile + wall) and their private team interests, against a fake Data API. */
@@ -32,7 +32,8 @@ function fakeClient(answer: (q: { table: string, cols: string, filters: unknown[
       or(...a: unknown[]) { q.filters.push(['or', ...a]); return chain },
       order(...a: unknown[]) { q.filters.push(['order', ...a]); return chain },
       limit(...a: unknown[]) { q.filters.push(['limit', ...a]); return chain },
-      maybeSingle: run,
+      // Like postgrest-js: zero or one row, as the row itself.
+      maybeSingle: async () => { const r = await run(); return Array.isArray(r.data) ? { ...r, data: r.data[0] ?? null } : r },
       single: run,
       then: (res: (v: unknown) => unknown, rej: (e: unknown) => unknown) => run().then(res, rej),
     }
@@ -90,15 +91,78 @@ describe('a supporter’s page', () => {
     expect(calls.some(c => c.table === 'posts')).toBe(false)
   })
 
-  it('an address that isn’t a user id never reaches the database', async () => {
+  it('an address that is neither a handle nor a user id never reaches the database', async () => {
     const { client, calls } = fakeClient(() => ({ data: null }))
-    for (const bad of ['lotta', '@lotta', '1 or 1=1', '']) {
-      expect(isUserId(bad)).toBe(false)
+    for (const bad of ['', 'xy', 'lotta-g', '1 or 1=1', 'a'.repeat(21), 'lotta/../admin', '11111111-1111-4111-8111']) {
+      expect(parseAddress(bad), bad).toBeNull()
       const wall = createWall(client, bad)
       await wall.load()
       expect(wall.status.value).toBe('hidden')
     }
     expect(calls).toEqual([])
+    expect(isUserId(LOTTA)).toBe(true)
+  })
+})
+
+describe('addresses: handle first, user id underneath', () => {
+  const byHandle = (q: { filters: unknown[][] }) => q.filters.find(f => f[0] === 'eq' && f[1] === 'handle')?.[2]
+  const byId = (q: { filters: unknown[][] }) => q.filters.find(f => f[0] === 'eq' && f[1] === 'id')?.[2]
+  /* Lotta is "lotta" now and used to be "kaminen81". */
+  const db = (q: { table: string, head: boolean, filters: unknown[][] }): Result => {
+    if (q.table === 'profiles') return { data: byHandle(q) === 'lotta' || byId(q) === LOTTA ? [lotta] : [] }
+    if (q.table === 'profile_handle_aliases') return { data: q.filters.some(f => f[2] === 'kaminen81') ? [{ profile_id: LOTTA }] : [] }
+    return q.head ? { count: 1 } : { data: [post(1)] }
+  }
+  const first = (calls: { table: string, filters: unknown[][] }[], table: string) => calls.find(c => c.table === table)
+
+  it('her handle: found by handle, and that is the address', async () => {
+    const { client, calls } = fakeClient(db)
+    const wall = createWall(client, 'lotta')
+    await wall.load()
+    expect([wall.status.value, wall.id.value, wall.canonical.value]).toEqual(['ready', LOTTA, 'lotta'])
+    expect(first(calls, 'profiles')!.filters).toContainEqual(['eq', 'handle', 'lotta'])
+    // Her posts are found by her id, never by the handle.
+    expect(first(calls, 'posts')!.filters).toContainEqual(['eq', 'author_id', LOTTA])
+    expect(calls.some(c => c.table === 'profile_handle_aliases')).toBe(false)
+  })
+
+  it('typed with capitals or an @: the same supporter, shown at her handle', async () => {
+    const { client } = fakeClient(db)
+    for (const typed of ['Lotta', '@lotta']) {
+      const wall = createWall(client, typed)
+      await wall.load()
+      expect([wall.id.value, wall.canonical.value]).toEqual([LOTTA, 'lotta'])
+    }
+  })
+
+  it('a former handle resolves through its alias to her, and her current handle', async () => {
+    const { client, calls } = fakeClient(db)
+    const wall = createWall(client, 'kaminen81')
+    await wall.load()
+    expect([wall.status.value, wall.id.value, wall.canonical.value]).toEqual(['ready', LOTTA, 'lotta'])
+    expect(calls.filter(c => c.table === 'profiles').map(c => c.filters[0])).toEqual([['eq', 'handle', 'kaminen81'], ['eq', 'id', LOTTA]])
+  })
+
+  it('an old /laktaren/<user id> link: found by id, shown at her handle', async () => {
+    const { client, calls } = fakeClient(db)
+    const wall = createWall(client, LOTTA.toUpperCase())
+    await wall.load()
+    expect([wall.status.value, wall.canonical.value]).toEqual(['ready', 'lotta'])
+    expect(first(calls, 'profiles')!.filters).toContainEqual(['eq', 'id', LOTTA])
+  })
+
+  it('an unknown handle, or one that isn’t public (the database shows neither): hidden', async () => {
+    const { client } = fakeClient(db)
+    const wall = createWall(client, 'nobody_here')
+    await wall.load()
+    expect([wall.status.value, wall.id.value, wall.canonical.value]).toEqual(['hidden', null, null])
+  })
+
+  it('a database without aliases yet: no alias, not an error', async () => {
+    const { client } = fakeClient(q => (q.table === 'profile_handle_aliases' ? { error: { code: '42P01', message: 'relation does not exist' } } : db(q)))
+    const wall = createWall(client, 'kaminen81')
+    await wall.load()
+    expect(wall.status.value).toBe('hidden')
   })
 
   it('a network failure says so, and can be retried', async () => {

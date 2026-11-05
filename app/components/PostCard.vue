@@ -15,7 +15,7 @@ const emit = defineEmits<{ mention: [handle: string], removed: [id: string] }>()
 const { filter, community } = useSnacket()
 const { show } = useStorySpotlight()
 const route = useRoute()
-const authorPath = computed(() => supporterPath(props.post.author.id))
+const authorPath = computed(() => supporterPath(props.post.author.handle))
 
 // Tags and Stories live on the front page: from elsewhere, go there first.
 async function showTag(tag: string) {

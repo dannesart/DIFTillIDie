@@ -5,16 +5,18 @@ import type { CommunityPost } from '~/lib/posts'
 
 /*
  * A supporter's place on the stands: their name, handle, avatar and bio, and
- * their wall (their own Snacket posts). Found by user id, which never changes;
- * the handle can. Everything is loaded in the browser, like the feed, so the
- * cached HTML is the same empty shell for everyone.
+ * their wall (their own Snacket posts). The address is their handle; a former
+ * handle or their user id leads to the same supporter and is replaced by the
+ * current handle. Who they are, and whether it's your page, is their user id.
+ * Everything is loaded in the browser, like the feed, so the cached HTML is
+ * the same empty shell for everyone.
  *
  * The supporter themselves also sees "Mina lag", their private team
  * interests. Nobody else can read them, and nothing is hidden because of them.
  */
 const route = useRoute()
-const id = String(route.params.id)
-const wall = useWall(id)
+const address = String(route.params.handle)
+const wall = useWall(address)
 const { status, profile, posts, total, more, loadingMore, moreError } = wall
 const auth = useAuth()
 const { userId, profileStatus } = auth
@@ -25,7 +27,12 @@ const interactions = useInteractions()
 // Stories in the feeds right now: posts from before frozen Stories still link to theirs.
 useNews()
 
-const own = computed(() => !!userId.value && userId.value === id)
+const own = computed(() => !!userId.value && userId.value === wall.id.value)
+
+// An id, a former handle, or your own handle just changed: show the current address.
+watch(wall.canonical, (handle) => {
+  if (handle && handle !== address) void navigateTo({ path: supporterPath(handle), hash: route.hash }, { replace: true })
+})
 
 useSeoMeta({
   title: () => (profile.value ? `${profile.value.displayName} på läktaren – Djurgår’n tills jag dör` : 'På läktaren – Djurgår’n tills jag dör'),
@@ -84,7 +91,7 @@ const postsLabel = computed(() => {
         <p class="mx-auto mt-2 max-w-md text-krita-dim">
           Den här supportern har inte klivit fram i Snacket än – eller så finns platsen inte.
         </p>
-        <p v-if="own && profileStatus === 'missing'" class="mt-5">
+        <p v-if="userId && userId === address && profileStatus === 'missing'" class="mt-5">
           <button class="rounded-full bg-guld px-6 py-3 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="accountOpen = true">Välj ditt läktarnamn</button>
         </p>
         <NuxtLink v-else to="/#snacket" class="mt-6 inline-block rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold transition hover:border-himmel hover:text-himmel">Till Snacket på stan</NuxtLink>
