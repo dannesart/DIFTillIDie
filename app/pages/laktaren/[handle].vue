@@ -14,6 +14,14 @@ import type { CommunityPost } from '~/lib/posts'
  * The supporter themselves also sees "Mina lag", their private team
  * interests. Nobody else can read them, and nothing is hidden because of them.
  */
+/*
+ * One supporter per page instance: going from one supporter's page to
+ * another's (a name under a post, back/forward) builds a fresh page, so the
+ * address, identity, posts, count and "is this mine" are never carried over.
+ * Explicit, rather than relying on the router's default.
+ */
+definePageMeta({ key: r => `laktaren:${String(r.params.handle)}` })
+
 const route = useRoute()
 const address = String(route.params.handle)
 const wall = useWall(address)

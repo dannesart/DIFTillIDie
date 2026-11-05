@@ -196,7 +196,7 @@ Posts need visible authors, which the profiles migration anticipated ("public di
 | UI | `SnacketSection`, `PostComposer`, `PostCard`, `StoryComposeDialog` |
 
 - **Posts are fetched in the browser.** The server never renders them, so the CDN-cached homepage stays identical for everyone and the feed is always fresh.
-- **The feed query is:** `posts.select('id, body, sport, story_id, story_ref, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle)')`, newest first, limit 50. On a database without `story_ref` yet (`42703`), it retries without it.
+- **The feed query is:** `posts.select('id, body, sport, story_id, story_ref, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle, avatar)')`, newest first, limit 50. On a database without the supporter-profiles migration yet (`42703`), it retries without `avatar` ([supporter-profiles.md](supporter-profiles.md)).
 - **Publishing is:** `rpc('publish_post', { p_body, p_sport, p_story, p_story_sig }).select(…)`, with the same columns.
 
 ## Tests

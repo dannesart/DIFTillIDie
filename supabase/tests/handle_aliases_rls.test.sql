@@ -10,7 +10,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(14);
+select plan(16);
 
 insert into auth.users (id, email) values
   ('11111111-1111-4111-8111-111111111111', 'lotta@example.test'),
@@ -29,13 +29,15 @@ select lives_ok($$ insert into public.profiles (id, display_name, handle) values
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
 select lives_ok($$ insert into public.profiles (id, display_name, handle) values ('11111111-1111-4111-8111-111111111111', 'Lotta', 'rlstest_lotta') $$, 'Lotta creates her profile');
 select lives_ok($$ update public.profiles set handle = 'rlstest_lotta2' where id = '11111111-1111-4111-8111-111111111111' $$, 'Lotta changes her handle');
+select lives_ok($$ update public.profiles set handle = 'rlstest_lotta3' where id = '11111111-1111-4111-8111-111111111111' $$, 'Lotta changes it again');
 select results_eq($$ select profile_id::text from public.profile_handle_aliases where handle = 'rlstest_lotta' $$, array['11111111-1111-4111-8111-111111111111'], 'Lotta can resolve her old handle');
 select throws_ok($$ insert into public.profile_handle_aliases (handle, profile_id) values ('rlstest_fake', '11111111-1111-4111-8111-111111111111') $$, '42501', null, 'Lotta cannot write aliases herself');
 
 -- ── Before she posts, her alias is hers alone ────────────────────────────
 select set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
 select is_empty($$ select profile_id from public.profile_handle_aliases where handle = 'rlstest_lotta' $$, 'Hasse cannot resolve the alias of an unpublished profile');
-select throws_ok($$ update public.profiles set handle = 'rlstest_lotta' where id = '22222222-2222-4222-8222-222222222222' $$, '23505', null, 'Hasse cannot take Lotta''s retired handle');
+select throws_ok($$ update public.profiles set handle = 'rlstest_lotta' where id = '22222222-2222-4222-8222-222222222222' $$, '23505', null, 'Hasse cannot take Lotta''s first handle, two changes later');
+select throws_ok($$ update public.profiles set handle = 'rlstest_lotta2' where id = '22222222-2222-4222-8222-222222222222' $$, '23505', null, 'Hasse cannot take Lotta''s second handle either');
 select throws_ok($$ delete from public.profile_handle_aliases where handle = 'rlstest_lotta' $$, '42501', null, 'Hasse cannot delete Lotta''s alias');
 
 reset role;

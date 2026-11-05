@@ -6,12 +6,11 @@
 -- the same supporter.
 --
 --   No impersonation: a retired handle stays reserved for the supporter who
---     used it. Nobody else can take it (23505, like any taken handle), so an
---     old link can never start pointing at someone else. Its owner can take
---     it back, which simply makes it current again.
---   No hoarding: each supporter keeps their 5 most recent retired handles.
---     Older ones are released; links to them then lead nowhere (or, once
---     someone else takes the handle, to that supporter).
+--     used it for as long as their account exists, however many times they
+--     change handle after. Nobody else can take it (23505, like any taken
+--     handle), so a link once shared can never start pointing at someone
+--     else. Its owner can take it back, which simply makes it current again.
+--     Aliases are never pruned; they go only with the account (cascade).
 --   No leaks: an alias is readable exactly when its profile is (the policy
 --     asks profiles, whose own policy decides): by everyone once the
 --     supporter has posted or commented, otherwise only by themselves.
@@ -59,15 +58,9 @@ begin
 
   if tg_op = 'UPDATE' and new.handle <> old.handle then
     -- Taking back one of your own old handles makes it current again.
-    delete from public.profile_handle_aliases where handle = new.handle;
+    delete from public.profile_handle_aliases where handle = new.handle and profile_id = new.id;
     insert into public.profile_handle_aliases (handle, profile_id) values (old.handle, old.id)
       on conflict (handle) do update set retired_at = clock_timestamp();
-    -- Keep the 5 most recent.
-    delete from public.profile_handle_aliases
-      where profile_id = new.id
-        and handle not in (
-          select handle from public.profile_handle_aliases where profile_id = new.id order by retired_at desc, handle limit 5
-        );
   end if;
   return new;
 end;

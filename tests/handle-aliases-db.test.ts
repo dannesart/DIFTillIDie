@@ -51,10 +51,17 @@ describe('changing your handle', () => {
     expect(await aliasesOf(LOTTA)).toEqual(['lotta_g'])
   })
 
-  it('keeps the 5 most recent; older ones are released', async () => {
-    for (const h of ['l_1', 'l_2', 'l_3', 'l_4', 'l_5', 'l_6']) await claim(LOTTA, h)
-    expect(await aliasesOf(LOTTA)).toEqual(['l_1', 'l_2', 'l_3', 'l_4', 'l_5'])
-    expect(await codeOf(claim(HASSE, 'lotta'))).toBe('ok')
+  it('every former handle stays hers for good, however many times she changes (none are ever released)', async () => {
+    const later = Array.from({ length: 12 }, (_, i) => `lotta_${i + 1}`)
+    for (const h of later) await claim(LOTTA, h)
+    expect(await aliasesOf(LOTTA)).toEqual(['lotta', ...later.slice(0, -1)])
+    // Her very first handle, and every one since, is still refused to anyone else…
+    for (const h of ['lotta', ...later.slice(0, -1)]) expect(await codeOf(claim(HASSE, h)), h).toBe('23505')
+    expect((await db.query('select handle from public.profiles where id = $1', [HASSE])).rows).toEqual([{ handle: 'hasse' }])
+    // …and still hers to take back, after all those changes.
+    await claim(LOTTA, 'lotta')
+    expect(await aliasesOf(LOTTA)).toEqual(later)
+    expect((await db.query('select handle from public.profiles where id = $1', [LOTTA])).rows).toEqual([{ handle: 'lotta' }])
   })
 
   it('a refused change leaves no alias behind', async () => {

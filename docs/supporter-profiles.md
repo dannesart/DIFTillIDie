@@ -28,8 +28,8 @@ Every supporter has a page at **`/laktaren/<handle>`**, e.g. `/laktaren/jarnmann
 
 When a supporter changes their handle, the database keeps the old one in `profile_handle_aliases`, written by a trigger on `profiles`.
 
-- **No impersonation:** a retired handle stays reserved for the supporter who used it. Nobody else can take it (the same "Upptaget" as any taken handle), so an old link never starts pointing at someone else. Its owner can take it back.
-- **No hoarding:** each supporter keeps their **5** most recent former handles. Older ones are released. A link to a released handle leads nowhere, or, once someone else takes it, to them. That's the one accepted trade-off.
+- **No impersonation:** a former handle stays reserved for the supporter who used it **for the lifetime of their account**, however many times they change handle after. Nobody else can take it (the same "Upptaget" as any taken handle), so a link once shared never resolves to another supporter. Its owner can take it back at any time.
+- **Never pruned:** aliases are only removed when the account is (cascade). The cost is that each handle change permanently uses up a name. If that's ever abused, the fix is to limit how often a handle can change, never to release old ones.
 - **No leaks:** an alias is readable exactly when its profile is. Its policy asks `profiles`, whose own policy decides. When a handle was retired is never readable.
 - **Written only by the database:** there are no insert, update or delete grants. The trigger function is `SECURITY DEFINER`, so it can see every alias in order to refuse a reserved one, but it only acts on the row being saved, which RLS has already checked.
 
@@ -115,13 +115,13 @@ If the app is deployed before step 1, it still works: reading posts, comments, y
 - **[`tests/handle-aliases-db.test.ts`](../tests/handle-aliases-db.test.ts)** covers former handles:
   - recorded on a change, and not on a name-only change;
   - reserved against others, including new profiles, and reclaimable by their owner;
-  - the 5 most recent kept;
+  - all kept for good, never released, still reclaimable after many changes;
   - nothing left behind by a refused change;
   - visible exactly when the profile is;
   - not writable through the API, and the trigger can't be called directly;
   - cascade with the profile;
   - existing data kept, and an existing supporter's rename recorded;
-  - plus [`supabase/tests/handle_aliases_rls.test.sql`](../supabase/tests/handle_aliases_rls.test.sql) (pgTAP, 14 assertions) on an empty and a non-empty database.
+  - plus [`supabase/tests/handle_aliases_rls.test.sql`](../supabase/tests/handle_aliases_rls.test.sql) (pgTAP, 16 assertions) on an empty and a non-empty database.
 - **[`supabase/tests/supporter_profiles_rls.test.sql`](../supabase/tests/supporter_profiles_rls.test.sql)** is the same checks for the real database (pgTAP, 24 assertions, rolled back).
 - **[`tests/supporter-profiles.test.ts`](../tests/supporter-profiles.test.ts)** covers the page and team-interest stores against a fake Data API:
   - a hidden profile looks the same whether or not it exists;
