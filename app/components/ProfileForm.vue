@@ -1,14 +1,23 @@
 <script setup lang="ts">
+import type { AvatarKey } from '#shared/utils/profile'
+import { AVATARS, BIO_MAX } from '#shared/utils/profile'
 import type { ProfileErrors } from '~/lib/auth'
 
-/* Choose how you're known on the stands: display name + unique handle. */
-const props = defineProps<{ initial?: { displayName: string, handle: string } | null }>()
+/*
+ * Choose how you're known on the stands: display name, unique handle, and
+ * (optional) an avatar design and a few words about yourself. The one form
+ * for creating and editing a profile, wherever it's opened from.
+ */
+const props = defineProps<{ initial?: { displayName: string, handle: string, bio?: string | null, avatar?: AvatarKey | null } | null }>()
 const emit = defineEmits<{ saved: [], cancel: [] }>()
 const auth = useAuth()
 
 const displayName = ref(props.initial?.displayName ?? '')
 const handle = ref(props.initial?.handle ?? '')
 const handleTouched = ref(!!props.initial)
+const avatar = ref<AvatarKey | null>(props.initial?.avatar ?? null)
+const bio = ref(props.initial?.bio ?? '')
+const bioLeft = computed(() => BIO_MAX - [...bio.value.replace(/s+/g, ' ').trim()].length)
 const errors = ref<ProfileErrors>({})
 const saving = ref(false)
 
@@ -22,7 +31,7 @@ const liveHandleError = computed(() => (handleTouched.value && preview.value ? v
 async function submit() {
   saving.value = true
   errors.value = {}
-  const r = await auth.saveProfile({ displayName: displayName.value, handle: handle.value })
+  const r = await auth.saveProfile({ displayName: displayName.value, handle: handle.value, bio: bio.value, avatar: avatar.value })
   saving.value = false
   if (r.ok) emit('saved')
   else errors.value = r.errors
@@ -69,6 +78,44 @@ async function submit() {
         <template v-if="errors.handle || liveHandleError">{{ errors.handle ?? liveHandleError }}</template>
         <template v-else-if="preview && preview !== handle">Blir <span class="font-semibold text-krita">@{{ preview }}</span>. </template>
         <template v-else>Unikt. 3–20 tecken: a–z, siffror och _. </template>
+      </span>
+    </label>
+
+    <fieldset>
+      <legend class="text-sm font-semibold">Din avatar</legend>
+      <div class="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Välj avatar">
+        <button
+          v-for="a in [{ key: null, label: 'Dina egna ränder' }, ...AVATARS]"
+          :key="a.key ?? 'randig'"
+          type="button"
+          role="radio"
+          :aria-checked="avatar === a.key"
+          :aria-label="a.label"
+          :title="a.label"
+          class="rounded-full p-0.5 ring-2 transition motion-safe:hover:-translate-y-0.5"
+          :class="avatar === a.key ? 'ring-guld' : 'ring-transparent hover:ring-white/30'"
+          @click="avatar = a.key"
+        >
+          <Avatar :name="displayName.trim() || 'Du'" :design="a.key" />
+        </button>
+      </div>
+    </fieldset>
+
+    <label class="block">
+      <span class="text-sm font-semibold">Om dig <span class="font-normal text-krita-dim">(valfritt)</span></span>
+      <textarea
+        v-model="bio"
+        rows="2"
+        :maxlength="BIO_MAX + 20"
+        placeholder="t.ex. Sektion A sedan -98. Kaffe i termosen, halsduken på."
+        class="mt-1.5 w-full resize-none rounded-2xl border bg-navy-950 px-4 py-3 text-base outline-none transition focus:border-himmel"
+        :class="errors.bio || bioLeft < 0 ? 'border-rod' : 'border-white/12'"
+        :aria-invalid="!!errors.bio || bioLeft < 0"
+        aria-describedby="bio-help"
+      />
+      <span id="bio-help" class="mt-1 flex gap-3 text-xs" :class="errors.bio || bioLeft < 0 ? 'text-rod' : 'text-krita-dim'">
+        <span class="flex-1">{{ errors.bio ?? 'Syns för alla, precis som ditt namn, när du har skrivit eller kommenterat i Snacket. Skriv inget du inte vill att alla ska läsa.' }}</span>
+        <span class="tabular-nums" aria-hidden="true">{{ bioLeft }}</span>
       </span>
     </label>
 

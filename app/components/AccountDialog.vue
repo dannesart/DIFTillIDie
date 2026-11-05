@@ -7,6 +7,7 @@
 const auth = useAuth()
 const { status, profile, profileStatus } = auth
 const open = useAccountDialog()
+const editor = useProfileEditor()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const editing = ref(false)
@@ -16,7 +17,8 @@ watch(open, (isOpen) => {
   const el = dialog.value
   if (!el) return
   if (isOpen) {
-    editing.value = false
+    editing.value = editor.editing.value
+    editor.editing.value = false
     opener = document.activeElement as HTMLElement | null
     if (!el.open) el.showModal()
     document.documentElement.classList.add('dialog-open')
@@ -29,6 +31,8 @@ watch(open, (isOpen) => {
 // Opened before this component mounted (e.g. from another page): show it right away.
 onMounted(() => {
   if (open.value && dialog.value && !dialog.value.open) {
+    editing.value = editor.editing.value
+    editor.editing.value = false
     dialog.value.showModal()
     document.documentElement.classList.add('dialog-open')
   }
@@ -96,16 +100,17 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
       <template v-else-if="status === 'signed-in' && profileStatus === 'ready' && profile">
         <h2 id="account-title" class="sr-only">Ditt konto</h2>
         <div class="mt-3 flex items-center gap-4">
-          <Avatar :name="profile.displayName" />
+          <Avatar :name="profile.displayName" :design="profile.avatar" />
           <div class="min-w-0">
             <p class="truncate font-display text-2xl font-bold leading-tight">{{ profile.displayName }}</p>
             <p class="truncate text-sm text-krita-dim">@{{ profile.handle }}</p>
           </div>
         </div>
         <p class="mt-4 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm leading-relaxed text-krita-dim">
-          Du publicerar i Snacket på stan med den här profilen. Namnet och handlet syns för alla när du har skrivit något – din e-postadress aldrig.
+          Du publicerar i Snacket på stan med den här profilen. Namn, handle, avatar och text om dig syns för alla när du har skrivit något – din e-postadress aldrig.
         </p>
         <div class="mt-5 flex flex-wrap gap-2">
+          <NuxtLink :to="supporterPath(profile.id)" class="rounded-full bg-guld px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="open = false">Din läktarplats</NuxtLink>
           <button class="rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold transition hover:border-himmel hover:text-himmel" @click="editing = true">Ändra profil</button>
           <button class="rounded-full px-5 py-2.5 text-sm font-bold text-krita-dim transition hover:text-krita" @click="signOut">Logga ut</button>
         </div>

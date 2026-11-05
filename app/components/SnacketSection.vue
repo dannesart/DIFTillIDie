@@ -157,7 +157,7 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
             <!-- Signed in with a profile: that's who you are here -->
             <template v-if="identity.kind === 'member' && me">
               <div class="mt-3 flex items-center gap-3">
-                <Avatar :name="me.name" />
+                <Avatar :name="me.name" :design="me.avatar" />
                 <div class="min-w-0 flex-1">
                   <p class="truncate font-semibold">{{ me.name }}</p>
                   <p class="truncate text-xs text-krita-dim">@{{ me.handle }}</p>

@@ -167,13 +167,20 @@ describe('grants', () => {
       select privilege_type, column_name from information_schema.column_privileges
       where table_schema = 'public' and table_name = 'profiles' and grantee = 'authenticated' and privilege_type in ('SELECT', 'INSERT', 'UPDATE')
       order by privilege_type, column_name`)
+    // bio and avatar since the supporter-profiles migration. Never id (on update) or the timestamps.
     expect(cols.rows).toEqual([
+      { privilege_type: 'INSERT', column_name: 'avatar' },
+      { privilege_type: 'INSERT', column_name: 'bio' },
       { privilege_type: 'INSERT', column_name: 'display_name' },
       { privilege_type: 'INSERT', column_name: 'handle' },
       { privilege_type: 'INSERT', column_name: 'id' },
+      { privilege_type: 'SELECT', column_name: 'avatar' },
+      { privilege_type: 'SELECT', column_name: 'bio' },
       { privilege_type: 'SELECT', column_name: 'display_name' },
       { privilege_type: 'SELECT', column_name: 'handle' },
       { privilege_type: 'SELECT', column_name: 'id' },
+      { privilege_type: 'UPDATE', column_name: 'avatar' },
+      { privilege_type: 'UPDATE', column_name: 'bio' },
       { privilege_type: 'UPDATE', column_name: 'display_name' },
       { privilege_type: 'UPDATE', column_name: 'handle' },
     ])

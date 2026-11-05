@@ -166,6 +166,8 @@ export type ReactionKey = 'hjarta' | 'eld' | 'stjarna' | 'tarar'
 export interface PostAuthor {
   name: string
   handle: string
+  /** Their chosen avatar design (shared/utils/profile.ts AVATARS); absent = striped initials. */
+  avatar?: import('../utils/profile').AvatarKey
 }
 
 export type FixtureTeam = 'herr' | 'dam'

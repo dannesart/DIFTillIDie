@@ -91,7 +91,7 @@ describe('state', () => {
     expect(calls.some(c => c.method === 'signInWithOtp' || c.method === 'verifyOtp')).toBe(false)
     await tick(); await auth.whenProfileLoaded()
     expect(auth.profileStatus.value).toBe('ready')
-    expect(auth.profile.value).toEqual({ id: 'user-lotta', displayName: 'Lotta från Gärdet', handle: 'kaminen81' })
+    expect(auth.profile.value).toEqual({ id: 'user-lotta', displayName: 'Lotta från Gärdet', handle: 'kaminen81', bio: null, avatar: null })
   })
 
   it('reports a missing profile for a new supporter', async () => {
@@ -340,6 +340,39 @@ describe('saving the profile', () => {
     expect(profileErrorMessage({ code: '42501' }).form).toMatch(/egen profil/)
     const { auth } = await signedIn({ profile: null, save: { error: new TypeError('Failed to fetch') } })
     expect((await auth.saveProfile({ displayName: 'Lotta', handle: 'lotta' })) as unknown).toEqual({ ok: false, errors: { form: expect.stringMatching(/Ingen kontakt/) } })
+  })
+
+  it('saves a bio (one tidy paragraph) and an avatar design; empty clears the bio', async () => {
+    const saved = { ...row, bio: 'Sektion A sedan -98.', avatar: 'halsduk' }
+    const { auth, calls } = await signedIn({ profile: row, save: { data: saved } })
+    expect(await auth.saveProfile({ displayName: 'Lotta från Gärdet', handle: 'kaminen81', bio: '  Sektion A\n sedan -98. ', avatar: 'halsduk' })).toEqual({ ok: true })
+    expect(calls.find(c => c.method === 'db.update')!.args).toEqual([{ display_name: 'Lotta från Gärdet', handle: 'kaminen81', bio: 'Sektion A sedan -98.', avatar: 'halsduk' }])
+    expect(auth.profile.value).toEqual({ id: 'user-lotta', displayName: 'Lotta från Gärdet', handle: 'kaminen81', bio: 'Sektion A sedan -98.', avatar: 'halsduk' })
+    await auth.saveProfile({ displayName: 'Lotta från Gärdet', handle: 'kaminen81', bio: '   ', avatar: null })
+    expect(calls.filter(c => c.method === 'db.update').at(-1)!.args).toEqual([{ display_name: 'Lotta från Gärdet', handle: 'kaminen81', bio: null, avatar: null }])
+  })
+
+  it('a bio that is too long is caught before any request', async () => {
+    const { auth, calls } = await signedIn({ profile: row })
+    const before = calls.length
+    expect(await auth.saveProfile({ displayName: 'Lotta', handle: 'lotta', bio: 'x'.repeat(161) })).toEqual({ ok: false, errors: { bio: 'Högst 160 tecken.' } })
+    expect(calls.length).toBe(before)
+  })
+
+  it('reads its profile from a database without bio and avatar yet (before that migration)', async () => {
+    let n = 0
+    const { client } = fakeClient({ session: session() })
+    const real = client.from.bind(client)
+    ;(client as unknown as { from: (t: string) => unknown }).from = (t: string) => {
+      const q = real(t) as unknown as Record<string, unknown>
+      q.maybeSingle = async () => (n++ ? { data: row, error: null } : { data: null, error: { code: '42703', message: 'column profiles.bio does not exist' } })
+      return q
+    }
+    const auth = createAuth(client, { storage: memoryStorage() })
+    await auth.init()
+    await tick()
+    await auth.whenProfileLoaded()
+    expect([auth.profileStatus.value, auth.profile.value]).toEqual(['ready', { id: 'user-lotta', displayName: 'Lotta från Gärdet', handle: 'kaminen81', bio: null, avatar: null }])
   })
 
   it('refuses to save when signed out', async () => {

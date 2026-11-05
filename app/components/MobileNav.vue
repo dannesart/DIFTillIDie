@@ -1,8 +1,10 @@
 <script setup lang="ts">
 /*
  * Bottom navigation for phones and tablets (the header's links only show
- * from lg up). Plain in-page anchors — no routing, so podcast playback
- * never stops — with a scroll-spy for the active section.
+ * from lg up). On the front page, plain in-page anchors with a scroll-spy
+ * for the active section; elsewhere (a supporter's page) the same items lead
+ * back to those sections. The podcast player lives in app.vue, so it keeps
+ * playing either way.
  */
 type Section = 'hem' | 'stories' | 'snacket' | 'lyssna'
 const items: { id: Section, label: string }[] = [
@@ -13,6 +15,8 @@ const items: { id: Section, label: string }[] = [
 ]
 
 const active = ref<Section>('hem')
+const route = useRoute()
+const onHome = computed(() => route.path === '/')
 const { status: authStatus, profile } = useAuth()
 const accountOpen = useAccountDialog()
 const hasAccount = computed(() => authStatus.value !== 'unavailable')
@@ -56,6 +60,10 @@ onBeforeUnmount(() => {
 })
 
 function go(id: Section) {
+  if (!onHome.value) {
+    void navigateTo(id === 'hem' ? '/' : `/#${id}`)
+    return
+  }
   active.value = id
   lockedUntil = Date.now() + 1200
   const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -85,17 +93,17 @@ function go(id: Section) {
     <ul class="mx-auto grid h-16 max-w-xl" :class="hasAccount ? 'grid-cols-5' : 'grid-cols-4'">
       <li v-for="item in items" :key="item.id">
         <a
-          :href="item.id === 'hem' ? '#' : `#${item.id}`"
-          :aria-current="active === item.id ? 'location' : undefined"
+          :href="(onHome ? '' : '/') + (item.id === 'hem' ? '#' : `#${item.id}`)"
+          :aria-current="onHome && active === item.id ? 'location' : undefined"
           class="relative flex h-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold transition-colors motion-safe:active:scale-95"
-          :class="active === item.id ? 'text-himmel' : 'text-krita-dim hover:text-krita'"
+          :class="onHome && active === item.id ? 'text-himmel' : 'text-krita-dim hover:text-krita'"
           @click.prevent="go(item.id)"
         >
           <!-- Active marker: a short stripe, like the club's -->
           <span
             aria-hidden="true"
             class="stripes absolute top-0 h-[3px] w-8 rounded-b-full [--stripe:4px] transition-opacity duration-300"
-            :class="active === item.id ? 'opacity-100' : 'opacity-0'"
+            :class="onHome && active === item.id ? 'opacity-100' : 'opacity-0'"
           />
 
           <span class="relative grid size-6 place-items-center" aria-hidden="true">

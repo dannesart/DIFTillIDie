@@ -230,7 +230,7 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
     @keydown.esc="composerOpen.escape() && textarea?.blur()"
   >
     <div class="flex gap-3">
-      <Avatar :name="me?.name ?? 'Du'" :size="inline ? 'sm' : undefined" />
+      <Avatar :name="me?.name ?? 'Du'" :design="me?.avatar" :size="inline ? 'sm' : undefined" />
       <label class="min-w-0 flex-1">
         <span class="sr-only">{{ inline ? 'Skriv om den här Storyn' : 'Skriv ett inlägg' }}</span>
         <textarea

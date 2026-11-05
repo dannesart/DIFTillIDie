@@ -21,13 +21,10 @@ await Promise.all([useNews(), usePodcasts(), useFixtures()])
       <MediaSection />
     </main>
     <AppFooter />
-    <PodcastAudio />
-    <MiniPlayer />
     <StoryComposeDialog />
     <MobileNav />
     <InstallHint />
     <InstallGuide />
-    <AccountDialog />
     <StripeBurst />
   </div>
 </template>

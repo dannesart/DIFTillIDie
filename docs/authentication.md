@@ -38,7 +38,7 @@ We first tried Google OAuth. Google's consent screen showed the random Supabase 
 
 - **Our state holds:** the user's id, and, while a code is pending, the address the supporter typed, on their own device.
 - **The e-mail address:** it's never shown to anyone else and never stored in `profiles`. Supabase keeps it in `auth.users`, which is private to the project.
-- **Profiles:** none are created automatically. With the posts migration, a supporter's `display_name` and `handle` become readable by everyone once they've published a post, and nothing else ever is (see [snacket-posts.md](snacket-posts.md#what-changes-for-profiles)).
+- **Profiles:** none are created automatically. With the posts migration, a supporter's `display_name` and `handle` become readable by everyone once they've published a post (see [snacket-posts.md](snacket-posts.md#what-changes-for-profiles)). The optional `bio` and `avatar` design follow exactly the same rule; team interests are never readable by anyone else (see [supporter-profiles.md](supporter-profiles.md)).
 
 ### Caching and personal data: the `'/': { isr: 300 }` review
 

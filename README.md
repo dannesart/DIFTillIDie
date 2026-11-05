@@ -156,6 +156,7 @@ Supporters sign in with a six-digit code sent by e-mail (Supabase `signInWithOtp
 
 Signed in with a profile, you **publish**, **react** (💙 🔥 ⭐ 😭, one per post) and **comment** in Snacket på stan under that name and handle, for everyone to read. Reactions and comments: [`docs/snacket-interactions.md`](docs/snacket-interactions.md). The design, the security model, the tests and a two-device test plan are in [`docs/snacket-posts.md`](docs/snacket-posts.md). Local demo reactions, comments and drafts are kept separately per account and for the guest, so a shared browser never shows one supporter's local content to another.
 
+- **Your place on the stands:** every supporter has a page, `/laktaren/<user id>`, with their name, handle, a chosen avatar design, an optional bio and their wall of posts. Names and avatars in Snacket link there. Your own page also has "Mina lag", which teams you follow, visible only to you ([details](docs/supporter-profiles.md)).
 - **Docs:** setup, the security model, the caching review, the e-mail template, SMTP requirements, future registration modes and a device test plan are in [`docs/authentication.md`](docs/authentication.md).
 - **Migration:** [`supabase/migrations/`](supabase/migrations/), with pgTAP authorization tests in [`supabase/tests/`](supabase/tests/).
 - **E-mail template:** [`supabase/templates/otp-code.html`](supabase/templates/otp-code.html).

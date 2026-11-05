@@ -1,7 +1,7 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { ref } from 'vue'
-import type { SupporterProfile } from '#shared/utils/profile'
-import { normalizeHandle, validateDisplayName, validateHandle } from '#shared/utils/profile'
+import type { AvatarKey, ProfileRow, SupporterProfile } from '#shared/utils/profile'
+import { cleanBio, isAvatarKey, normalizeHandle, PROFILE_COLUMNS, PROFILE_COLUMNS_BEFORE_DESIGN, toProfile, validateDisplayName, validateHandle } from '#shared/utils/profile'
 
 /*
  * Supporter accounts: a six-digit code by e-mail (Supabase signInWithOtp /
@@ -103,6 +103,7 @@ export function verifyErrorMessage(e: AuthLikeError | undefined): string {
 export interface ProfileErrors {
   handle?: string
   displayName?: string
+  bio?: string
   form?: string
 }
 
@@ -110,14 +111,12 @@ export interface ProfileErrors {
 export function profileErrorMessage(e: { code?: string, message?: string } | unknown): ProfileErrors {
   const code = (e as { code?: string })?.code
   if (code === '23505') return { handle: 'Upptaget – välj ett annat.' }
-  if (code === '23514') return { form: 'Något i profilen följer inte reglerna. Kolla namn och handle.' }
+  if (code === '23514') return { form: 'Något i profilen följer inte reglerna. Kolla namn, handle och text.' }
   if (code === '42501') return { form: 'Du kan bara ändra din egen profil. Logga in igen och försök på nytt.' }
   if (isNetworkError(e)) return { form: NETWORK }
   return { form: 'Profilen kunde inte sparas. Försök igen.' }
 }
 
-interface ProfileRow { id: string, display_name: string, handle: string }
-const toProfile = (r: ProfileRow): SupporterProfile => ({ id: r.id, displayName: r.display_name, handle: r.handle })
 
 interface Pending { email: string, sentAt: number }
 
@@ -203,10 +202,13 @@ export function createAuth(client: SupabaseClient | null, options: AuthOptions =
     profileStatus.value = 'loading'
     loading = (async () => {
       try {
-        const { data, error: e } = await client.from('profiles').select('id, display_name, handle').eq('id', id).maybeSingle()
+        const own = (cols: string) => client.from('profiles').select(cols).eq('id', id).maybeSingle()
+        let { data, error: e } = await own(PROFILE_COLUMNS)
+        // A database without the supporter-profiles migration yet: read what it has.
+        if ((e as { code?: string } | null)?.code === '42703') ({ data, error: e } = await own(PROFILE_COLUMNS_BEFORE_DESIGN))
         if (request !== profileRequest || id !== userId.value) return
         if (e) throw e
-        profile.value = data ? toProfile(data as ProfileRow) : null
+        profile.value = data ? toProfile(data as unknown as ProfileRow) : null
         profileStatus.value = data ? 'ready' : 'missing'
       }
       catch {
@@ -279,8 +281,12 @@ export function createAuth(client: SupabaseClient | null, options: AuthOptions =
     applySession(null)
   }
 
-  /** Create or update the supporter's own profile. The database enforces ownership and rules. */
-  async function saveProfile(input: { displayName: string, handle: string }): Promise<{ ok: true } | { ok: false, errors: ProfileErrors }> {
+  /**
+   * Create or update the supporter's own profile. The database enforces
+   * ownership and rules. `bio` and `avatar` are only sent when given
+   * (undefined = leave as is; '' / null = clear).
+   */
+  async function saveProfile(input: { displayName: string, handle: string, bio?: string, avatar?: AvatarKey | null }): Promise<{ ok: true } | { ok: false, errors: ProfileErrors }> {
     const id = userId.value
     if (!client || !id) return { ok: false, errors: { form: 'Logga in först.' } }
     const displayName = input.displayName.trim()
@@ -288,17 +294,22 @@ export function createAuth(client: SupabaseClient | null, options: AuthOptions =
     const errors: ProfileErrors = {}
     const nameError = validateDisplayName(displayName)
     const handleError = validateHandle(handle)
+    const bio = input.bio === undefined ? undefined : cleanBio(input.bio)
     if (nameError) errors.displayName = nameError
     if (handleError) errors.handle = handleError
-    if (nameError || handleError) return { ok: false, errors }
+    if (bio && !bio.ok) errors.bio = bio.error
+    if (input.avatar != null && !isAvatarKey(input.avatar)) errors.form = 'Välj en av avatarerna.'
+    if (Object.keys(errors).length) return { ok: false, errors }
     try {
-      const values = { display_name: displayName, handle }
+      const values: Record<string, string | null> = { display_name: displayName, handle }
+      if (bio?.ok) values.bio = bio.bio
+      if (input.avatar !== undefined) values.avatar = input.avatar
       const query = profile.value
         ? client.from('profiles').update(values).eq('id', id)
         : client.from('profiles').insert({ id, ...values })
-      const { data, error: e } = await query.select('id, display_name, handle').single()
+      const { data, error: e } = await query.select(PROFILE_COLUMNS).single()
       if (e) throw e
-      profile.value = toProfile(data as ProfileRow)
+      profile.value = toProfile(data as unknown as ProfileRow)
       profileStatus.value = 'ready'
       return { ok: true }
     }

@@ -102,7 +102,7 @@ describe('reading the real feed (public, no sign-in needed)', () => {
     expect(c.posts.value.map(x => [x.body, x.author.handle])).toEqual([['Senare', 'hovethasse'], ['Tidigare', 'kaminen81']])
     expect(calls.find(x => x.op === 'order')!.args).toEqual(['created_at', { ascending: false }])
     // Only public author fields are asked for.
-    expect(calls.find(x => x.op === 'select')!.args[0]).toMatch(/author:profiles!posts_author_id_fkey\(id, display_name, handle\)/)
+    expect(calls.find(x => x.op === 'select')!.args[0]).toMatch(/author:profiles!posts_author_id_fkey\(id, display_name, handle, avatar\)/)
   })
 
   it('works signed out: no auth store needed to read', async () => {
@@ -160,14 +160,14 @@ describe('publishing', () => {
     expect(STORY_UNVERIFIED).toMatch(/finns kvar/)
   })
 
-  it('a database without the frozen-Story column yet: the feed still loads, the old way', async () => {
+  it('a database without the supporter-profiles migration yet: the feed still loads, without avatars', async () => {
     let n = 0
-    const { client, calls } = fakeClient({ list: () => (n++ ? { data: [row('a', 'Hej')] } : { error: { code: '42703', message: 'column posts.story_ref does not exist' } }) })
+    const { client, calls } = fakeClient({ list: () => (n++ ? { data: [row('a', 'Hej')] } : { error: { code: '42703', message: 'column profiles_1.avatar does not exist' } }) })
     const c = createCommunity(client, fakeAuth())
     await c.refresh()
-    expect([c.status.value, c.posts.value.map(p => p.body)]).toEqual(['ready', ['Hej']])
+    expect([c.status.value, c.posts.value.map(p => [p.body, p.author.avatar])]).toEqual(['ready', [['Hej', null]]])
     const selects = calls.filter(x => x.op === 'select').map(x => String(x.args[0]))
-    expect([selects[0]!.includes('story_ref'), selects[1]!.includes('story_ref')]).toEqual([true, false])
+    expect([selects[0]!.includes('avatar'), selects[1]!.includes('avatar'), selects[1]!.includes('story_ref')]).toEqual([true, false, true])
   })
 
   it('reads the frozen Story back, and ignores one it can’t show', () => {

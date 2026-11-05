@@ -46,8 +46,63 @@ export function validateDisplayName(name: string): string | null {
   return null
 }
 
+export const BIO_MAX = 160
+
+/** Optional, one paragraph. The cleaned bio (null = none), or what's wrong. Mirrors the SQL constraints. */
+export function cleanBio(input: string): { ok: true, bio: string | null } | { ok: false, error: string } {
+  const bio = input.replace(/\s+/g, ' ').trim()
+  if (!bio) return { ok: true, bio: null }
+  if ([...bio].length > BIO_MAX) return { ok: false, error: `Högst ${BIO_MAX} tecken.` }
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001F\u007F]/.test(bio)) return { ok: false, error: 'Texten innehåller otillåtna tecken.' }
+  return { ok: true, bio }
+}
+
+/**
+ * Avatar designs, drawn by the app (components/Avatar.vue). null is the
+ * default: striped initials. Mirrors the SQL check on profiles.avatar.
+ */
+export const AVATARS = [
+  { key: 'himmel', label: 'Himmelsblå ränder' },
+  { key: 'tricolor', label: 'Blått, gult och rött' },
+  { key: 'stjarna', label: 'Guldstjärna' },
+  { key: 'halsduk', label: 'Halsduk' },
+  { key: 'boll', label: 'Boll' },
+  { key: 'puck', label: 'Puck' },
+  { key: 'trumma', label: 'Trumma' },
+] as const
+export type AvatarKey = typeof AVATARS[number]['key']
+export const isAvatarKey = (v: unknown): v is AvatarKey => AVATARS.some(a => a.key === v)
+
+/** The teams a supporter can follow, whatever the feeds cover today. Mirrors the SQL check. */
+export const TEAM_INTERESTS = [
+  { key: 'fotboll:herr', sport: 'Fotboll', team: 'Herrar' },
+  { key: 'fotboll:dam', sport: 'Fotboll', team: 'Damer' },
+  { key: 'hockey:herr', sport: 'Hockey', team: 'Herrar' },
+  { key: 'hockey:dam', sport: 'Hockey', team: 'Damer' },
+] as const
+export type TeamInterest = typeof TEAM_INTERESTS[number]['key']
+export const isTeamInterest = (v: unknown): v is TeamInterest => TEAM_INTERESTS.some(t => t.key === v)
+
 export interface SupporterProfile {
   id: string
   displayName: string
   handle: string
+  bio: string | null
+  avatar: AvatarKey | null
 }
+
+/** A profile row as Supabase returns it (bio and avatar may be absent before their migration). */
+export interface ProfileRow { id: string, display_name: string, handle: string, bio?: string | null, avatar?: string | null }
+export const toProfile = (r: ProfileRow): SupporterProfile =>
+  ({ id: r.id, displayName: r.display_name, handle: r.handle, bio: r.bio ?? null, avatar: isAvatarKey(r.avatar) ? r.avatar : null })
+export const PROFILE_COLUMNS = 'id, display_name, handle, bio, avatar'
+
+/** Who wrote a post or comment, as shown next to it. `id` is the stable identity (the profile page); the handle can change. */
+export interface PublicAuthor { id: string, name: string, handle: string, avatar: AvatarKey | null }
+/** The embedded author of a post or comment row (avatar absent before its migration). */
+export type AuthorRow = { id: string, display_name: string, handle: string, avatar?: string | null }
+export const toAuthor = (a: AuthorRow): PublicAuthor => ({ id: a.id, name: a.display_name, handle: a.handle, avatar: isAvatarKey(a.avatar) ? a.avatar : null })
+export const authorOf = (p: SupporterProfile): PublicAuthor => ({ id: p.id, name: p.displayName, handle: p.handle, avatar: p.avatar })
+/** Before 20261105230000_supporter_profiles: a database without bio and avatar answers 42703. */
+export const PROFILE_COLUMNS_BEFORE_DESIGN = 'id, display_name, handle'

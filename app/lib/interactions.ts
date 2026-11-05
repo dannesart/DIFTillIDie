@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ref, watch } from 'vue'
 import type { ReactionKey } from '#shared/types/domain'
+import type { AuthorRow, PublicAuthor } from '#shared/utils/profile'
+import { authorOf, toAuthor } from '#shared/utils/profile'
 import type { AuthStore } from './auth'
 import type { CommunityStore } from './posts'
 import { normalizePostBody, publishErrorMessage, validatePostBody } from './posts'
@@ -20,7 +22,7 @@ export interface PostStats { reactions: Record<ReactionKey, number>, comments: n
 export interface RealComment {
   id: string
   postId: string
-  author: { id: string, name: string, handle: string }
+  author: PublicAuthor
   body: string
   createdAt: string
 }
@@ -33,14 +35,14 @@ export const COMMENT_LIMIT = 200
 /** `more`: the thread hit COMMENT_LIMIT, so older-first, later comments are not shown. */
 interface CommentThread { status: LoadStatus, list: RealComment[], more: boolean }
 
-const COMMENT_COLUMNS = 'id, post_id, body, created_at, author:profiles!post_comments_author_id_fkey(id, display_name, handle)'
+const COMMENT_COLUMNS = 'id, post_id, body, created_at, author:profiles!post_comments_author_id_fkey(id, display_name, handle, avatar)'
 
 interface CommentRow {
   id: string
   post_id: string
   body: string
   created_at: string
-  author: { id: string, display_name: string, handle: string } | { id: string, display_name: string, handle: string }[] | null
+  author: AuthorRow | AuthorRow[] | null
 }
 
 interface StatsRow { post_id: string, hjarta: number, eld: number, stjarna: number, tarar: number, comments: number }
@@ -48,7 +50,7 @@ interface StatsRow { post_id: string, hjarta: number, eld: number, stjarna: numb
 export function toRealComment(r: CommentRow): RealComment | null {
   const a = Array.isArray(r.author) ? r.author[0] : r.author
   if (!a) return null
-  return { id: r.id, postId: r.post_id, author: { id: a.id, name: a.display_name, handle: a.handle }, body: r.body, createdAt: r.created_at }
+  return { id: r.id, postId: r.post_id, author: toAuthor(a), body: r.body, createdAt: r.created_at }
 }
 
 const emptyStats = (): PostStats => ({ reactions: { hjarta: 0, eld: 0, stjarna: 0, tarar: 0 }, comments: 0 })
@@ -112,7 +114,9 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
       const { data, error: e } = await client.from('post_reactions').select('post_id, reaction').in('post_id', ids)
       if (e) throw e
       if (auth?.userId.value !== uid) return // someone else signed in meanwhile
-      const next: Record<string, ReactionKey | null> = {}
+      // Replace only these posts' entries: the feed and a supporter's wall load separately.
+      const next: Record<string, ReactionKey | null> = { ...mine.value }
+      for (const id of ids) delete next[id]
       for (const r of (data ?? []) as { post_id: string, reaction: ReactionKey }[]) next[r.post_id] = r.reaction
       mine.value = next
     }
@@ -152,14 +156,17 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
     const prev = threads.value[postId]
     threads.value = { ...threads.value, [postId]: { status: prev?.list.length ? 'ready' : 'loading', list: prev?.list ?? [], more: prev?.more ?? false } }
     try {
-      const { data, error: e } = await client.from('post_comments').select(COMMENT_COLUMNS)
+      const list = (cols: string) => client.from('post_comments').select(cols)
         .eq('post_id', postId).order('created_at', { ascending: true }).order('id', { ascending: true }).limit(COMMENT_LIMIT)
+      let { data, error: e } = await list(COMMENT_COLUMNS)
+      // A database without the supporter-profiles migration yet: read what it has.
+      if ((e as DataError | null)?.code === '42703') ({ data, error: e } = await list(COMMENT_COLUMNS.replace(', avatar)', ')')))
       if (e) throw e
       const rows = data as unknown as CommentRow[]
-      const list = rows.map(toRealComment).filter((c): c is RealComment => !!c)
+      const comments = rows.map(toRealComment).filter((c): c is RealComment => !!c)
       // The total stays post_stats()'s: this list is a capped page (and skips
       // rows without a visible author), so its length is not a count.
-      threads.value = { ...threads.value, [postId]: { status: 'ready', list, more: rows.length >= COMMENT_LIMIT } }
+      threads.value = { ...threads.value, [postId]: { status: 'ready', list: comments, more: rows.length >= COMMENT_LIMIT } }
     }
     catch {
       threads.value = { ...threads.value, [postId]: { status: prev?.list.length ? 'ready' : 'error', list: prev?.list ?? [], more: prev?.more ?? false } }
@@ -237,7 +244,7 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
       if (!p) return
       const next: Record<string, CommentThread> = {}
       for (const [id, t] of Object.entries(threads.value)) {
-        next[id] = { ...t, list: t.list.map(c => c.author.id === p.id ? { ...c, author: { id: p.id, name: p.displayName, handle: p.handle } } : c) }
+        next[id] = { ...t, list: t.list.map(c => c.author.id === p.id ? { ...c, author: authorOf(p) } : c) }
       }
       threads.value = next
     })

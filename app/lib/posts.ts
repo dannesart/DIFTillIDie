@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ref, watch } from 'vue'
 import type { FrozenStory, Sport, Story } from '#shared/types/domain'
+import type { AuthorRow, PublicAuthor } from '#shared/utils/profile'
+import { authorOf, toAuthor } from '#shared/utils/profile'
 import type { AuthStore } from './auth'
 
 /*
@@ -14,7 +16,7 @@ export const POST_MAX = 280
 
 export interface CommunityPost {
   id: string
-  author: { id: string, name: string, handle: string }
+  author: PublicAuthor
   body: string
   sport?: Sport
   storyId?: string
@@ -26,18 +28,18 @@ export interface CommunityPost {
 export type FeedStatus = 'unavailable' | 'idle' | 'loading' | 'ready' | 'error'
 
 /** What the app reads for a post; also what publish_post() returns, with the author embedded. */
-export const COLUMNS = 'id, body, sport, story_id, story_ref, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle)'
-/** A database without the frozen-Story migration yet (42703: no such column): read what it has. */
-const COLUMNS_BEFORE_REFS = COLUMNS.replace(' story_ref,', '')
+export const COLUMNS = 'id, body, sport, story_id, story_ref, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle, avatar)'
+/** A database without the supporter-profiles migration yet (42703: no such column): read what it has. */
+export const COLUMNS_BEFORE_DESIGN = COLUMNS.replace(', avatar)', ')')
 
-interface PostRow {
+export interface PostRow {
   id: string
   body: string
   sport: string | null
   story_id: string | null
   story_ref?: unknown
   created_at: string
-  author: { id: string, display_name: string, handle: string } | { id: string, display_name: string, handle: string }[] | null
+  author: AuthorRow | AuthorRow[] | null
 }
 
 export function toCommunityPost(r: PostRow): CommunityPost | null {
@@ -46,7 +48,7 @@ export function toCommunityPost(r: PostRow): CommunityPost | null {
   if (!a) return null
   return {
     id: r.id,
-    author: { id: a.id, name: a.display_name, handle: a.handle },
+    author: toAuthor(a),
     body: r.body,
     sport: r.sport === 'fotboll' || r.sport === 'hockey' ? r.sport : undefined,
     storyId: r.story_id ?? undefined,
@@ -124,7 +126,7 @@ export function createCommunity(client: SupabaseClient | null, auth: AuthStore |
       try {
         const list = (cols: string) => client.from('posts').select(cols).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(limit)
         let { data, error: e } = await list(COLUMNS)
-        if ((e as DataError | null)?.code === '42703') ({ data, error: e } = await list(COLUMNS_BEFORE_REFS))
+        if ((e as DataError | null)?.code === '42703') ({ data, error: e } = await list(COLUMNS_BEFORE_DESIGN))
         if (e) throw e
         posts.value = (data as unknown as PostRow[]).map(toCommunityPost).filter((p): p is CommunityPost => !!p)
         status.value = 'ready'
@@ -199,7 +201,7 @@ export function createCommunity(client: SupabaseClient | null, auth: AuthStore |
   if (auth) {
     watch(auth.profile, (p) => {
       if (!p) return
-      posts.value = posts.value.map(post => post.author.id === p.id ? { ...post, author: { id: p.id, name: p.displayName, handle: p.handle } } : post)
+      posts.value = posts.value.map(post => post.author.id === p.id ? { ...post, author: authorOf(p) } : post)
     })
   }
 

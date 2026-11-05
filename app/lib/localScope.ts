@@ -35,7 +35,7 @@ export function resolveIdentity(
   if (!owner) return { kind: 'pending' }
   if (owner === 'guest') return { kind: 'guest' }
   if (profileStatus === 'ready' && profile && owner === `account:${profile.id}`) {
-    return { kind: 'member', author: { name: profile.displayName, handle: profile.handle } }
+    return { kind: 'member', author: { name: profile.displayName, handle: profile.handle, avatar: profile.avatar ?? undefined } }
   }
   return { kind: profileStatus === 'missing' || profileStatus === 'error' ? 'needs-profile' : 'pending' }
 }

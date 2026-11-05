@@ -31,6 +31,8 @@ export default defineNuxtConfig({
     // Shared CDN HTML is safe because sign-in lives entirely in the browser:
     // the server never sees a session, so this page is identical for everyone.
     '/': { isr: 300 },
+    // A supporter's page: the same public shell for everyone; the profile and wall load in the browser.
+    '/laktaren/**': { isr: 300 },
     '/api/news': { isr: 600 },
     '/api/podcast': { isr: 600 },
     '/api/fixtures': { isr: 900 },

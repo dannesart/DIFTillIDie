@@ -121,10 +121,12 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
       <!-- Capped thread: say so rather than imply the list is complete -->
       <p v-if="thread.more" class="text-xs text-krita-dim">Visar de {{ thread.list.length }} äldsta av {{ s ? s.comments : 'fler' }} kommentarer.</p>
       <div v-for="c in thread.list" :key="c.id" class="flex gap-2.5">
-        <Avatar :name="c.author.name" size="sm" />
+        <NuxtLink :to="supporterPath(c.author.id)" class="shrink-0 self-start rounded-full transition hover:scale-105" tabindex="-1" :aria-label="`${c.author.name} på läktaren`">
+          <Avatar :name="c.author.name" :design="c.author.avatar" size="sm" />
+        </NuxtLink>
         <div class="min-w-0 flex-1 rounded-2xl rounded-tl-sm bg-white/[0.04] px-3.5 py-2.5">
           <p class="flex flex-wrap items-baseline gap-x-1.5 text-xs">
-            <span class="font-semibold">{{ c.author.name }}</span>
+            <NuxtLink :to="supporterPath(c.author.id)" class="font-semibold underline-offset-2 hover:text-himmel hover:underline">{{ c.author.name }}</NuxtLink>
             <span class="text-krita-dim">@{{ c.author.handle }} · <TimeAgo :at="c.createdAt" /></span>
             <template v-if="c.author.id === userId">
               <span v-if="confirming === c.id" class="ml-auto flex gap-2">

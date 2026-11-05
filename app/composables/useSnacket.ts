@@ -1,4 +1,5 @@
 import type { NewsResponse, ReactionKey, Sport, Story } from '#shared/types/domain'
+import type { PublicAuthor } from '#shared/utils/profile'
 import type { SnacketIdentity } from '~/lib/localScope'
 import { resolveIdentity } from '~/lib/localScope'
 import type { FeedSort } from '~/lib/feedSort'
@@ -27,7 +28,7 @@ export interface FeedFilter {
 
 export interface FeedPost {
   id: string
-  author: { id: string, name: string, handle: string }
+  author: PublicAuthor
   body: string
   createdAt: string
   sport?: Sport

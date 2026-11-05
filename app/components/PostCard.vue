@@ -2,12 +2,30 @@
 import type { FeedPost } from '~/composables/useSnacket'
 import { frozenLead } from '~/lib/posts'
 
-/* One post in Snacket på stan, with its real reactions and comments. */
-const props = defineProps<{ post: FeedPost }>()
-const emit = defineEmits<{ mention: [handle: string] }>()
+/*
+ * One post in Snacket på stan, with its real reactions and comments.
+ * The author's name and avatar lead to their page (by user id); their
+ * @handle inserts a mention, where there is a composer to insert it into.
+ * On a supporter's own wall: `onWall` (no link to the page you're on, and
+ * no mention buttons, since there's no composer there).
+ */
+const props = defineProps<{ post: FeedPost, onWall?: boolean }>()
+const emit = defineEmits<{ mention: [handle: string], removed: [id: string] }>()
 
 const { filter, community } = useSnacket()
 const { show } = useStorySpotlight()
+const route = useRoute()
+const authorPath = computed(() => supporterPath(props.post.author.id))
+
+// Tags and Stories live on the front page: from elsewhere, go there first.
+async function showTag(tag: string) {
+  filter.value = { tag: tag.toLowerCase() }
+  if (route.path !== '/') await navigateTo('/#snacket')
+}
+async function showStory(id: string) {
+  if (route.path !== '/') await navigateTo(`/#${id}`)
+  show(id)
+}
 const { stories, status: newsStatus } = useNews()
 
 /*
@@ -35,17 +53,23 @@ async function remove() {
   const r = await community.remove(props.post.id)
   removing.value = false
   if (!r.ok) removeError.value = r.message
+  else emit('removed', props.post.id)
 }
 </script>
 
 <template>
   <article class="card p-5 transition duration-300 hover:border-white/15" :class="post.own && 'border-himmel/30'">
     <header class="flex items-start gap-3">
-      <Avatar :name="post.author.name" />
+      <Avatar v-if="onWall" :name="post.author.name" :design="post.author.avatar" />
+      <NuxtLink v-else :to="authorPath" class="shrink-0 rounded-full transition hover:scale-105" :aria-label="`${post.author.name} på läktaren`" tabindex="-1">
+        <Avatar :name="post.author.name" :design="post.author.avatar" />
+      </NuxtLink>
       <div class="min-w-0 flex-1">
         <p class="flex flex-wrap items-baseline gap-x-2">
-          <span class="font-semibold">{{ post.author.name }}</span>
-          <button class="text-sm text-krita-dim hover:text-himmel" :title="`Nämn @${post.author.handle}`" @click="emit('mention', post.author.handle)">@{{ post.author.handle }}</button>
+          <span v-if="onWall" class="font-semibold">{{ post.author.name }}</span>
+          <NuxtLink v-else :to="authorPath" class="font-semibold underline-offset-2 hover:text-himmel hover:underline" :title="`${post.author.name} på läktaren`">{{ post.author.name }}</NuxtLink>
+          <span v-if="onWall" class="text-sm text-krita-dim">@{{ post.author.handle }}</span>
+          <button v-else class="text-sm text-krita-dim hover:text-himmel" :title="`Nämn @${post.author.handle}`" @click="emit('mention', post.author.handle)">@{{ post.author.handle }}</button>
         </p>
         <p class="text-xs text-krita-dim">
           <TimeAgo :at="post.createdAt" />
@@ -64,8 +88,9 @@ async function remove() {
 
     <p class="mt-3 whitespace-pre-line text-[1.02rem] leading-relaxed">
       <template v-for="(t, i) in tokens" :key="i">
-        <button v-if="t.type === 'mention'" class="font-semibold text-himmel hover:underline" :title="`Svara @${t.value}`" @click="emit('mention', t.value)">@{{ t.value }}</button>
-        <button v-else-if="t.type === 'tag'" class="font-semibold text-guld hover:underline" @click="filter = { tag: t.value.toLowerCase() }">#{{ t.value }}</button>
+        <span v-if="t.type === 'mention' && onWall" class="font-semibold text-himmel">@{{ t.value }}</span>
+        <button v-else-if="t.type === 'mention'" class="font-semibold text-himmel hover:underline" :title="`Svara @${t.value}`" @click="emit('mention', t.value)">@{{ t.value }}</button>
+        <button v-else-if="t.type === 'tag'" class="font-semibold text-guld hover:underline" @click="showTag(t.value)">#{{ t.value }}</button>
         <template v-else>{{ t.value }}</template>
       </template>
     </p>
@@ -76,7 +101,7 @@ async function remove() {
         :is="live ? 'button' : 'div'"
         class="group flex w-full items-center gap-3 text-left"
         v-bind="live ? { type: 'button', title: 'Visa Storyn' } : {}"
-        @click="live && show(live.id)"
+        @click="live && showStory(live.id)"
       >
         <span class="h-10 w-1.5 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 5px, var(--color-navy-700) 5px 10px)" />
         <span class="min-w-0 flex-1">
@@ -100,7 +125,7 @@ async function remove() {
     </div>
 
     <!-- From before frozen Stories, while its Story is still in the feeds -->
-    <button v-else-if="live" class="group mt-4 flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-navy-950/60 p-3 text-left transition hover:border-himmel/50" @click="show(live.id)">
+    <button v-else-if="live" class="group mt-4 flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-navy-950/60 p-3 text-left transition hover:border-himmel/50" @click="showStory(live.id)">
       <span class="h-10 w-1.5 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 5px, var(--color-navy-700) 5px 10px)" />
       <span class="min-w-0 flex-1">
         <span class="kicker block text-krita-dim">Story · {{ sourcesLabel(live.sources.length) }}</span>

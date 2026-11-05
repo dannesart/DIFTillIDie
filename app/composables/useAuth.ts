@@ -17,3 +17,10 @@ export function useAuth(): AuthStore {
 
 /** Is the account dialog open? (Opened from the header, the bottom nav, or after signing in.) */
 export const useAccountDialog = () => useState('account-dialog-open', () => false)
+
+/** Open the account dialog straight on "Ändra profil" (the one profile form, wherever it's asked for). */
+export function useProfileEditor() {
+  const open = useAccountDialog()
+  const editing = useState('account-dialog-edit', () => false)
+  return { editing, edit: () => { editing.value = true; open.value = true } }
+}
