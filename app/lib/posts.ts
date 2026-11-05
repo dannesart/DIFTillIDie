@@ -25,7 +25,8 @@ export interface CommunityPost {
 
 export type FeedStatus = 'unavailable' | 'idle' | 'loading' | 'ready' | 'error'
 
-const COLUMNS = 'id, body, sport, story_id, story_ref, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle)'
+/** What the app reads for a post; also what publish_post() returns, with the author embedded. */
+export const COLUMNS = 'id, body, sport, story_id, story_ref, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle)'
 /** A database without the frozen-Story migration yet (42703: no such column): read what it has. */
 const COLUMNS_BEFORE_REFS = COLUMNS.replace(' story_ref,', '')
 

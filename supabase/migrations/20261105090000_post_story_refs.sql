@@ -15,9 +15,15 @@
 -- refused, and then nothing is published: the post and its reference are
 -- written together or not at all.
 --
--- Publishing therefore goes through publish_post() only. Direct inserts
--- are closed, and "who may publish" now lives in that function (it used to
--- be the insert policy): an approval or membership check goes there.
+-- Publishing goes through publish_post(), where "who may publish" now
+-- lives (it used to be the insert policy): an approval or membership check
+-- goes there.
+--
+-- This migration only ADDS (column, check, function), so the app that is
+-- live while it's applied keeps publishing the old way. Direct inserts are
+-- closed by the next migration, 20261105090100_close_direct_post_inserts,
+-- once the app that uses publish_post() is deployed. See "Deploying" in
+-- docs/snacket-posts.md.
 --
 -- Posts published before this migration keep their bare story_id and no
 -- story_ref. Nothing here guesses what they were about; the app shows their
@@ -34,17 +40,8 @@ alter table public.posts
   add constraint posts_story_ref_matches
   check (story_ref is null or (story_id is not null and story_ref ->> 'storyId' = story_id));
 
--- Every new post with a Story has it frozen. NOT VALID: the older posts are
--- left exactly as they were, and posts are never updated.
-alter table public.posts
-  add constraint posts_story_frozen
-  check (story_id is null or story_ref is not null) not valid;
-
 -- ── Publishing: one function, one transaction ───────────────────────────
-revoke insert (body, sport, story_id) on table public.posts from authenticated;
-revoke insert on table public.posts from authenticated;
-drop policy "Supporters with a profile can publish as themselves" on public.posts;
-
+-- story_ref has no insert grant, so the old insert path can never set it.
 create function public.publish_post(
   p_body text,
   p_sport text default null,

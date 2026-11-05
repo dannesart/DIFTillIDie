@@ -79,7 +79,7 @@ A post keeps the Story it's about for good, frozen when it was published. The RS
 - The browser can choose *which* signed Story to attach, but can't change a word of it.
 
 **Atomic.**
-- Publishing is `publish_post()` only, one function and one transaction. Direct inserts into `posts` are closed.
+- Publishing is `publish_post()` only, one function and one transaction. Direct inserts into `posts` are closed by a second migration, [`20261105090100_close_direct_post_inserts.sql`](../supabase/migrations/20261105090100_close_direct_post_inserts.sql), applied after the app is deployed (see [Deploying](#deploying-frozen-story-references)).
 - The post and its frozen Story are written together or not at all. A refused capture publishes nothing, and the composer keeps the text and says so.
 - A Story is never silently dropped from a post.
 
@@ -94,7 +94,7 @@ A post keeps the Story it's about for good, frozen when it was published. The RS
 **Keys.**
 - The server side is `NUXT_STORY_CAPTURE_KEY_ID` and `NUXT_STORY_CAPTURE_KEY`: `runtimeConfig.storyCapture`, server-only and never under `public`.
 - The database side is `select vault.create_secret('<same secret>', 'story_capture_key:<same id>')`.
-- **Rotation:** add a new id in both places, switch the server to it, and remove the old secret from Vault once no page still holds old captures (a day is plenty). Removing it only stops new attachments signed with it; posts already published keep their frozen Story.
+- Rotating or revoking a key: see [Signing keys](#signing-keys).
 
 **Posts from before 2026-11-05.**
 - These have a bare `story_id` and no `story_ref`, and nothing is invented for them.
@@ -243,6 +243,57 @@ Posts need visible authors, which the profiles migration anticipated ("public di
 - **Device A, signed in:** a failed publish keeps the text; "Publicerar…" with nothing shown early; confirmed, the post appears; a Story post with its Story attached.
 - **Device B, anonymous:** sees both posts with name and handle, with no delete button and no session.
 - **Deletion:** A deletes one post; B sees it gone after "Hämta nya inlägg".
+
+## Deploying frozen Story references
+
+The change is two migrations around one app deploy. Applying the closing migration before the new app is live would stop the live app from publishing; the order below never does.
+
+| Step | What | Who publishes how |
+|---|---|---|
+| 0 | `main` contains `20261105090000` and `20261105090100`, **not yet deployed** | old app: direct insert |
+| 1 | Apply `20261105090000_post_story_refs.sql` only (adds the column, check and `publish_post()`) | old app: direct insert, still works |
+| 2 | Choose a key id and a secret (`openssl rand -hex 32`). Put it in **Vault**: `select vault.create_secret('<secret>', 'story_capture_key:<id>')`; and in **Netlify** (server only, never `NUXT_PUBLIC_`): `NUXT_STORY_CAPTURE_KEY_ID`, `NUXT_STORY_CAPTURE_KEY` | old app |
+| 3 | Deploy the new app (it uses `publish_post()`; a new deploy also clears the CDN's cached pages and `/api/news`). Check that `/api/news` Stories carry `capture` | new app: `publish_post()`; old tabs until reloaded: direct insert, still works |
+| 4 | Run `npm run test:acceptance` against it, except the direct-insert check, which passes only after step 5 | new app |
+| 5 | Apply `20261105090100_close_direct_post_inserts.sql`, then run `supabase/tests/*.test.sql` and `npm run test:acceptance` again (all green) | new app only |
+
+- **Between steps 1 and 5**, an old tab can still post a Story the old way: a bare `story_id`, like the posts from before. That's honest and harmless; it can't write a frozen Story (`story_ref` has no insert grant).
+- **Old tabs after step 5** get "Ditt konto kan inte publicera just nu"; their text stays. Reloading fixes it. Wait at least the CDN's 10 minutes after step 3 before step 5.
+- Steps 1 and 5 are separate entries in the migration history. With the Supabase CLI, apply step 1 by pushing while only that file is new, or run it in the SQL editor and record it with `supabase migration repair --status applied 20261105090000`; then the same for step 5.
+
+**Recovery.**
+
+| Something wrong after… | Do |
+|---|---|
+| step 1 | Nothing to undo: it only adds. Leave it. Don't drop `story_ref` once any post has one. |
+| step 2 | A wrong key only means Stories can't be attached (publishing says so). Fix the value in Vault or Netlify and redeploy. |
+| step 3 (before step 5) | Roll back the Netlify deploy ("Publish deploy" on the previous one). The old app keeps working, since direct inserts are still open. Posts published meanwhile keep their frozen Story, and the old app shows them like posts from before. |
+| step 5 | First run [`supabase/rollback/20261105090100_close_direct_post_inserts.down.sql`](../supabase/rollback/20261105090100_close_direct_post_inserts.down.sql) in the SQL editor: it restores the old insert grant and policy and changes no rows. Then roll back the Netlify deploy. When the new app is back, re-apply the closing migration's statements by hand (the CLI still lists it as applied). |
+
+## Signing keys
+
+The key only matters **when a post is published**: `publish_post()` checks the signature then, and never again. Reading a post never touches a key, so frozen Stories stay readable whatever happens to keys later. Each frozen Story records its `kid`.
+
+Captures signed with a key live on in:
+- **the CDN:** `/` (5 min) and `/api/news` (10 min). A new deploy clears both.
+- **open tabs:** a tab keeps the news it loaded until it's reloaded, so for days if left open. The service worker caches no content.
+
+**Planned rotation (old key → new key):**
+1. Add the new key to Vault: `select vault.create_secret('<new secret>', 'story_capture_key:<new id>')`. Both keys are now accepted.
+2. Set `NUXT_STORY_CAPTURE_KEY_ID` and `NUXT_STORY_CAPTURE_KEY` in Netlify to the new pair and redeploy. New captures use the new key, and the CDN starts fresh.
+3. Leave the old key in Vault for a grace period, say 7 days, so open tabs can still attach.
+4. Then remove it: `delete from vault.secrets where name = 'story_capture_key:<old id>'`. A tab that still holds an old capture now gets "Storyn gick inte att bifoga just nu…" with its text kept; reloading fixes it.
+
+**A compromised key** (someone could sign made-up headlines):
+1. Remove it from Vault at once: `delete from vault.secrets where name = 'story_capture_key:<id>'`. From that moment nothing signed with it is accepted.
+2. Add a new key and redeploy, as in planned rotation steps 1 and 2. Until then, Stories can't be attached; publishing without one works.
+3. Review what was published with it since the suspected leak:
+   ```sql
+   select id, author_id, created_at, story_ref -> 'sources' -> 0 ->> 'headline' as headline
+   from public.posts where story_ref ->> 'kid' = '<id>' and created_at > '<suspected leak time>'
+   order by created_at;
+   ```
+   Compare the headlines and links with the publishers' sites. Delete a forged post as its author, or in the SQL editor; posts can't be edited. Genuine ones stay as they are.
 
 ## Manual two-device test plan (after applying the migration)
 

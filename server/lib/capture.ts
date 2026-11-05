@@ -23,16 +23,27 @@ export interface CaptureKey { kid: string, secret: string }
 /** Sources a frozen reference may hold; Stories are a handful of articles. */
 export const MAX_SOURCES = 20
 
+/**
+ * At most MAX_SOURCES, oldest first as in the Story, and always including
+ * the lead: if it's beyond the limit, it takes the last place.
+ */
+export function sourcesToFreeze(story: Story): Story['sources'] {
+  const lead = story.sources.find(a => a.id === story.leadId) ?? story.sources[0]!
+  const first = story.sources.slice(0, MAX_SOURCES)
+  return first.includes(lead) ? first : [...first.slice(0, MAX_SOURCES - 1), lead]
+}
+
 export function freezeStory(story: Story, kid: string, feeds: Pick<FeedStatus, 'id' | 'fetchedAt'>[]): FrozenStory {
   const fetched = new Map(feeds.map(f => [f.id, f.fetchedAt]))
-  const keyOf = new Map(story.sources.map(a => [a.id, articleKey(a.url)]))
+  const sources = sourcesToFreeze(story)
+  const lead = story.sources.find(a => a.id === story.leadId) ?? story.sources[0]!
   return {
     v: 1,
     kid,
     storyId: story.id,
-    leadKey: keyOf.get(story.leadId) ?? keyOf.get(story.sources[0]!.id)!,
-    sources: story.sources.slice(0, MAX_SOURCES).map(a => ({
-      key: keyOf.get(a.id)!,
+    leadKey: articleKey(lead.url),
+    sources: sources.map(a => ({
+      key: articleKey(a.url),
       id: a.id,
       ...(a.legacyId ? { legacyId: a.legacyId } : {}),
       sourceId: a.sourceId,

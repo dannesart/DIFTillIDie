@@ -48,6 +48,19 @@ describe('the capture of a Story', () => {
     expect(freezeStory(story(many), 'k1', []).sources).toHaveLength(MAX_SOURCES)
   })
 
+  it('the lead is always among them, even beyond the limit (regression)', () => {
+    const many = Array.from({ length: 25 }, (_, i) => art(`https://e.se/${i}`))
+    for (const leadAt of [0, 19, 20, 24]) {
+      const f = freezeStory(story(many, many[leadAt]!.id), 'k1', [])
+      expect(f.sources).toHaveLength(MAX_SOURCES)
+      expect(f.sources.filter(s => s.key === f.leadKey).map(s => s.id), `lead at ${leadAt}`).toEqual([many[leadAt]!.id])
+      // Otherwise the Story's own order, oldest first, without duplicates.
+      expect(new Set(f.sources.map(s => s.key)).size).toBe(MAX_SOURCES)
+    }
+    const f = freezeStory(story(many, many[24]!.id), 'k1', [])
+    expect(f.sources.map(s => s.id)).toEqual([...many.slice(0, 19), many[24]!].map(a => a.id))
+  })
+
   it('no key: no captures, so nothing can be attached as if it were verified', () => {
     expect(withCaptures([story([a])], null, [])[0]!.capture).toBeUndefined()
     expect(withCaptures([story([a])], KEY, [])[0]!.capture?.sig).toMatch(/^[0-9a-f]{64}$/)

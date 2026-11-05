@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { FrozenStory, SourceArticle, Story, StoryCapture } from '../shared/types/domain'
+import { toCommunityPost } from '../app/lib/posts'
 import { captureStory, signCapture } from '../server/lib/capture'
 import { articleId, articleKey, legacyArticleId } from '../server/lib/news'
 import type { Db } from './db/supabase-harness'
@@ -68,6 +71,14 @@ describe('publishing with a Story', () => {
     const cap = captureStory(story([art('https://example.se/å', 'Ålänningen öppnar: ”Härligt” – 💙❤️💛')]), KEY, FEEDS)
     expect((await db.query<{ sig: string }>(`select encode(extensions.hmac($1, $2, 'sha256'), 'hex') as sig`, [cap.data, KEY.secret])).rows[0]!.sig).toBe(cap.sig)
     expect(await codeOf(publish('Heja', cap))).toBe('ok')
+  })
+
+  it('a big Story whose lead is past the 20-source limit still attaches, lead included', async () => {
+    const many = Array.from({ length: 25 }, (_, i) => art(`https://e.se/many/${i}`, `Rubrik ${i}`))
+    const big = { ...story(many), leadId: many[24]!.id }
+    const { rows: [post] } = await publish('Stor Story', captureStory(big, KEY, FEEDS))
+    const ref = post!.story_ref!
+    expect([ref.sources.length, ref.sources.find(s => s.key === ref.leadKey)?.headline]).toEqual([20, 'Rubrik 24'])
   })
 
   it('without a Story, as before', async () => {
@@ -225,6 +236,96 @@ describe('posts from before this migration', () => {
     // A new post can't take that shortcut: a Story without a frozen reference is refused outright.
     expect(await codeOf(old.query(`insert into public.posts (author_id, body, story_id) values ($1, 'Ny', 'story-x')`, [HASSE]))).toBe('23514')
     await old.close()
+  })
+})
+
+describe('the response the app gets through PostgREST', () => {
+  /*
+   * What PostgREST (v12) runs for the app's call,
+   *   rpc('publish_post', args).select(POST_COLUMNS).single(),
+   * reduced to its shape: the function in a CTE, the author embedded with a
+   * lateral join through posts_author_id_fkey, all in ONE statement and as
+   * the caller's role. That's where a first-time poster could come back
+   * without an author (the "has posted" policy can't see a row inserted in
+   * the same statement); the own-profile policy is what makes it visible.
+   */
+  const PGRST_CALL = `
+    with pgrst_source as (
+      select pgrst_call.* from public.publish_post(p_body := $1, p_sport := $2, p_story := $3, p_story_sig := $4) pgrst_call
+    )
+    select coalesce((json_agg(t) -> 0)::text, 'null') as body
+    from (
+      select s.id, s.body, s.sport, s.story_id, s.story_ref, s.created_at, row_to_json(a.*)::jsonb as author
+      from pgrst_source s
+      left join lateral (
+        select p.id, p.display_name, p.handle from public.profiles p where p.id = s.author_id
+      ) a on true
+    ) t`
+
+  it('a first-time poster gets the post back with its author and frozen Story, as the app reads it', async () => {
+    const cap = captureStory(story([A, B]), KEY, FEEDS)
+    const { rows } = await as(db, 'authenticated', LOTTA, () => db.query<{ body: string }>(PGRST_CALL, ['Första gången', 'fotboll', cap.data, cap.sig]))
+    const json = JSON.parse(rows[0]!.body)
+    expect(json).toEqual({
+      id: expect.any(String), body: 'Första gången', sport: 'fotboll', story_id: `story-${A.id}`,
+      story_ref: JSON.parse(cap.data), created_at: expect.any(String),
+      author: { id: LOTTA, display_name: 'Lotta', handle: 'lotta_g' },
+    })
+    const post = toCommunityPost(json)
+    expect(post).toMatchObject({ author: { id: LOTTA, name: 'Lotta', handle: 'lotta_g' }, storyId: `story-${A.id}`, storyRef: JSON.parse(cap.data) })
+  })
+
+  it('without a Story: the same shape, story fields null', async () => {
+    const { rows } = await as(db, 'authenticated', HASSE, () => db.query<{ body: string }>(PGRST_CALL, ['Bara snack', null, null, null]))
+    expect(toCommunityPost(JSON.parse(rows[0]!.body))).toMatchObject({ storyId: undefined, storyRef: undefined, author: { handle: 'hovethasse' } })
+  })
+
+  it('anyone then reads it, with the author and the frozen Story, through the feed query', async () => {
+    const cap = captureStory(story([A]), KEY, FEEDS)
+    await as(db, 'authenticated', LOTTA, () => db.query(PGRST_CALL, ['Läs mig', null, cap.data, cap.sig]))
+    const { rows } = await as(db, 'anon', null, () => db.query<{ handle: string, story_ref: FrozenStory }>(
+      `select p.story_ref, a.handle from public.posts p left join lateral (select handle from public.profiles where id = p.author_id) a on true`))
+    expect(rows).toEqual([{ handle: 'lotta_g', story_ref: JSON.parse(cap.data) }])
+  })
+})
+
+describe('deploying in two steps, and recovering', () => {
+  const CLOSE = '20261105090100_close_direct_post_inserts.sql'
+  const oldWay = (d: Db, body: string, storyId: string | null = null) =>
+    as(d, 'authenticated', HASSE, () => d.query(`insert into public.posts (body, story_id) values ($1, $2)`, [body, storyId]))
+  const newWay = (d: Db, body: string, cap?: StoryCapture) =>
+    as(d, 'authenticated', HASSE, () => d.query('select id from public.publish_post($1, null, $2, $3)', [body, cap?.data ?? null, cap?.sig ?? null]))
+  async function withHasse(d: Db) {
+    await d.exec(`insert into auth.users (id) values ('${HASSE}')`)
+    await as(d, 'authenticated', HASSE, () => d.query(`insert into public.profiles (id, display_name, handle) values ($1, 'Hasse', 'hovethasse')`, [HASSE]))
+    await d.query(`select vault.create_secret($1, 'story_capture_key:' || $2)`, [KEY.secret, KEY.kid])
+  }
+
+  it('step 1 only adds: the live (old) app keeps publishing, the new app already can', async () => {
+    const d = await createSupabaseLikeDb({ stopBefore: CLOSE })
+    await withHasse(d)
+    expect(await codeOf(oldWay(d, 'Gamla appen', `story-${A.legacyId}`))).toBe('ok')
+    expect(await codeOf(newWay(d, 'Nya appen', captureStory(story([A]), KEY, FEEDS)))).toBe('ok')
+    // The old path can never write a frozen Story.
+    expect(await codeOf(as(d, 'authenticated', HASSE, () => d.query(`insert into public.posts (body, story_id, story_ref) values ('x', 'story-x', '{"storyId":"story-x"}')`)))).toBe('42501')
+    await d.close()
+  })
+
+  it('step 2 closes the old path; the recovery script reopens it without touching any post', async () => {
+    const d = await createSupabaseLikeDb()
+    await withHasse(d)
+    await newWay(d, 'Med Story', captureStory(story([A, B]), KEY, FEEDS))
+    expect(await codeOf(oldWay(d, 'Gamla appen'))).toBe('42501')
+    const before = (await d.query('select body, story_id, story_ref from public.posts order by body')).rows
+    await d.exec(readFileSync(fileURLToPath(new URL('../supabase/rollback/20261105090100_close_direct_post_inserts.down.sql', import.meta.url)), 'utf8'))
+    expect((await d.query('select body, story_id, story_ref from public.posts order by body')).rows).toEqual(before)
+    // The rolled-back app publishes again, Story or not; the new app still works too.
+    expect(await codeOf(oldWay(d, 'Gamla appen igen', `story-${A.legacyId}`))).toBe('ok')
+    expect(await codeOf(newWay(d, 'Nya appen igen', captureStory(story([A]), KEY, FEEDS)))).toBe('ok')
+    // Re-applying step 2 afterwards works and closes it again.
+    await d.exec(readFileSync(fileURLToPath(new URL(`../supabase/migrations/${CLOSE}`, import.meta.url)), 'utf8'))
+    expect(await codeOf(oldWay(d, 'Stängt igen'))).toBe('42501')
+    await d.close()
   })
 })
 
