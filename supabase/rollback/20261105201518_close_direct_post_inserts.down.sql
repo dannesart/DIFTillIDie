@@ -1,6 +1,6 @@
 -- RECOVERY ONLY. Not a migration: run by hand in the SQL editor if the app
 -- that publishes through publish_post() has to be rolled back after
--- 20261105190000_close_direct_post_inserts was applied. It restores the
+-- 20261105201518_close_direct_post_inserts was applied. It restores the
 -- old way of publishing exactly as 20261103144226_posts.sql defined it.
 --
 -- Safe with data: it changes no rows. Posts published meanwhile keep their

@@ -290,7 +290,7 @@ describe('the response the app gets through PostgREST', () => {
 })
 
 describe('deploying in two steps, and recovering', () => {
-  const CLOSE = '20261105190000_close_direct_post_inserts.sql'
+  const CLOSE = '20261105201518_close_direct_post_inserts.sql'
   const oldWay = (d: Db, body: string, storyId: string | null = null) =>
     as(d, 'authenticated', HASSE, () => d.query(`insert into public.posts (body, story_id) values ($1, $2)`, [body, storyId]))
   const newWay = (d: Db, body: string, cap?: StoryCapture) =>
@@ -317,7 +317,7 @@ describe('deploying in two steps, and recovering', () => {
     await newWay(d, 'Med Story', captureStory(story([A, B]), KEY, FEEDS))
     expect(await codeOf(oldWay(d, 'Gamla appen'))).toBe('42501')
     const before = (await d.query('select body, story_id, story_ref from public.posts order by body')).rows
-    await d.exec(readFileSync(fileURLToPath(new URL('../supabase/rollback/20261105190000_close_direct_post_inserts.down.sql', import.meta.url)), 'utf8'))
+    await d.exec(readFileSync(fileURLToPath(new URL('../supabase/rollback/20261105201518_close_direct_post_inserts.down.sql', import.meta.url)), 'utf8'))
     expect((await d.query('select body, story_id, story_ref from public.posts order by body')).rows).toEqual(before)
     // The rolled-back app publishes again, Story or not; the new app still works too.
     expect(await codeOf(oldWay(d, 'Gamla appen igen', `story-${A.legacyId}`))).toBe('ok')

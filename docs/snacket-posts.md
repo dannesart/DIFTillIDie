@@ -79,7 +79,7 @@ A post keeps the Story it's about for good, frozen when it was published. The RS
 - The browser can choose *which* signed Story to attach, but can't change a word of it.
 
 **Atomic.**
-- Publishing is `publish_post()` only, one function and one transaction. Direct inserts into `posts` are closed by a second migration, [`20261105190000_close_direct_post_inserts.sql`](../supabase/migrations/20261105190000_close_direct_post_inserts.sql), applied after the app is deployed (see [Deploying](#deploying-frozen-story-references)).
+- Publishing is `publish_post()` only, one function and one transaction. Direct inserts into `posts` are closed by a second migration, [`20261105201518_close_direct_post_inserts.sql`](../supabase/migrations/20261105201518_close_direct_post_inserts.sql), applied after the app is deployed (see [Deploying](#deploying-frozen-story-references)).
 - The post and its frozen Story are written together or not at all. A refused capture publishes nothing, and the composer keeps the text and says so.
 - A Story is never silently dropped from a post.
 
@@ -250,17 +250,17 @@ The change is two migrations around one app deploy. Applying the closing migrati
 
 | Step | What | Who publishes how |
 |---|---|---|
-| 0 | The repository contains `20261105183401` and `20261105190000`, **not yet deployed** | old app: direct insert |
+| 0 | The repository contains `20261105183401` and `20261105201518`, not yet deployed | old app: direct insert |
 | 1 | Apply `20261105183401_post_story_refs.sql` only (adds the column, check and `publish_post()`). **Done on `djurgarn-dev`, 2026-11-05, recorded as `20261105183401_post_story_refs`**: the Story-reference tests 15/15 and the posts, interactions and profiles tests 93/93 passed there; direct inserts and signed `publish_post()` both work; no test data left | old app: direct insert, still works |
-| 2 | Choose a key id and a secret (`openssl rand -hex 32`). Put it in **Vault**: `select vault.create_secret('<secret>', 'story_capture_key:<id>')`; and in **Netlify** (server only, never `NUXT_PUBLIC_`): `NUXT_STORY_CAPTURE_KEY_ID`, `NUXT_STORY_CAPTURE_KEY` | old app |
-| 3 | Deploy the new app (it uses `publish_post()`; a new deploy also clears the CDN's cached pages and `/api/news`). Check that `/api/news` Stories carry `capture` | new app: `publish_post()`; old tabs until reloaded: direct insert, still works |
-| 4 | Run `npm run test:acceptance` against it, except the direct-insert check, which passes only after step 5 | new app |
-| 5 | Apply `20261105190000_close_direct_post_inserts.sql`, then run `supabase/tests/*.test.sql` and `npm run test:acceptance` again (all green) | new app only |
+| 2 | Choose a key id and a secret (`openssl rand -hex 32`). Put it in **Vault**: `select vault.create_secret('<secret>', 'story_capture_key:<id>')`; and in **Netlify** (server only, never `NUXT_PUBLIC_`): `NUXT_STORY_CAPTURE_KEY_ID`, `NUXT_STORY_CAPTURE_KEY`. **Done: key id `v1`**, in Vault and in Netlify (Functions scope); a real signed post ("Snyggt!") was accepted by `publish_post()` | old app |
+| 3 | Deploy the new app (it uses `publish_post()`; a new deploy also clears the CDN's cached pages and `/api/news`). Check that `/api/news` Stories carry `capture`. **Done: `main` at `aacc230`, deployed to diftillidie.netlify.app**; all 19 live Stories signed with `v1`, and their signatures verify against the same key; the frozen "Snyggt!" attachment renders | new app: `publish_post()`; old tabs until reloaded: direct insert, still works |
+| 4 | Run `npm run test:acceptance` against it, except the direct-insert check, which passes only after step 5. **Not run**: no test-supporter session was available | new app |
+| 5 | Apply `20261105201518_close_direct_post_inserts.sql`, then run `supabase/tests/*.test.sql` and `npm run test:acceptance` again (all green). **Done on `djurgarn-dev`, 2026-11-05, recorded as `20261105201518_close_direct_post_inserts`**: 110/110 hosted security assertions passed; direct inserts closed, `publish_post()` available to supporters; all 6 existing posts and the frozen Story kept; no test data left. `npm run test:acceptance`: not yet run | new app only |
 
 - **Between steps 1 and 5**, an old tab can still post a Story the old way: a bare `story_id`, like the posts from before. That's honest and harmless; it can't write a frozen Story (`story_ref` has no insert grant).
 - **Old tabs after step 5** get "Ditt konto kan inte publicera just nu"; their text stays. Reloading fixes it. Wait at least the CDN's 10 minutes after step 3 before step 5.
 - Steps 1 and 5 are separate entries in the migration history. With the Supabase CLI, apply step 1 by pushing while only that file is new, or run it in the SQL editor and record it with `supabase migration repair --status applied 20261105183401`; then the same for step 5.
-- The file names follow the hosted history: the first migration was renamed to the version Supabase recorded for it (its SQL is unchanged, byte for byte), and the closing one sorts after it, so a fresh database applies them in the same order. The first file's header comment still calls the closing migration by its old name, `20261105090100_…`; it was left as applied.
+- The file names follow the hosted history: both migrations were renamed to the versions Supabase recorded for them, with their contents unchanged byte for byte, so a fresh database applies them in the same order. Their header comments still use earlier names, left as applied: the first calls the closing migration `20261105090100_…`, and the closing one calls the recovery script `20261105190000_…down.sql`. The recovery script is now [`20261105201518_close_direct_post_inserts.down.sql`](../supabase/rollback/20261105201518_close_direct_post_inserts.down.sql).
 
 **Recovery.**
 
@@ -269,7 +269,7 @@ The change is two migrations around one app deploy. Applying the closing migrati
 | step 1 | Nothing to undo: it only adds. Leave it. Don't drop `story_ref` once any post has one. |
 | step 2 | A wrong key only means Stories can't be attached (publishing says so). Fix the value in Vault or Netlify and redeploy. |
 | step 3 (before step 5) | Roll back the Netlify deploy ("Publish deploy" on the previous one). The old app keeps working, since direct inserts are still open. Posts published meanwhile keep their frozen Story, and the old app shows them like posts from before. |
-| step 5 | First run [`supabase/rollback/20261105190000_close_direct_post_inserts.down.sql`](../supabase/rollback/20261105190000_close_direct_post_inserts.down.sql) in the SQL editor: it restores the old insert grant and policy and changes no rows. Then roll back the Netlify deploy. When the new app is back, re-apply the closing migration's statements by hand (the CLI still lists it as applied). |
+| step 5 | First run [`supabase/rollback/20261105201518_close_direct_post_inserts.down.sql`](../supabase/rollback/20261105201518_close_direct_post_inserts.down.sql) in the SQL editor: it restores the old insert grant and policy and changes no rows. Then roll back the Netlify deploy. When the new app is back, re-apply the closing migration's statements by hand (the CLI still lists it as applied). |
 
 ## Signing keys
 
