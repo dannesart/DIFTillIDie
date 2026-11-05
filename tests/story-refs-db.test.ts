@@ -18,7 +18,7 @@ import { applyMigrations, as, codeOf, createSupabaseLikeDb, realDataSnapshot, se
 const HASSE = '22222222-2222-4222-8222-222222222222'
 const LOTTA = '11111111-1111-4111-8111-111111111111'
 const KEY = { kid: 'k1', secret: 'test-secret-not-for-production' }
-const MIGRATION = '20261105090000_post_story_refs.sql'
+const MIGRATION = '20261105183401_post_story_refs.sql'
 
 function art(url: string, headline: string, outlet = 'Sportbladet', publisher = 'Aftonbladet'): SourceArticle {
   return {
@@ -290,7 +290,7 @@ describe('the response the app gets through PostgREST', () => {
 })
 
 describe('deploying in two steps, and recovering', () => {
-  const CLOSE = '20261105090100_close_direct_post_inserts.sql'
+  const CLOSE = '20261105190000_close_direct_post_inserts.sql'
   const oldWay = (d: Db, body: string, storyId: string | null = null) =>
     as(d, 'authenticated', HASSE, () => d.query(`insert into public.posts (body, story_id) values ($1, $2)`, [body, storyId]))
   const newWay = (d: Db, body: string, cap?: StoryCapture) =>
@@ -317,7 +317,7 @@ describe('deploying in two steps, and recovering', () => {
     await newWay(d, 'Med Story', captureStory(story([A, B]), KEY, FEEDS))
     expect(await codeOf(oldWay(d, 'Gamla appen'))).toBe('42501')
     const before = (await d.query('select body, story_id, story_ref from public.posts order by body')).rows
-    await d.exec(readFileSync(fileURLToPath(new URL('../supabase/rollback/20261105090100_close_direct_post_inserts.down.sql', import.meta.url)), 'utf8'))
+    await d.exec(readFileSync(fileURLToPath(new URL('../supabase/rollback/20261105190000_close_direct_post_inserts.down.sql', import.meta.url)), 'utf8'))
     expect((await d.query('select body, story_id, story_ref from public.posts order by body')).rows).toEqual(before)
     // The rolled-back app publishes again, Story or not; the new app still works too.
     expect(await codeOf(oldWay(d, 'Gamla appen igen', `story-${A.legacyId}`))).toBe('ok')

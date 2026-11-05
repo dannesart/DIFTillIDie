@@ -3,7 +3,7 @@
 -- Apply AFTER the app that publishes through publish_post() is deployed
 -- (see "Deploying" in docs/snacket-posts.md); before that, the live app
 -- would lose the ability to publish. Undo, if ever needed:
--- supabase/rollback/20261105090100_close_direct_post_inserts.down.sql.
+-- supabase/rollback/20261105190000_close_direct_post_inserts.down.sql.
 
 revoke insert (body, sport, story_id) on table public.posts from authenticated;
 revoke insert on table public.posts from authenticated;
