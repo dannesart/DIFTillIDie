@@ -6,7 +6,7 @@
     "node": ">=22.22.3 <23 || >=24.15.0"
   },
   "scripts": {
-    "dev": "nuxt dev",
+    "dev": "nuxt dev --port 1891",
     "build": "nuxt build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
