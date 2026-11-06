@@ -13,9 +13,13 @@ const small = useMedia('(max-width: 639px)')
 const visible = computed(() => !!current.value && !playerInView.value && !(typing.value && small.value))
 
 // Back to the playing show's own player — switching the picker to it if needed.
+// (In the app-shell prototype "Lyssna" is a view of its own: go there.)
+const links = useSectionLinks()
 function backToPlayer() {
   if (currentShow.value) selectedShow.value = currentShow.value.id
-  document.getElementById('lyssna')?.scrollIntoView({ behavior: 'smooth' })
+  const el = document.getElementById('lyssna')
+  if (!el && links.value.shell) return void navigateTo(links.value.section('lyssna'))
+  el?.scrollIntoView({ behavior: 'smooth' })
 }
 </script>
 
@@ -32,6 +36,7 @@ function backToPlayer() {
     <aside
       v-if="visible && current"
       class="fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem]"
+      :class="links.shell && 'lg:bottom-3 lg:left-3 lg:right-auto lg:w-[calc(var(--shell-nav-w)-1.5rem)]'"
       aria-label="Spelare"
     >
       <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-navy-900/90 shadow-[0_24px_60px_-24px_rgb(3_9_21/0.95)] backdrop-blur-xl">

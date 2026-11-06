@@ -8,6 +8,7 @@ const auth = useAuth()
 const { status, profile, profileStatus } = auth
 const open = useAccountDialog()
 const editor = useProfileEditor()
+const links = useSectionLinks()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const editing = ref(false)
@@ -110,7 +111,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
           Du publicerar i Snacket på stan med den här profilen. Namn, handle, avatar och text om dig syns för alla när du har skrivit något – din e-postadress aldrig.
         </p>
         <div class="mt-5 flex flex-wrap gap-2">
-          <NuxtLink :to="supporterPath(profile.handle)" class="rounded-full bg-guld px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="open = false">Din läktarplats</NuxtLink>
+          <NuxtLink :to="links.supporter(profile.handle)" class="rounded-full bg-guld px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="open = false">Din läktarplats</NuxtLink>
           <button class="rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold transition hover:border-himmel hover:text-himmel" @click="editing = true">Ändra profil</button>
           <button class="rounded-full px-5 py-2.5 text-sm font-bold text-krita-dim transition hover:text-krita" @click="signOut">Logga ut</button>
         </div>

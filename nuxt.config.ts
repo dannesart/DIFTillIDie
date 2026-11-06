@@ -4,7 +4,8 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-10-01',
   devtools: { enabled: false },
 
-  modules: ['@nuxt/fonts'],
+  // The app-shell prototype's routes exist only in development (see the module).
+  modules: ['@nuxt/fonts', './modules/app-shell-preview'],
   css: ['~/assets/css/main.css'],
 
   vite: {

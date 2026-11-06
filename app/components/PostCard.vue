@@ -8,22 +8,23 @@ import { frozenLead } from '~/lib/posts'
  * @handle inserts a mention, where there is a composer to insert it into.
  * On a supporter's own wall: `onWall` (no link to the page you're on, and
  * no mention buttons, since there's no composer there).
+ * `noMentions` alone: links, but no mention buttons (a preview without a composer).
  */
-const props = defineProps<{ post: FeedPost, onWall?: boolean }>()
+const props = defineProps<{ post: FeedPost, onWall?: boolean, noMentions?: boolean }>()
 const emit = defineEmits<{ mention: [handle: string], removed: [id: string] }>()
 
 const { filter, community } = useSnacket()
 const { show } = useStorySpotlight()
-const route = useRoute()
-const authorPath = computed(() => supporterPath(props.post.author.handle))
+const links = useSectionLinks()
+const authorPath = computed(() => links.value.supporter(props.post.author.handle))
 
-// Tags and Stories live on the front page: from elsewhere, go there first.
+// Tags and Stories live on the front page (or their own view): from elsewhere, go there first.
 async function showTag(tag: string) {
   filter.value = { tag: tag.toLowerCase() }
-  if (route.path !== '/') await navigateTo('/#snacket')
+  if (!links.value.shows('snacket')) await navigateTo(links.value.section('snacket'))
 }
 async function showStory(id: string) {
-  if (route.path !== '/') await navigateTo(`/#${id}`)
+  if (!links.value.shows('stories')) await navigateTo(links.value.shell ? `${links.value.section('stories')}#${id}` : `/#${id}`)
   show(id)
 }
 const { stories, status: newsStatus } = useNews()
@@ -68,7 +69,7 @@ async function remove() {
         <p class="flex flex-wrap items-baseline gap-x-2">
           <span v-if="onWall" class="font-semibold">{{ post.author.name }}</span>
           <NuxtLink v-else :to="authorPath" class="font-semibold underline-offset-2 hover:text-himmel hover:underline" :title="`${post.author.name} på läktaren`">{{ post.author.name }}</NuxtLink>
-          <span v-if="onWall" class="text-sm text-krita-dim">@{{ post.author.handle }}</span>
+          <span v-if="onWall || noMentions" class="text-sm text-krita-dim">@{{ post.author.handle }}</span>
           <button v-else class="text-sm text-krita-dim hover:text-himmel" :title="`Nämn @${post.author.handle}`" @click="emit('mention', post.author.handle)">@{{ post.author.handle }}</button>
         </p>
         <p class="text-xs text-krita-dim">
@@ -88,7 +89,7 @@ async function remove() {
 
     <p class="mt-3 whitespace-pre-line text-[1.02rem] leading-relaxed">
       <template v-for="(t, i) in tokens" :key="i">
-        <span v-if="t.type === 'mention' && onWall" class="font-semibold text-himmel">@{{ t.value }}</span>
+        <span v-if="t.type === 'mention' && (onWall || noMentions)" class="font-semibold text-himmel">@{{ t.value }}</span>
         <button v-else-if="t.type === 'mention'" class="font-semibold text-himmel hover:underline" :title="`Svara @${t.value}`" @click="emit('mention', t.value)">@{{ t.value }}</button>
         <button v-else-if="t.type === 'tag'" class="font-semibold text-guld hover:underline" @click="showTag(t.value)">#{{ t.value }}</button>
         <template v-else>{{ t.value }}</template>
