@@ -51,6 +51,27 @@ export function startPostDraft(d: PostDraft, browsing: { sport?: Sport, storyId?
   return { body: d.body, sport: d.sport ?? browsing.sport, storyId: browsing.storyId || undefined }
 }
 
+/**
+ * Throwing a draft away on purpose: its text and attached Story go; the
+ * sport stays as the next default, as after publishing. What's left isn't
+ * worth keeping, so writing it removes the stored draft. The Story is
+ * cleared explicitly, so it also goes when this is merged into a draft
+ * (useCompose's setPost).
+ */
+export const discardPostDraft = (d: PostDraft): PostDraft => ({ body: '', sport: d.sport, storyId: undefined })
+
+/**
+ * What the compact entry shows of a draft worth keeping (keepsPostDraft):
+ * its text, or, for a draft that's only an attached Story, that Story.
+ * Null when there's no draft to show.
+ */
+export function postDraftPreview(d: PostDraft, storyHeadline?: string): string | null {
+  if (!keepsPostDraft(d)) return null
+  const text = d.body.trim()
+  if (text) return text
+  return storyHeadline ? `Om: ${storyHeadline}` : 'En Story bifogad'
+}
+
 /** Adds `@handle ` at the end, ready to write after; a handle already mentioned isn't added twice. */
 export function withMention(body: string, handle: string) {
   const tag = `@${handle}`

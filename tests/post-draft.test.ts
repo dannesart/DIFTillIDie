@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emptyPostDraft, keepsPostDraft, POST_DRAFT_KEY, readPostDraft, startPostDraft, withMention, writePostDraft } from '../app/lib/postDraft'
+import { discardPostDraft, emptyPostDraft, keepsPostDraft, POST_DRAFT_KEY, postDraftPreview, readPostDraft, startPostDraft, withMention, writePostDraft } from '../app/lib/postDraft'
 
 /*
  * Mission #18: the Snacket post written in the compose dialog survives
@@ -127,5 +127,64 @@ describe('an @mention, ready to use', () => {
 
   it('a longer handle that starts the same is someone else', () => {
     expect(withMention('Hej @jarnmannen2', 'jarnmannen')).toBe('Hej @jarnmannen2 @jarnmannen ')
+  })
+})
+
+describe('throwing a draft away (Släng utkast)', () => {
+  const STORY_DRAFTS = 'djurgarn:drafts:v1'
+
+  it('the text and the Story go; the sport stays as the next default', () => {
+    expect(discardPostDraft({ body: 'Halvskrivet', sport: 'hockey', storyId: 'story-1' })).toEqual({ body: '', sport: 'hockey' })
+    expect(keepsPostDraft(discardPostDraft({ body: 'x', storyId: 'story-1' }))).toBe(false)
+  })
+
+  it('removes this account’s stored draft, and only that', () => {
+    const s = memoryStorage({ [`${STORY_DRAFTS}:${HASSE}`]: JSON.stringify({ 'story-9': 'Om derbyt…' }) })
+    writePostDraft(s, HASSE, { body: 'Hasses', sport: 'fotboll', storyId: 'story-1' })
+    writePostDraft(s, LOTTA, { body: 'Lottas' })
+    writePostDraft(s, HASSE, discardPostDraft(readPostDraft(s, HASSE)))
+    expect(readPostDraft(s, HASSE)).toEqual(emptyPostDraft())
+    // Another account's draft, and this account's Story drafts, are untouched.
+    expect(readPostDraft(s, LOTTA).body).toBe('Lottas')
+    expect(JSON.parse(s.data[`${STORY_DRAFTS}:${HASSE}`]!)).toEqual({ 'story-9': 'Om derbyt…' })
+    expect(s.data[`${POST_DRAFT_KEY}:${HASSE}`]).toBeUndefined()
+  })
+
+  it('applied the way the store applies changes (merged into the draft), the Story still goes', () => {
+    // Regression: a discard without a storyId key left the attached Story in place.
+    const draft = { body: '', sport: 'fotboll' as const, storyId: 'story-1' }
+    const merged = { ...draft, ...discardPostDraft(draft) }
+    expect(merged.storyId).toBeUndefined()
+    expect(keepsPostDraft(merged)).toBe(false)
+  })
+
+  it('a draft that is only an attached Story is thrown away too', () => {
+    const s = memoryStorage()
+    writePostDraft(s, HASSE, { body: '', storyId: 'story-1' })
+    expect(readPostDraft(s, HASSE).storyId).toBe('story-1')
+    writePostDraft(s, HASSE, discardPostDraft(readPostDraft(s, HASSE)))
+    expect(s.data).toEqual({})
+  })
+
+  it('the next post starts fresh from what you’re browsing, with the sport kept', () => {
+    const after = discardPostDraft({ body: 'Slängt', sport: 'hockey', storyId: 'story-1' })
+    expect(startPostDraft(after, { sport: 'fotboll', storyId: 'story-2' })).toEqual({ body: '', sport: 'hockey', storyId: 'story-2' })
+  })
+})
+
+describe('what the compact entry shows of a draft', () => {
+  it('its text', () => {
+    expect(postDraftPreview({ body: '  Vilken match!  ', storyId: 'story-1' }, 'Derbyt')).toBe('Vilken match!')
+  })
+
+  it('a draft that is only an attached Story is still a draft', () => {
+    expect(postDraftPreview({ body: '', storyId: 'story-1' }, 'Derbyt avgjort')).toBe('Om: Derbyt avgjort')
+    expect(postDraftPreview({ body: ' ', storyId: 'story-1' })).toBe('En Story bifogad')
+  })
+
+  it('nothing worth keeping: no draft (a sport alone is only a default)', () => {
+    expect(postDraftPreview(emptyPostDraft())).toBeNull()
+    expect(postDraftPreview({ body: '  ', sport: 'hockey' })).toBeNull()
+    expect(postDraftPreview(discardPostDraft({ body: 'x', sport: 'hockey', storyId: 's' }), 'Derbyt')).toBeNull()
   })
 })

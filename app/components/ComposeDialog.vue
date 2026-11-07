@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keepsPostDraft } from '~/lib/postDraft'
 import { postAnchor, revealPost } from '~/lib/reveal'
 
 /*
@@ -13,7 +14,7 @@ import { postAnchor, revealPost } from '~/lib/reveal'
  * loses one. While a post is on its way it can't be closed, so its result
  * (published, or an error with the text kept) always lands here.
  */
-const { activeId, postOpen, post, postResumed, draftFor, setDraft, setPost, close } = useCompose()
+const { activeId, postOpen, post, postResumed, draftFor, setDraft, setPost, discardPost, close } = useCompose()
 const { stories } = useNews()
 const { postsForStory, filter, identity } = useSnacket()
 const { publishing } = useCommunity()
@@ -33,6 +34,39 @@ const draft = computed({
   set: v => activeId.value && setDraft(activeId.value, v),
 })
 
+/*
+ * "Släng utkast": the one way to lose a Snacket draft on purpose (closing
+ * always keeps it). Asked first, with "Behåll" focused; Escape there just
+ * keeps it. Never while a post is on its way.
+ */
+const discarding = ref(false)
+/** What screen readers last heard about the draft. */
+const draftNews = ref('')
+const discardAsk = useTemplateRef<HTMLButtonElement>('discardAsk')
+const discardNo = useTemplateRef<HTMLButtonElement>('discardNo')
+
+function askDiscard() {
+  if (publishing.value) return
+  discarding.value = true
+  draftNews.value = ''
+  nextTick(() => discardNo.value?.focus())
+}
+
+function keepDraft() {
+  discarding.value = false
+  nextTick(() => discardAsk.value?.focus())
+}
+
+function confirmDiscard() {
+  if (publishing.value) return
+  discardPost()
+  discarding.value = false
+  restored.value = false
+  draftNews.value = 'Utkastet är slängt.'
+  // The buttons are gone with the draft: back to writing, in the now empty text.
+  nextTick(() => composer.value?.focus())
+}
+
 const restored = ref(false)
 const published = ref<{ id: string, text: string } | null>(null)
 let opener: HTMLElement | null = null
@@ -40,6 +74,8 @@ let opener: HTMLElement | null = null
 watch(mode, async (now, before) => {
   const el = dialog.value
   if (!el) return
+  discarding.value = false
+  draftNews.value = ''
   if (now) {
     published.value = null
     restored.value = now === 'story' ? !!draft.value : postResumed.value
@@ -90,6 +126,7 @@ function onClick(e: MouseEvent) {
 }
 
 function onPublished(id: string, text: string) {
+  discarding.value = false
   published.value = { id, text }
   // The composer already emptied the Snacket draft (text and Story); the sport stays for next time.
   if (activeId.value) setDraft(activeId.value, '')
@@ -170,6 +207,16 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
           />
           <div class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-krita-dim">
             <p id="compose-note">Ditt utkast sparas medan du skriver. Publicerade inlägg syns för alla i Snacket på stan.</p>
+            <!-- Throwing the Snacket draft away, on purpose: asked first, never while it's being published -->
+            <template v-if="mode === 'post' && identity.kind !== 'guest' && (discarding || keepsPostDraft(post))">
+              <span v-if="discarding" role="group" aria-labelledby="discard-question" class="flex flex-wrap items-center gap-x-3 gap-y-1" @keydown.esc.prevent.stop="keepDraft">
+                <span id="discard-question" class="font-semibold text-krita">Släng utkastet för gott?</span>
+                <button ref="discardYes" type="button" class="font-bold text-rod hover:underline disabled:opacity-40" :disabled="publishing" @click="confirmDiscard">Släng utkast</button>
+                <button ref="discardNo" type="button" class="font-semibold hover:text-krita disabled:opacity-40" :disabled="publishing" @click="keepDraft">Behåll</button>
+              </span>
+              <button v-else ref="discardAsk" type="button" class="font-semibold hover:text-rod disabled:opacity-40" :disabled="publishing" @click="askDiscard">Släng utkast</button>
+            </template>
+            <span class="sr-only" role="status">{{ draftNews }}</span>
             <button v-if="earlier.length && mode === 'story'" class="font-semibold hover:text-krita" @click="toSnacket">
               {{ earlier.length }} {{ earlier.length === 1 ? 'inlägg' : 'inlägg' }} om detta →
             </button>

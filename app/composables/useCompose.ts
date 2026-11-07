@@ -2,7 +2,7 @@ import type { Sport } from '#shared/types/domain'
 import type { LocalOwner } from '~/lib/localScope'
 import { readScoped, scopedKey } from '~/lib/localScope'
 import type { PostDraft } from '~/lib/postDraft'
-import { emptyPostDraft, readPostDraft, startPostDraft, withMention, writePostDraft } from '~/lib/postDraft'
+import { discardPostDraft, emptyPostDraft, readPostDraft, startPostDraft, withMention, writePostDraft } from '~/lib/postDraft'
 
 /*
  * Writing happens in one shared dialog (ComposeDialog), in one of two ways:
@@ -80,10 +80,17 @@ export function useCompose() {
   /** Reply to someone: their @handle in the Snacket draft, ready to write after. */
   const mention = (handle: string, browsing: { sport?: Sport, storyId?: string } = {}) => openPost(browsing, handle)
 
+  /**
+   * Throw the Snacket draft away (text and Story; the sport stays), here and
+   * in this account's storage. Other accounts' drafts and the Story drafts
+   * are untouched.
+   */
+  const discardPost = () => setPost(discardPostDraft(post.value))
+
   const close = () => {
     activeId.value = null
     postOpen.value = false
   }
 
-  return { activeId, drafts, postOpen, post, postResumed, load, draftFor, setDraft, setPost, open, openPost, mention, close }
+  return { activeId, drafts, postOpen, post, postResumed, load, draftFor, setDraft, setPost, discardPost, open, openPost, mention, close }
 }
