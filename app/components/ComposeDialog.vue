@@ -124,12 +124,13 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
     @close="onClose"
     @click="onClick"
   >
-    <div v-if="mode" class="relative flex max-h-[inherit] flex-col overflow-hidden">
+    <div v-if="mode" class="relative flex min-h-0 flex-1 flex-col">
       <div class="stripes h-1.5 shrink-0 [--stripe:10px]" aria-hidden="true" />
       <!-- Grab handle on phones -->
-      <div class="mx-auto mt-2 h-1 w-10 rounded-full bg-white/20 sm:hidden" aria-hidden="true" />
+      <div class="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/20 sm:hidden" aria-hidden="true" />
 
-      <div class="overflow-y-auto overscroll-contain px-5 pb-5 pt-3 sm:px-7 sm:pb-7 sm:pt-5">
+      <!-- The one scrolling area: the Story picker's results scroll with it, its search stays on top -->
+      <div class="dialog-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-3 sm:px-7 sm:pb-7 sm:pt-5">
         <div class="flex items-center justify-between gap-3">
           <h2 id="compose-title" class="kicker text-guld">
             {{ published ? 'Publicerat' : mode === 'story' ? 'Snacka om detta' : 'Snacka om det' }}
@@ -211,6 +212,12 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
   border-radius: 1.5rem 1.5rem 0 0;
   background: var(--color-navy-900);
   box-shadow: 0 -24px 80px -20px rgb(3 9 21 / 0.9);
+  /* Never a scrollbar of its own: its content is a column whose body scrolls. */
+  overflow: hidden;
+}
+.compose-dialog[open] {
+  display: flex;
+  flex-direction: column;
 }
 @media (min-width: 640px) {
   /* Desktop: a centred card */

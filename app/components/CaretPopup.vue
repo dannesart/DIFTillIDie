@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
     -->
     <div
       ref="el"
-      class="fixed z-[60] overflow-y-auto overscroll-contain rounded-2xl border border-white/12 bg-navy-950/95 p-1 shadow-[0_24px_60px_-20px_rgb(3_9_21/0.95)] backdrop-blur-xl"
+      class="dialog-scroll fixed z-[60] overflow-y-auto overscroll-contain rounded-2xl border border-white/12 bg-navy-950/95 p-1 shadow-[0_24px_60px_-20px_rgb(3_9_21/0.95)] backdrop-blur-xl"
       :style="style"
       :data-side="place?.side"
       @mousedown.prevent

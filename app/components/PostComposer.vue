@@ -209,7 +209,7 @@ defineExpose({ focus })
           :rows="aboutStory ? 3 : 4"
           :placeholder="prompt"
           :readonly="publishing"
-          class="w-full resize-none bg-transparent leading-relaxed placeholder:text-krita-dim/70 focus:outline-none"
+          class="dialog-scroll w-full resize-none bg-transparent leading-relaxed placeholder:text-krita-dim/70 focus:outline-none"
           :class="aboutStory ? 'pt-1 text-[0.95rem]' : 'pt-2.5 text-base'"
           :aria-describedby="hintId"
           aria-autocomplete="list"

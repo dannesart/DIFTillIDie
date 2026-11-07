@@ -5,7 +5,8 @@ import { matchStories, moveActive } from '~/lib/storyLookup'
 /*
  * "Bifoga": search the Stories already on the page and attach one. The
  * same list as the `#` suggestions, for anyone who doesn't know (or want)
- * the syntax, including before a single word is written.
+ * the syntax, including before a single word is written. Every result is
+ * listed; the compose dialog scrolls them, with the search kept on top.
  */
 const props = defineProps<{ stories: Story[] }>()
 const emit = defineEmits<{ choose: [story: Story], close: [] }>()
@@ -42,8 +43,12 @@ function onKey(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="basis-full rounded-2xl border border-white/10 bg-navy-950/80 p-2">
-    <div class="flex items-center gap-2 px-1">
+  <div class="basis-full rounded-2xl border border-white/10 bg-navy-950 p-2">
+    <!--
+      Stays in view while the results scroll by (with the dialog); opaque, so they pass beneath it.
+      The negative top is the dialog body's top padding, so it sticks at the very edge with nothing peeking above.
+    -->
+    <div class="sticky -top-3 z-10 -mx-2 -mt-2 flex sm:-top-5 items-center gap-2 rounded-t-2xl bg-navy-950 px-3 pb-1 pt-2">
       <label class="min-w-0 flex-1">
         <span class="sr-only">Sök bland Stories</span>
         <input
