@@ -48,7 +48,8 @@ Times shown relative to "now" use one moment fixed on the server (`useDemoNow`, 
 - **Attaching a Story to a post:** "📎 Bifoga Story" searches the Stories on the page. Typing `#` floats up to three matching Stories at the caret, starting with the latest. With no match they quietly go, and it stays an ordinary hashtag unless you choose one ([details](docs/snacket-posts.md#attaching-a-story)).
 - **"Snacka om detta"** on any Story opens a dialog (a bottom sheet on phones) for writing about it, with the Story attached. Drafts survive closing it by accident. Signed in with a profile, the post is published to Snacket på stan for everyone. The small "💬 N inlägg" link next to the button takes you to what's already been said.
 - **The source badge on the match card** ("dif.se" / "Verifierad …") opens details on team coverage and where the fixtures come from.
-- **Click an @handle** to mention that person in the composer. **Click a #tag** to filter the feed.
+- **"Vad snackas det om på stan?"** at the top of Snacket opens the same dialog for a post of your own, with sport and an optional Story. The draft is kept if you close it.
+- **Click an author's @handle** to reply: the dialog opens with the mention ready. **Type @** in the composer for suggestions from the supporters on the page. **Click an @mention** in a post or comment to visit that supporter. **Click a #tag** to filter the feed.
 - **"Lägg i kalendern"** downloads an `.ics` file for the real next match.
 - After 23:00 the night sky comes out, and the podcast gets a 🌙 badge.
 - **Start an episode, then scroll away.** A mini-player follows you through Stories and Snacket, driving the same audio element as the main player. On phones it steps aside while you type, and lock-screen controls work through the Media Session API.

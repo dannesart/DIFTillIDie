@@ -5,7 +5,7 @@ const props = defineProps<{ story: Story, lead?: boolean }>()
 
 const { spotlight } = useStorySpotlight()
 const { countForStory, filter } = useSnacket()
-const compose = useStoryCompose()
+const compose = useCompose()
 
 const leadSource = computed(() => leadOf(props.story))
 const others = computed(() => props.story.sources.filter(s => s.id !== props.story.leadId))

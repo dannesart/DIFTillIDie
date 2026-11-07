@@ -15,9 +15,9 @@ import type { Story } from '#shared/types/domain'
  *    #derby and carrying on never attaches anything by accident.
  */
 
-/** The `#word` around the caret that the suggestions are for. */
+/** The `#word` (or `@word`) around the caret that the suggestions are for. */
 export interface LookupTrigger {
-  /** Index of the `#`. */
+  /** Index of the `#` (or `@`). */
   start: number
   /** End of the word (it may continue past the caret). */
   end: number
@@ -25,17 +25,20 @@ export interface LookupTrigger {
 }
 
 const WORD = /[\p{L}\p{N}_]/u
-/** A `#` starts a lookup at the start of the text, after whitespace or an opening bracket. */
-const BEFORE_HASH = /[\s([{"'“‘]/u
+/**
+ * A `#` (or `@`) starts a lookup at the start of the text, after whitespace
+ * or an opening bracket; so an e-mail address (`hej@dif.se`) never does.
+ */
+const BEFORE_MARK = /[\s([{"'“‘]/u
 
-export function findTrigger(text: string, caret: number, selectionEnd = caret): LookupTrigger | null {
+export function findTrigger(text: string, caret: number, selectionEnd = caret, mark: '#' | '@' = '#'): LookupTrigger | null {
   if (selectionEnd !== caret || caret < 1 || caret > text.length) return null
-  // Walk back over the word to its `#`.
+  // Walk back over the word to its mark.
   let i = caret
   while (i > 0 && WORD.test(text[i - 1]!)) i--
   const start = i - 1
-  if (start < 0 || text[start] !== '#') return null
-  if (start > 0 && !BEFORE_HASH.test(text[start - 1]!)) return null
+  if (start < 0 || text[start] !== mark) return null
+  if (start > 0 && !BEFORE_MARK.test(text[start - 1]!)) return null
   let end = caret
   while (end < text.length && WORD.test(text[end]!)) end++
   const query = text.slice(start + 1, end)
@@ -98,22 +101,24 @@ export function moveActive(active: number, delta: 1 | -1, count: number): number
 }
 
 /**
- * The `#` suggestions in the post text: what's open, what's active, and
- * what choosing or dismissing does. The component feeds it the text and
- * caret after every input, click and caret move.
+ * Suggestions at the caret, for the word after a mark (`#` Stories, `@`
+ * supporters): what's open, what's active, and what dismissing does. The
+ * component feeds it the text and caret after every input, click and caret
+ * move. Only open with something to suggest, so a `#tag` or an `@` that
+ * matches nothing is just text; Enter only chooses once arrows made a
+ * suggestion active.
  */
-export function createInlineLookup(opts: { stories: () => Story[], enabled: () => boolean }) {
+export function createCaretLookup<T>(opts: { mark: '#' | '@', search: (query: string) => T[], enabled: () => boolean }) {
   const trigger = ref<LookupTrigger | null>(null)
   const active = ref(-1)
-  /** The `#` (by position) Escape was pressed on; it stays quiet until the caret leaves it. */
+  /** The mark (by position) Escape was pressed on; it stays quiet until the caret leaves it. */
   let dismissed: number | null = null
 
-  const results = computed(() => (trigger.value ? matchStories(opts.stories(), trigger.value.query, INLINE_LIMIT) : []))
-  /** Only with something to suggest: a hashtag that matches nothing is just a hashtag. */
+  const results = computed(() => (trigger.value ? opts.search(trigger.value.query) : []))
   const open = computed(() => !!trigger.value && opts.enabled() && results.value.length > 0)
 
   function sync(text: string, caret: number, selectionEnd = caret) {
-    const t = findTrigger(text, caret, selectionEnd)
+    const t = findTrigger(text, caret, selectionEnd, opts.mark)
     if (!t) dismissed = null
     const next = t && t.start !== dismissed ? t : null
     if (next?.start !== trigger.value?.start || next?.query !== trigger.value?.query) active.value = -1
@@ -130,21 +135,12 @@ export function createInlineLookup(opts: { stories: () => Story[], enabled: () =
     close()
   }
 
-  /** Choose a Story: the `#query` leaves the text, the rest stays, the caret goes where it was. */
-  function choose(text: string, story: Story): { text: string, caret: number, storyId: string } | null {
-    const t = trigger.value
-    if (!t) return null
-    const r = removeTrigger(text, t)
-    close()
-    return { ...r, storyId: story.id }
-  }
-
   /**
    * Arrow keys move, Enter chooses the active one (only once arrows made
-   * one active), Escape dismisses. Returns the Story chosen with Enter,
+   * one active), Escape dismisses. Returns the suggestion chosen with Enter,
    * `true` if the key was used, or `false` to let it do its usual thing.
    */
-  function key(k: string): Story | boolean {
+  function key(k: string): T | boolean {
     if (!open.value) return false
     const n = results.value.length
     if (k === 'ArrowDown' || k === 'ArrowUp') {
@@ -159,5 +155,21 @@ export function createInlineLookup(opts: { stories: () => Story[], enabled: () =
     return false
   }
 
-  return { trigger, active, results, open, sync, close, dismiss, choose, key }
+  return { trigger, active, results, open, sync, close, dismiss, key }
+}
+
+/** The `#` suggestions in the post text: up to three Stories, for the word after the `#`. */
+export function createInlineLookup(opts: { stories: () => Story[], enabled: () => boolean }) {
+  const lookup = createCaretLookup({ mark: '#', search: q => matchStories(opts.stories(), q, INLINE_LIMIT), enabled: opts.enabled })
+
+  /** Choose a Story: the `#query` leaves the text, the rest stays, the caret goes where it was. */
+  function choose(text: string, story: Story): { text: string, caret: number, storyId: string } | null {
+    const t = lookup.trigger.value
+    if (!t) return null
+    const r = removeTrigger(text, t)
+    lookup.close()
+    return { ...r, storyId: story.id }
+  }
+
+  return { ...lookup, choose }
 }

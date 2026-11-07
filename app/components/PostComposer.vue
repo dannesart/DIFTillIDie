@@ -1,73 +1,59 @@
 <script setup lang="ts">
 import type { Sport, Story } from '#shared/types/domain'
-import { createComposerOpen, focusDestination } from '~/lib/composerState'
+import type { PublicAuthor } from '#shared/utils/profile'
+import { focusDestination } from '~/lib/composerState'
+import { insertMention, matchSupporters } from '~/lib/mentions'
 import { POST_MAX, postLength } from '~/lib/posts'
-import { revealPost } from '~/lib/reveal'
-import { createInlineLookup } from '~/lib/storyLookup'
+import { createCaretLookup, createInlineLookup } from '~/lib/storyLookup'
 
 /*
- * One composer, two homes: at the top of Snacket på stan, and in the
- * "Snacka om detta" dialog, where `story` locks the attachment and the
- * text is bound to that Story's draft via v-model:body.
+ * The one post composer, in the compose dialog (ComposeDialog), two ways:
+ *  - a Snacket post: text, sport and attached Story are the dialog's draft
+ *    (v-model:body, v-model:sport, v-model:story-id), so closing keeps them;
+ *  - about a Story ("Snacka om detta"): `story` locks the attachment and
+ *    the text is bound to that Story's draft via v-model:body.
  *
  * Writing here means publishing for real, so it's only offered to someone
  * who can publish: signed-out visitors get a way to sign in instead. A post
  * is only "out" once Supabase has confirmed it; on failure the text stays.
  */
-const props = defineProps<{ story?: Story, autofocus?: boolean }>()
+const props = defineProps<{ story?: Story }>()
 const body = defineModel<string>('body', { default: '' })
+const sport = defineModel<Sport | undefined>('sport')
+const storyId = defineModel<string | undefined>('storyId')
 const emit = defineEmits<{ published: [postId: string, text: string] }>()
 
-const { me, identity, owner, publish, filter } = useSnacket()
+const { me, identity, publish } = useSnacket()
 const { status: authStatus } = useAuth()
 const { publishing } = useCommunity()
 const { stories } = useNews()
 const accountOpen = useAccountDialog()
-const { sport: sportFilter } = useSport()
 
-const sport = ref<Sport | undefined>()
-const storyId = ref('')
 const error = ref<string | null>(null)
 const form = useTemplateRef<HTMLFormElement>('form')
 const textarea = useTemplateRef<HTMLTextAreaElement>('textarea')
 const hintId = useId()
 
-const inline = computed(() => !!props.story)
+const aboutStory = computed(() => !!props.story)
 const attached = computed(() => props.story ?? findStory(stories.value, storyId.value))
 /** Guests can't publish, so they aren't handed a text box that would only pretend to. */
 const canWrite = computed(() => identity.value.kind !== 'guest')
 
 const prompts = ['Vad snackas det om på stan?', 'Hur kändes det i kväll?', 'Vem ska starta på lördag?', 'Någon som ska på bortamatchen?']
 const storyPrompts = ['Vad tycker du?', 'Säg din sak, Djurgårdare.', 'Hur ser du på det här?', 'Ditt hjärta, dina ord.']
-const prompt = ref((inline.value ? storyPrompts : prompts)[0])
+const prompt = ref((aboutStory.value ? storyPrompts : prompts)[0])
 onMounted(() => {
-  const list = inline.value ? storyPrompts : prompts
+  const list = aboutStory.value ? storyPrompts : prompts
   prompt.value = list[Math.floor(Math.random() * list.length)]!
-  if (props.autofocus) nextTick(() => textarea.value?.focus({ preventScroll: true }))
 })
 
-if (props.story) sport.value = props.story.sport
-else watch(sportFilter, s => (sport.value = s === 'alla' ? undefined : s), { immediate: true })
-
-// Browsing Snacket for one Story? Then a new post is most likely about it.
-if (!props.story) {
-  watch(() => filter.value.storyId, (id) => {
-    if (id && findStory(stories.value, id)) storyId.value = id
-  }, { immediate: true })
-}
-
 const left = computed(() => POST_MAX - postLength(body.value))
-// Open/closed is its own state (see composerState): choosing a Story or a
-// sport never closes the composer, whatever happens to focus on the way.
-const composerOpen = createComposerOpen(() => !body.value.trim() && !storyId.value && !error.value)
-const expanded = computed(() => inline.value || composerOpen.open.value || body.value.length > 0 || !!error.value)
+// Leaving for something else closes the Story suggestions and search; the text stays.
 function onFocusOut(e: FocusEvent) {
-  const to = focusDestination(form.value, e.relatedTarget)
-  if (to === 'outside') {
-    lookup.close()
-    picking.value = false
-  }
-  composerOpen.leave(to)
+  if (focusDestination(form.value, e.relatedTarget) !== 'outside') return
+  lookup.close()
+  people.close()
+  picking.value = false
 }
 watch(body, () => (error.value = null))
 
@@ -81,7 +67,7 @@ watch(body, () => (error.value = null))
  * Not in a Story's own dialog (that Story is the attachment), and quiet
  * while a Story is attached, so hashtags are just hashtags.
  */
-const lookup = createInlineLookup({ stories: () => stories.value, enabled: () => !inline.value && !attached.value })
+const lookup = createInlineLookup({ stories: () => stories.value, enabled: () => !aboutStory.value && !attached.value })
 const lookupId = `${hintId}-stories`
 const lookupList = useTemplateRef<{ optionId: (i: number) => string }>('lookupList')
 const picking = ref(false)
@@ -89,9 +75,34 @@ const bifoga = useTemplateRef<HTMLButtonElement>('bifoga')
 /** What screen readers last heard about attaching: chosen or dismissed. */
 const attachNews = ref('')
 
+/*
+ * `@` + the start of a handle or name: supporters to mention, from the
+ * authors of the posts and comments on the page (lib/mentions). Choosing one
+ * puts their @handle in its place; carrying on writing keeps the text as typed.
+ */
+const { candidates } = useMentions()
+const people = createCaretLookup({ mark: '@', search: q => matchSupporters(candidates.value, q), enabled: () => true })
+const peopleId = `${hintId}-people`
+const peopleList = useTemplateRef<{ optionId: (i: number) => string }>('peopleList')
+
 function syncLookup() {
   const t = textarea.value
-  if (t) lookup.sync(t.value, t.selectionStart, t.selectionEnd)
+  if (!t) return
+  lookup.sync(t.value, t.selectionStart, t.selectionEnd)
+  people.sync(t.value, t.selectionStart, t.selectionEnd)
+}
+
+function choosePerson(p: PublicAuthor) {
+  const t = people.trigger.value
+  if (!t) return
+  const r = insertMention(body.value, t, p.handle)
+  people.close()
+  body.value = r.text
+  attachNews.value = `Nämnde @${p.handle}.`
+  nextTick(() => {
+    textarea.value?.focus()
+    textarea.value?.setSelectionRange(r.caret, r.caret)
+  })
 }
 
 function attach(story: Story) {
@@ -113,7 +124,9 @@ function chooseInline(story: Story) {
 
 function onTextKey(e: KeyboardEvent) {
   if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
-  const r = lookup.key(e.key)
+  // One mark at the caret at a time, so at most one of them is open.
+  const mentioning = people.open.value
+  const r = mentioning ? people.key(e.key) : lookup.key(e.key)
   if (r === false) return
   e.preventDefault()
   if (e.key === 'Escape') {
@@ -121,7 +134,10 @@ function onTextKey(e: KeyboardEvent) {
     e.stopPropagation()
     attachNews.value = 'Förslagen stängda.'
   }
-  if (typeof r === 'object') chooseInline(r)
+  if (typeof r === 'object') {
+    if (mentioning) choosePerson(r as PublicAuthor)
+    else chooseInline(r as Story)
+  }
 }
 
 function choosePicked(story: Story) {
@@ -131,7 +147,7 @@ function choosePicked(story: Story) {
 }
 
 function detach() {
-  storyId.value = ''
+  storyId.value = undefined
   attachNews.value = 'Storyn är inte längre bifogad.'
   // The ✕ is gone; keep focus in the composer, on the way to attach another.
   nextTick(() => bifoga.value?.focus())
@@ -143,6 +159,10 @@ function closePicker() {
 }
 
 const lookupStatus = computed(() => {
+  if (people.open.value) {
+    const n = people.results.value.length
+    return `${n} ${n === 1 ? 'supporter' : 'supportrar'} att nämna. Pil ned och Enter för att välja, eller skriv vidare.`
+  }
   if (!lookup.open.value) return attachNews.value
   const q = lookup.trigger.value?.query
   const n = lookup.results.value.length
@@ -150,66 +170,56 @@ const lookupStatus = computed(() => {
   return `${found} Pil ned och Enter för att bifoga, eller skriv vidare.`
 })
 
-// Text typed as one person is never posted as the next. (The Story composer's
-// text is that Story's draft, which is already kept per person.)
-if (!props.story) watch(owner, (_next, prev) => { if (prev) body.value = '' })
+// Text typed as one person is never posted as the next: every draft is kept
+// per person (useCompose), and switching account closes the dialog.
 
 async function submit() {
   if (!me.value || publishing.value || !body.value.trim() || left.value < 0) return
   error.value = null
   const r = await publish(body.value, {
-    sport: sport.value,
-    storyId: props.story?.id ?? (storyId.value || undefined),
-    keepView: inline.value,
+    sport: props.story?.sport ?? sport.value,
+    // Only a Story still among the loaded ones (an old draft's may have gone).
+    storyId: props.story?.id ?? (attached.value ? storyId.value : undefined),
+    keepView: aboutStory.value,
   })
   if (!r.ok) {
-    // The text stays exactly as it was.
+    // The text, sport and Story stay exactly as they were.
     error.value = r.message
     return
   }
   body.value = ''
-  if (inline.value) {
-    emit('published', r.post.id, r.post.body)
-    return
+  if (!aboutStory.value) {
+    storyId.value = undefined
+    lookup.close()
+    picking.value = false
+    attachNews.value = ''
   }
-  storyId.value = ''
-  lookup.close()
-  picking.value = false
-  attachNews.value = ''
-  composerOpen.reset()
-  // Focus stays on the composer's own control otherwise, now hidden.
-  if (form.value?.contains(document.activeElement)) (document.activeElement as HTMLElement).blur()
-  // Back on Nyast, so it's at the top: show it once the feed has rendered it.
-  void revealPost(r.post.id)
+  emit('published', r.post.id, r.post.body)
 }
 
-function mention(handle: string) {
-  if (!canWrite.value) {
-    accountOpen.value = true
-    return
-  }
-  const tag = `@${handle} `
-  if (!body.value.includes(tag)) body.value = `${body.value}${body.value && !body.value.endsWith(' ') ? ' ' : ''}${tag}`
-  textarea.value?.focus()
-  textarea.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+/** Into the text, at its end: ready to carry on (or to write after an @mention). */
+function focus() {
+  const t = textarea.value
+  if (!t) return
+  t.focus({ preventScroll: true })
+  t.setSelectionRange(t.value.length, t.value.length)
 }
 
-defineExpose({ mention, focus: () => textarea.value?.focus() })
+defineExpose({ focus })
 </script>
 
 <template>
   <!-- Signed out: sign in to write -->
   <div
     v-if="!canWrite"
-    class="flex flex-wrap items-center gap-3 p-4 sm:p-5"
-    :class="inline ? 'rounded-2xl border border-white/10 bg-navy-950/60' : 'card'"
+    class="flex flex-wrap items-center gap-3 p-4 sm:p-5 rounded-2xl border border-white/10 bg-navy-950/60"
   >
     <template v-if="authStatus === 'unavailable'">
       <p class="text-sm text-krita-dim">Att publicera inlägg är inte påslaget här.</p>
     </template>
     <template v-else>
       <p class="min-w-0 flex-1 text-sm leading-relaxed">
-        <span class="font-semibold">Vill du snacka{{ inline ? ' om det här' : '' }}?</span>
+        <span class="font-semibold">Vill du snacka{{ aboutStory ? ' om det här' : '' }}?</span>
         <span class="text-krita-dim"> Logga in med din e-post, så publicerar du med din supporterprofil.</span>
       </p>
       <button type="button" class="rounded-full bg-guld px-5 py-2 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="accountOpen = true">
@@ -221,30 +231,27 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
   <form
     v-else
     ref="form"
-    class="p-4 transition duration-300 sm:p-5"
-    :class="[inline ? 'rounded-2xl border border-white/10 bg-navy-950/60' : 'card', expanded && !inline && 'border-himmel/40 shadow-[0_20px_60px_-30px_rgb(95_176_236/0.6)]']"
+    class="p-4 sm:p-5 rounded-2xl border border-white/10 bg-navy-950/60"
     :aria-busy="publishing"
     @submit.prevent="submit"
-    @focusin="composerOpen.enter()"
     @focusout="onFocusOut"
-    @keydown.esc="composerOpen.escape() && textarea?.blur()"
   >
     <div class="flex gap-3">
-      <Avatar :name="me?.name ?? 'Du'" :design="me?.avatar" :size="inline ? 'sm' : undefined" />
+      <Avatar :name="me?.name ?? 'Du'" :design="me?.avatar" :size="aboutStory ? 'sm' : undefined" />
       <label class="min-w-0 flex-1">
-        <span class="sr-only">{{ inline ? 'Skriv om den här Storyn' : 'Skriv ett inlägg' }}</span>
+        <span class="sr-only">{{ aboutStory ? 'Skriv om den här Storyn' : 'Skriv ett inlägg' }}</span>
         <textarea
           ref="textarea"
           v-model="body"
-          :rows="expanded ? 3 : 1"
+          :rows="aboutStory ? 3 : 4"
           :placeholder="prompt"
           :readonly="publishing"
-          class="w-full resize-none bg-transparent leading-relaxed placeholder:text-krita-dim/70 focus:outline-none"
-          :class="inline ? 'pt-1 text-[0.95rem]' : 'pt-2.5 text-base'"
+          class="dialog-scroll w-full resize-none bg-transparent leading-relaxed placeholder:text-krita-dim/70 focus:outline-none"
+          :class="aboutStory ? 'pt-1 text-[0.95rem]' : 'pt-2.5 text-base'"
           :aria-describedby="hintId"
           aria-autocomplete="list"
-          :aria-controls="lookup.open.value && lookup.results.value.length ? lookupId : undefined"
-          :aria-activedescendant="lookup.open.value && lookup.active.value >= 0 ? lookupList?.optionId(lookup.active.value) : undefined"
+          :aria-controls="people.open.value ? peopleId : lookup.open.value && lookup.results.value.length ? lookupId : undefined"
+          :aria-activedescendant="people.open.value ? (people.active.value >= 0 ? peopleList?.optionId(people.active.value) : undefined) : lookup.open.value && lookup.active.value >= 0 ? lookupList?.optionId(lookup.active.value) : undefined"
           @keydown="onTextKey"
           @keydown.meta.enter.prevent="submit"
           @keydown.ctrl.enter.prevent="submit"
@@ -273,10 +280,22 @@ defineExpose({ mention, focus: () => textarea.value?.focus() })
         @hover="lookup.active.value = $event"
       />
     </CaretPopup>
+    <!-- `@` + text: supporters to mention, the same way -->
+    <CaretPopup v-if="people.open.value && people.trigger.value" :textarea="textarea" :at="people.trigger.value.start" :text="body">
+      <SupporterOptions
+        :id="peopleId"
+        ref="peopleList"
+        :supporters="people.results.value"
+        :active="people.active.value"
+        label="Supportrar att nämna"
+        @choose="choosePerson"
+        @hover="people.active.value = $event"
+      />
+    </CaretPopup>
     <p class="sr-only" aria-live="polite">{{ lookupStatus }}</p>
 
-    <div v-show="expanded" class="mt-3 flex flex-wrap items-center gap-2 border-t border-white/8 pt-3">
-      <template v-if="!inline">
+    <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-white/8 pt-3">
+      <template v-if="!aboutStory">
         <button
           v-for="s in (['fotboll', 'hockey'] as const)"
           :key="s"

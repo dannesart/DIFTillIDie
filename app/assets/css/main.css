@@ -191,6 +191,20 @@
   .chip {
     @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition duration-200;
   }
+
+  /*
+   * Scrolling inside a dialog or popup (the compose dialog, the post text,
+   * the `#` suggestions): a thin muted sky-blue thumb on no track of its
+   * own, so it sits on the navy it scrolls; the shell's scrollbar colours, at
+   * any width. The standard properties: Chromium and Firefox; Safari keeps its own.
+   */
+  .dialog-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-himmel) 45%, var(--color-navy-900)) transparent;
+  }
+  .dialog-scroll:hover {
+    scrollbar-color: color-mix(in srgb, var(--color-himmel) 70%, var(--color-navy-900)) transparent;
+  }
 }
 
 @keyframes stripe-drift {
