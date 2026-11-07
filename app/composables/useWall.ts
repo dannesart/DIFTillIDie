@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { DESKTOP_QUERY, sectionLinks } from '~/lib/sectionLinks'
 import { createWall } from '~/lib/wall'
 
 /**
@@ -17,3 +18,10 @@ export function useWall(address: string) {
  * them (an alias), and so do the older /laktaren/<user id> links.
  */
 export const supporterPath = (handle: string) => `/laktaren/${handle}`
+
+/** Section and supporter addresses for the page you're on (see lib/sectionLinks). */
+export function useSectionLinks() {
+  const route = useRoute()
+  const desktop = () => import.meta.client && window.matchMedia(DESKTOP_QUERY).matches
+  return computed(() => sectionLinks(route.path, { desktop }))
+}

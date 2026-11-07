@@ -8,6 +8,7 @@
 const { activeId, draftFor, setDraft, close } = useStoryCompose()
 const { stories } = useNews()
 const { postsForStory, filter, identity } = useSnacket()
+const links = useSectionLinks()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const composer = useTemplateRef<{ focus: () => void }>('composer')
@@ -69,6 +70,7 @@ function readInSnacket() {
   if (!id) return
   filter.value = { storyId: id }
   // A jump the reader asked for — never one that happens on its own.
+  if (!links.value.shows('snacket')) return void navigateTo(links.value.section('snacket'))
   requestAnimationFrame(() => document.getElementById('snacket')?.scrollIntoView({ behavior: 'smooth' }))
 }
 

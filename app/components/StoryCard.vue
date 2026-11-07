@@ -26,9 +26,11 @@ const sportDot = { fotboll: 'bg-himmel', hockey: 'bg-himmel-200' } as const
 // Writing and reading are two intents: the button writes (in a dialog),
 // the count reads (in Snacket på stan). Neither changes this card's size.
 const hasDraft = computed(() => !!compose.draftFor(props.story.id))
+const links = useSectionLinks()
 function readTalk() {
   filter.value = { storyId: props.story.id }
-  document.getElementById('snacket')?.scrollIntoView({ behavior: 'smooth' })
+  if (links.value.shows('snacket')) document.getElementById('snacket')?.scrollIntoView({ behavior: 'smooth' })
+  else void navigateTo(links.value.section('snacket'))
 }
 
 // A little pop when a new post about this Story arrives.

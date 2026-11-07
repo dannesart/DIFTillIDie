@@ -4,12 +4,16 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-10-01',
   devtools: { enabled: false },
 
-  modules: ['@nuxt/fonts'],
+  // The site's routes, laid out by the app shell (see the module).
+  modules: ['@nuxt/fonts', './modules/app-shell'],
   css: ['~/assets/css/main.css'],
 
   vite: {
     plugins: [tailwindcss()],
   },
+
+  // The routes come from modules/app-shell.ts, not from a pages/ directory.
+  pages: true,
 
   runtimeConfig: {
     // Server-only: signs Story captures (see server/lib/capture.ts). Set
@@ -31,6 +35,10 @@ export default defineNuxtConfig({
     // Shared CDN HTML is safe because sign-in lives entirely in the browser:
     // the server never sees a session, so this page is identical for everyone.
     '/': { isr: 300 },
+    // Desktop's section views: the same public HTML for everyone, like the front page.
+    '/snacket': { isr: 300 },
+    '/stories': { isr: 300 },
+    '/lyssna': { isr: 300 },
     // A supporter's page: the same public shell for everyone; the profile and wall load in the browser.
     '/laktaren/**': { isr: 300 },
     '/api/news': { isr: 600 },
