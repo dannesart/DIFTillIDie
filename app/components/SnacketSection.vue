@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import type { FeedSort } from '~/lib/feedSort'
 import { createFeedSort, engagement } from '~/lib/feedSort'
+import { postDraftPreview } from '~/lib/postDraft'
 import { postAnchor } from '~/lib/reveal'
 
 /*
  * Snacket på stan: posts, reactions and comments by signed-in supporters,
  * stored in Supabase and readable by everyone. Nyast by default; Hetast
  * ranks the loaded posts by their real reactions and comments (lib/feedSort).
- * Hashtags and filters come only from these posts.
+ * Hashtags and filters come only from these posts. Writing happens in the
+ * compose dialog (ComposeDialog), opened from the entry at the top or an @mention.
  */
-const { feed, all, community, filter, sort, me, identity } = useSnacket()
+const { feed, all, community, filter, sort, sport, me, identity } = useSnacket()
 const { stats, statsStatus, statsLoadedAt } = useInteractions()
 const { status: feedStatus, stale, refreshing } = community
 const { stories } = useNews()
@@ -41,7 +43,22 @@ const tags = computed(() => {
   return [...counts].sort((a, b) => b[1] - a[1]).slice(0, 8)
 })
 
-const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
+const compose = useCompose()
+// A post started here begins from what you're browsing: the sport, the Story whose posts these are.
+const browsing = () => ({ sport: sport.value === 'alla' ? undefined : sport.value, storyId: filterStory.value ? filter.value.storyId : undefined })
+/** The draft in progress (text, or only an attached Story), shown in the entry so it's clear nothing was lost. */
+const draftText = computed(() => {
+  if (identity.value.kind === 'guest') return null
+  const d = compose.post.value
+  const story = findStory(stories.value, d.storyId)
+  return postDraftPreview(d, story && leadOf(story).headline)
+})
+
+function mention(handle: string) {
+  // Guests are invited to sign in, as before; there's nothing to write with yet.
+  if (identity.value.kind === 'guest') accountOpen.value = true
+  else compose.mention(handle, browsing())
+}
 </script>
 
 <template>
@@ -65,7 +82,21 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
 
       <div class="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div class="min-w-0">
-          <PostComposer ref="composer" />
+          <!-- Compact: the composer itself opens in a dialog, with the draft as it was left -->
+          <button
+            type="button"
+            class="card flex w-full items-center gap-3 p-4 text-left transition hover:border-himmel/40 sm:p-5"
+            aria-haspopup="dialog"
+            @click="compose.openPost(browsing())"
+          >
+            <Avatar :name="me?.name ?? 'Du'" :design="me?.avatar" />
+            <span class="min-w-0 flex-1">
+              <span v-if="draftText" class="block text-xs font-semibold text-guld">Ditt utkast</span>
+              <span v-if="draftText" class="block truncate text-krita">{{ draftText }}</span>
+              <span v-else class="block text-base text-krita-dim">Vad snackas det om på stan?</span>
+            </span>
+            <span aria-hidden="true" class="shrink-0 rounded-full bg-himmel px-4 py-2 text-sm font-bold text-navy-950">{{ draftText ? 'Fortsätt' : 'Skriv' }}</span>
+          </button>
 
           <div v-if="hasFilter || all.length" class="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div v-if="hasFilter" class="flex min-w-0 flex-wrap items-center gap-2 text-sm">
@@ -133,7 +164,7 @@ const composer = useTemplateRef<{ mention: (h: string) => void }>('composer')
                   leave-active-class="transition duration-200 absolute inset-x-0"
                 >
                   <li v-for="post in shown" :id="postAnchor(post.id)" :key="post.id" class="scroll-below-header">
-                    <PostCard :post="post" @mention="composer?.mention($event)" />
+                    <PostCard :post="post" @mention="mention" />
                   </li>
                 </TransitionGroup>
                 <div v-if="!shown.length" class="card p-6 text-center">

@@ -139,7 +139,7 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
           </p>
           <p class="mt-0.5 whitespace-pre-line text-sm leading-relaxed">
             <template v-for="(t, i) in tokenize(c.body)" :key="i">
-              <span v-if="t.type === 'mention'" class="font-semibold text-himmel">@{{ t.value }}</span>
+              <MentionLink v-if="t.type === 'mention'" :handle="t.value" />
               <span v-else-if="t.type === 'tag'" class="font-semibold text-guld">#{{ t.value }}</span>
               <template v-else>{{ t.value }}</template>
             </template>

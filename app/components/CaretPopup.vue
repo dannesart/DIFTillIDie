@@ -8,11 +8,15 @@ import { type Placement, caretBox, placePopup, visibleBox } from '~/lib/caretPop
  * including a phone keyboard taking half the screen. Below the line if it
  * fits, otherwise above.
  *
- * Teleported to the end of <body>: the composer's card blurs its backdrop,
- * which would otherwise turn `position: fixed` into "fixed to the card".
+ * Teleported out of the composer, whose surroundings may blur their
+ * backdrop (turning `position: fixed` into "fixed to the card"): into the
+ * open modal <dialog> the composer is in, since everything outside one is
+ * inert and beneath it, or else to the end of <body>.
  * Pressing in it never takes focus from the textarea.
  */
 const props = defineProps<{ textarea: HTMLTextAreaElement | null, at: number, text: string }>()
+
+const target = computed(() => props.textarea?.closest('dialog') ?? '#teleports')
 
 const WIDTH = 352
 const MAX_HEIGHT = 320
@@ -74,14 +78,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <Teleport to="#teleports">
+  <Teleport :to="target">
     <!--
       mousedown.prevent: focus (and the phone keyboard) stays in the textarea.
       The one scrolling area, and only when a phone keyboard leaves too little room for three.
     -->
     <div
       ref="el"
-      class="fixed z-[60] overflow-y-auto overscroll-contain rounded-2xl border border-white/12 bg-navy-950/95 p-1 shadow-[0_24px_60px_-20px_rgb(3_9_21/0.95)] backdrop-blur-xl"
+      class="dialog-scroll fixed z-[60] overflow-y-auto overscroll-contain rounded-2xl border border-white/12 bg-navy-950/95 p-1 shadow-[0_24px_60px_-20px_rgb(3_9_21/0.95)] backdrop-blur-xl"
       :style="style"
       :data-side="place?.side"
       @mousedown.prevent
