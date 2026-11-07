@@ -14,9 +14,8 @@ import type { CommunityPost } from '~/lib/posts'
  * The supporter themselves also sees "Mina lag", their private team
  * interests. Nobody else can read them, and nothing is hidden because of them.
  *
- * Used by the page (/laktaren/<handle>) and by the app-shell prototype
- * (/prototyp/laktaren/<handle>): the page decides the surroundings and keeps
- * one instance per supporter.
+ * Used by the shell's view at /laktaren/<handle> (shell/views/Laktaren.vue),
+ * which decides the surroundings and keeps one instance per supporter.
  */
 const props = defineProps<{ address: string }>()
 const route = useRoute()

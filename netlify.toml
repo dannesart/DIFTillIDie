@@ -7,8 +7,3 @@
 
 [build.environment]
   NODE_VERSION = "22"
-
-# Mission #17: deploy previews (pull requests) are built with the desktop app
-# shell switched on; production and branch deploys are not. See docs/app-shell.md.
-[context.deploy-preview.environment]
-  APP_SHELL = "1"

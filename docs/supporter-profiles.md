@@ -6,7 +6,7 @@ Every supporter has a page at **`/laktaren/<handle>`**, e.g. `/laktaren/jarnmann
 |---|---|
 | Migrations | [`20261105220958_supporter_profiles.sql`](../supabase/migrations/20261105220958_supporter_profiles.sql), [`20261105221014_profile_handle_aliases.sql`](../supabase/migrations/20261105221014_profile_handle_aliases.sql) |
 | Rules shared with the database (avatars, bio, teams) | [`shared/utils/profile.ts`](../shared/utils/profile.ts) |
-| Page | [`app/pages/laktaren/[handle].vue`](../app/pages/laktaren/[handle].vue) |
+| Page | [`app/shell/views/Laktaren.vue`](../app/shell/views/Laktaren.vue), in the app shell ([docs/app-shell.md](app-shell.md)) |
 | Address resolution, profile and wall | [`app/lib/wall.ts`](../app/lib/wall.ts) |
 | Team interests | [`app/lib/preferences.ts`](../app/lib/preferences.ts) |
 | Avatar designs | [`app/components/Avatar.vue`](../app/components/Avatar.vue) |

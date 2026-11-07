@@ -32,7 +32,7 @@
   --nav-h: calc(4rem + env(safe-area-inset-bottom));
   /* The sticky header's height; AppHeader keeps it measured. */
   --header-h: 3.5rem;
-  /* The desktop app-shell prototype (/prototyp, development only): its sidebar and rail. */
+  /* The app shell's desktop sidebar and rail. */
   --shell-nav-w: 17rem;
   --shell-rail-w: 24rem;
 }
@@ -51,11 +51,10 @@
 }
 
 /*
- * The desktop app-shell prototype's scrollbars (the page's, and the sidebar's
+ * The app shell's scrollbars (the page's, and the sidebar's
  * when a short window makes it scroll): a quiet navy track and a muted
- * sky-blue thumb that brightens under the pointer. Only in the prototype
- * (AppShell.vue sets .app-shell on <html>) and only from lg; the site's own
- * pages and phones keep the browser's scrollbars.
+ * sky-blue thumb that brightens under the pointer. AppShell.vue sets
+ * .app-shell on <html>; only from lg, so phones keep the browser's scrollbars.
  */
 @media (min-width: 1024px) {
   .app-shell {

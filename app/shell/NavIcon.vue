@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SectionId } from '~/lib/sectionLinks'
 
-/* The bottom nav's glyphs (components/MobileNav.vue), for the prototype's sidebar. */
+/* The bottom nav's glyphs (components/MobileNav.vue), for the shell's sidebar. */
 defineProps<{ id: SectionId }>()
 </script>
 

@@ -22,7 +22,6 @@ export const supporterPath = (handle: string) => `/laktaren/${handle}`
 /** Section and supporter addresses for the page you're on (see lib/sectionLinks). */
 export function useSectionLinks() {
   const route = useRoute()
-  const shell = !!useAppConfig().appShell
   const desktop = () => import.meta.client && window.matchMedia(DESKTOP_QUERY).matches
-  return computed(() => sectionLinks(route.path, { shell, desktop }))
+  return computed(() => sectionLinks(route.path, { desktop }))
 }

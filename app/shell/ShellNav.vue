@@ -137,8 +137,6 @@ const accountLabel = computed(() => {
         <span aria-hidden="true">·</span>
         Ett supporterprojekt
       </p>
-      <!-- The prototype only: back to the site as it is, to compare -->
-      <NuxtLink v-if="links.prototype" to="/" class="block px-2 text-xs font-semibold text-krita-dim underline-offset-2 hover:text-krita hover:underline">Nuvarande design →</NuxtLink>
     </div>
   </div>
 </template>

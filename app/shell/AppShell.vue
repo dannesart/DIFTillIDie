@@ -2,8 +2,8 @@
 import { DESKTOP_QUERY, MOBILE_QUERY } from '~/lib/sectionLinks'
 
 /*
- * Mission #17 — the desktop app shell (switched on with APP_SHELL=1, and as
- * a development prototype at /prototyp; see modules/app-shell.ts).
+ * Mission #17 — the app shell: the parent of every page (see
+ * modules/app-shell.ts).
  *
  * From lg up: a persistent sidebar (sections, sport, you), one view at a
  * time in the middle (/, /snacket, …), and from xl a contextual rail (next
@@ -34,8 +34,6 @@ await Promise.all([useNews(), usePodcasts(), useFixtures()])
 
 const links = useSectionLinks()
 const screen = useScreenParts()
-// The prototype is a preview next to the real site: kept out of search, and says so.
-if (links.value.prototype) useSeoMeta({ title: 'Prototyp – Djurgår’n tills jag dör', robots: 'noindex, nofollow' })
 
 // Snacket and Stories bring their own side columns: the rail waits for a wider screen there.
 const roomy = computed(() => links.value.here('snacket') || links.value.here('stories'))
@@ -84,10 +82,6 @@ function skipToContent() {
     <div v-if="screen.mobile.value" class="lg:hidden">
       <PilotBanner :hydrate-on-media-query="MOBILE_QUERY" />
       <AppHeader :hydrate-on-media-query="MOBILE_QUERY" />
-      <p v-if="links.prototype" class="mx-4 mt-2 rounded-2xl bg-guld/10 px-4 py-2.5 text-xs leading-relaxed text-krita-dim sm:mx-6">
-        <span class="font-bold text-guld">Prototyp för dator.</span> På mobilen gäller nuvarande design.
-        <NuxtLink to="/" class="font-semibold text-krita underline underline-offset-2">Till startsidan</NuxtLink>
-      </p>
     </div>
 
     <!-- Fits any ordinary window; scrolls on its own only when it can't (a short window with the player docked at its foot) -->
