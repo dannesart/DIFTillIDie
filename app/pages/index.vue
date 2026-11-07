@@ -15,10 +15,7 @@ await Promise.all([useNews(), usePodcasts(), useFixtures()])
     <PilotBanner />
     <AppHeader />
     <main>
-      <HeroMatchday />
-      <StorySection />
-      <SnacketSection />
-      <MediaSection />
+      <HomeSections />
     </main>
     <AppFooter />
     <StoryComposeDialog />

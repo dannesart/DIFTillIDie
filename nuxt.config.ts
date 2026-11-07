@@ -4,12 +4,19 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-10-01',
   devtools: { enabled: false },
 
-  // The app-shell prototype's routes exist only in development (see the module).
-  modules: ['@nuxt/fonts', './modules/app-shell-preview'],
+  // The desktop app shell, and its development prototype (see the module).
+  modules: ['@nuxt/fonts', './modules/app-shell'],
   css: ['~/assets/css/main.css'],
 
   vite: {
     plugins: [tailwindcss()],
+  },
+
+  appConfig: {
+    // Mission #17: lay the site out with the desktop app shell. Read at build
+    // time (it decides which routes exist): set APP_SHELL=1 for a build, e.g.
+    // only in Netlify's deploy-preview context. Unset, the site is as before.
+    appShell: process.env.APP_SHELL === '1',
   },
 
   runtimeConfig: {

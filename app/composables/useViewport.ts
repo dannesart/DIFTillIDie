@@ -1,3 +1,5 @@
+import { DESKTOP_QUERY } from '~/lib/sectionLinks'
+
 /*
  * Small viewport helpers shared by the floating controls (bottom nav,
  * mini-player): is a text field focused (so a phone keyboard is likely
@@ -33,4 +35,33 @@ export function useMedia(query: string) {
   })
   onBeforeUnmount(() => mq?.removeEventListener('change', update))
   return matches
+}
+
+/*
+ * For the app shell, which has a desktop part and a phone part on the same
+ * page (the sidebars or the header; Hem's overview or the long front page):
+ * which of them to build.
+ *  - Server HTML: both, since the server can't know the screen. Each part is
+ *    then hydrated only on its own screen size (defineLazyHydrationComponent
+ *    with DESKTOP_QUERY / MOBILE_QUERY); the other stays inert HTML, hidden by
+ *    CSS: no setup, listeners or requests, until the window crosses over.
+ *  - Built in the browser (moving between pages): only the one that fits,
+ *    and the other when the window crosses over.
+ */
+export function useScreenParts() {
+  const both = import.meta.server || useNuxtApp().isHydrating
+  const desktop = ref<boolean | null>(both ? null : window.matchMedia(DESKTOP_QUERY).matches)
+  let mq: MediaQueryList | undefined
+  const update = () => (desktop.value = !!mq?.matches)
+  onMounted(() => {
+    if (both) return
+    mq = window.matchMedia(DESKTOP_QUERY)
+    update()
+    mq.addEventListener('change', update)
+  })
+  onBeforeUnmount(() => mq?.removeEventListener('change', update))
+  return {
+    desktop: computed(() => desktop.value !== false),
+    mobile: computed(() => desktop.value !== true),
+  }
 }

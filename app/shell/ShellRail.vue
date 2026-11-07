@@ -2,7 +2,7 @@
 import type { PodcastEpisode } from '#shared/types/domain'
 
 /*
- * The prototype's contextual sidebar: what's coming up while you read.
+ * The shell's contextual sidebar: what's coming up while you read.
  * The next match (the hero's card) and the newest real episodes, which play
  * through the page's one <audio> element like everywhere else. Optional: it
  * only appears where the screen has room for it (see AppShell.vue).
@@ -32,7 +32,7 @@ const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('sv-SE', {
     <section v-if="episodes && latest.length" aria-labelledby="rail-listen">
       <div class="flex items-baseline justify-between px-1">
         <h2 id="rail-listen" class="kicker text-krita-dim">Senaste avsnitten</h2>
-        <NuxtLink :to="links.section('lyssna')" class="text-xs font-semibold text-himmel hover:underline">Alla poddar</NuxtLink>
+        <NuxtLink :to="links.view('lyssna')" class="text-xs font-semibold text-himmel hover:underline">Alla poddar</NuxtLink>
       </div>
       <ul class="mt-3 divide-y divide-white/6 rounded-3xl border border-white/8 bg-navy-900/50">
         <li v-for="{ ep, show } in latest" :key="ep.id" class="flex items-center gap-3 p-3">

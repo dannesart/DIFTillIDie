@@ -4,8 +4,8 @@ import type { FeedPost } from '~/composables/useSnacket'
 import { frozenLead } from '~/lib/posts'
 
 /*
- * Prototype home: an overview, not a feed. A small hero, then what's being
- * said on the läktare and what's happening in the Stories, side by side as
+ * The shell's home on desktop: an overview, not a feed. A small hero, then
+ * what's being said on the läktare and what's happening in the Stories, side by side as
  * short previews of the real thing, each leading into its own view. The
  * next match and the podcasts are in the rail, so they aren't repeated here.
  */
@@ -37,40 +37,21 @@ function aboutStory(post: FeedPost) {
   return live && leadOf(live).headline
 }
 
-const storyPath = (s: Story) => `${links.value.section('stories')}#${s.id}`
+const storyPath = (s: Story) => `${links.value.view('stories')}#${s.id}`
 async function openStory(s: Story) {
   await navigateTo(storyPath(s))
   show(s.id)
 }
 function readTalk(s: Story) {
   filter.value = { storyId: s.id }
-  void navigateTo(links.value.section('snacket'))
+  void navigateTo(links.value.view('snacket'))
 }
 const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
-
-/*
- * Desktop placements of the centre (?hem=centrerad | vanster | mitt, default
- * bred). Below lg they are identical.
- * - bred: the whole space between the sidebars, with Stories' gutter and
- *   Stories' maximum width (80rem), so the two views line up.
- * - centrerad: the first version, 56rem centred in the main column.
- * - vanster: 56rem anchored to the sidebar, with Stories' gutter.
- * - mitt: 60rem, with the column's spare room split 1 : 2 between the
- *   sidebar side and the rail side, so it sits between the two.
- */
-const route = useRoute()
-const LAYOUTS = {
-  bred: { outer: 'lg:max-w-7xl', inner: '' },
-  centrerad: { outer: 'lg:px-10', inner: '' },
-  vanster: { outer: 'lg:mx-0', inner: '' },
-  mitt: { outer: 'lg:max-w-none lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,60rem)_minmax(0,2fr)]', inner: 'lg:col-start-2' },
-}
-const layout = computed(() => LAYOUTS[route.query.hem as keyof typeof LAYOUTS] ?? LAYOUTS.bred)
 </script>
 
 <template>
-  <div class="mx-auto max-w-4xl px-4 pb-24 sm:px-6 lg:pt-8" :class="layout.outer">
-    <div class="@container" :class="layout.inner">
+  <div class="mx-auto max-w-4xl px-4 pb-24 sm:px-6 lg:max-w-7xl lg:pt-8">
+    <div class="@container">
       <!-- A smaller hero: who we are, in one band -->
       <section class="relative isolate mt-4 overflow-hidden rounded-[2rem] border border-white/8 bg-navy-900/60 px-6 py-7 sm:px-8 lg:mt-0">
         <div aria-hidden="true" class="grain absolute -right-10 -top-8 -z-10 h-56 w-56 rotate-[8deg] overflow-hidden rounded-[2rem] opacity-70">
@@ -111,7 +92,7 @@ const layout = computed(() => LAYOUTS[route.query.hem as keyof typeof LAYOUTS] ?
                   <NuxtLink :to="links.supporter(post.author.handle)" class="truncate font-semibold hover:text-himmel">{{ post.author.name }}</NuxtLink>
                   <span class="shrink-0 text-xs text-krita-dim"><TimeAgo :at="post.createdAt" /></span>
                 </p>
-                <NuxtLink :to="links.section('snacket')" class="mt-0.5 line-clamp-2 text-sm leading-snug text-krita/90 hover:text-krita">{{ post.body }}</NuxtLink>
+                <NuxtLink :to="links.view('snacket')" class="mt-0.5 line-clamp-2 text-sm leading-snug text-krita/90 hover:text-krita">{{ post.body }}</NuxtLink>
                 <p v-if="aboutStory(post)" class="mt-1 flex items-center gap-1.5 text-xs text-krita-dim">
                   <span aria-hidden="true" class="h-3 w-1 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 3px, var(--color-navy-700) 3px 6px)" />
                   <span class="truncate">Om: {{ aboutStory(post) }}</span>
@@ -121,7 +102,7 @@ const layout = computed(() => LAYOUTS[route.query.hem as keyof typeof LAYOUTS] ?
           </ul>
           <p v-else class="mt-4 font-display text-lg font-bold">Läktaren väntar på första ramsan 💙</p>
 
-          <NuxtLink :to="links.section('snacket')" class="mt-auto self-start pt-4 text-sm font-bold text-himmel hover:underline">Till Snacket →</NuxtLink>
+          <NuxtLink :to="links.view('snacket')" class="mt-auto self-start pt-4 text-sm font-bold text-himmel hover:underline">Till Snacket →</NuxtLink>
         </section>
 
         <section class="card flex flex-col p-5" aria-labelledby="hem-stories">
@@ -147,7 +128,7 @@ const layout = computed(() => LAYOUTS[route.query.hem as keyof typeof LAYOUTS] ?
             </li>
           </ul>
 
-          <NuxtLink :to="links.section('stories')" class="mt-auto self-start pt-4 text-sm font-bold text-himmel hover:underline">Alla stories →</NuxtLink>
+          <NuxtLink :to="links.view('stories')" class="mt-auto self-start pt-4 text-sm font-bold text-himmel hover:underline">Alla stories →</NuxtLink>
         </section>
       </div>
 

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /*
- * Prototype view: a supporter's place on the stands, the same component as
- * /laktaren/<handle>. The shell keys its views by path, so another supporter
- * is always a fresh instance.
+ * Shell view: a supporter's place on the stands, the same component as the
+ * classic page (pages/laktaren/[handle].vue). The shell keys its views by
+ * path, so another supporter is always a fresh instance.
  */
 const route = useRoute()
 </script>

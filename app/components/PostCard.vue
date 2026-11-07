@@ -24,7 +24,7 @@ async function showTag(tag: string) {
   if (!links.value.shows('snacket')) await navigateTo(links.value.section('snacket'))
 }
 async function showStory(id: string) {
-  if (!links.value.shows('stories')) await navigateTo(links.value.shell ? `${links.value.section('stories')}#${id}` : `/#${id}`)
+  if (!links.value.shows('stories')) await navigateTo(links.value.story(id))
   show(id)
 }
 const { stories, status: newsStatus } = useNews()

@@ -13,13 +13,12 @@ const small = useMedia('(max-width: 639px)')
 const visible = computed(() => !!current.value && !playerInView.value && !(typing.value && small.value))
 
 // Back to the playing show's own player — switching the picker to it if needed.
-// (In the app-shell prototype "Lyssna" is a view of its own: go there.)
+// (In the app shell "Lyssna" is a view of its own on desktop: go there.)
 const links = useSectionLinks()
 function backToPlayer() {
   if (currentShow.value) selectedShow.value = currentShow.value.id
-  const el = document.getElementById('lyssna')
-  if (!el && links.value.shell) return void navigateTo(links.value.section('lyssna'))
-  el?.scrollIntoView({ behavior: 'smooth' })
+  if (links.value.shell && !links.value.shows('lyssna')) return void navigateTo(links.value.section('lyssna'))
+  document.getElementById('lyssna')?.scrollIntoView({ behavior: 'smooth' })
 }
 </script>
 

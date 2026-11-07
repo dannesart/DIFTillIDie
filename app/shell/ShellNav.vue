@@ -4,7 +4,7 @@ import type { SectionId } from '~/lib/sectionLinks'
 import NavIcon from './NavIcon.vue'
 
 /*
- * The prototype's persistent sidebar: the place you're in, always one click
+ * The shell's persistent sidebar: the place you're in, always one click
  * from the others. Everything here already exists on the site (the header's
  * sport switch, the bottom nav's sections, the account); it only moves.
  * The mini-player docks at its foot (see MiniPlayer.vue).
@@ -41,7 +41,7 @@ const accountLabel = computed(() => {
 
 <template>
   <div class="flex h-full flex-col px-4 pb-4 pt-6" :class="current && 'pb-24'">
-    <NuxtLink :to="links.section('hem')" class="group flex items-center gap-3 px-2" aria-label="Djurgår’n tills jag dör – hem">
+    <NuxtLink :to="links.view('hem')" class="group flex items-center gap-3 px-2" aria-label="Djurgår’n tills jag dör – hem">
       <span class="stripes block h-10 w-7 rounded-md [--stripe:5px] transition-transform duration-500 ease-spring group-hover:-rotate-6" />
       <span class="leading-none">
         <span class="block font-display text-2xl font-bold tracking-tight">Djurgår’n</span>
@@ -53,14 +53,14 @@ const accountLabel = computed(() => {
       <ul class="space-y-1">
         <li v-for="s in sections" :key="s.id">
           <NuxtLink
-            :to="links.section(s.id)"
-            :aria-current="links.shows(s.id) ? 'page' : undefined"
+            :to="links.view(s.id)"
+            :aria-current="links.here(s.id) ? 'page' : undefined"
             class="group relative flex items-center gap-3.5 rounded-2xl px-3 py-2.5 text-[0.95rem] font-semibold transition-colors"
-            :class="links.shows(s.id) ? 'bg-white/[0.07] text-krita' : 'text-krita-dim hover:bg-white/[0.04] hover:text-krita'"
+            :class="links.here(s.id) ? 'bg-white/[0.07] text-krita' : 'text-krita-dim hover:bg-white/[0.04] hover:text-krita'"
           >
             <!-- The active marker: a short club stripe -->
-            <span aria-hidden="true" class="stripes absolute inset-y-2 left-0 w-[3px] rounded-r-full [--stripe:4px] transition-opacity" :class="links.shows(s.id) ? 'opacity-100' : 'opacity-0'" />
-            <span :class="links.shows(s.id) ? 'text-himmel' : ''"><NavIcon :id="s.id" /></span>
+            <span aria-hidden="true" class="stripes absolute inset-y-2 left-0 w-[3px] rounded-r-full [--stripe:4px] transition-opacity" :class="links.here(s.id) ? 'opacity-100' : 'opacity-0'" />
+            <span :class="links.here(s.id) ? 'text-himmel' : ''"><NavIcon :id="s.id" /></span>
             {{ s.label }}
             <span v-if="s.id === 'lyssna' && playing" class="eq ml-auto flex h-3 items-end gap-px" aria-hidden="true">
               <span class="w-[2px] rounded-full bg-guld" /><span class="w-[2px] rounded-full bg-guld" /><span class="w-[2px] rounded-full bg-guld" />
@@ -131,10 +131,14 @@ const accountLabel = computed(() => {
       <p class="px-2 text-xs leading-relaxed text-krita-dim">
         <span class="font-display text-sm font-bold text-krita tabular-nums">{{ days }}</span> dagar sedan 12 mars 1891.
       </p>
-      <p class="flex items-center justify-between gap-2 px-2 text-xs">
-        <span class="kicker rounded-full bg-guld px-2 py-0.5 text-navy-950">Prototyp</span>
-        <NuxtLink to="/" class="font-semibold text-krita-dim underline-offset-2 hover:text-krita hover:underline">Nuvarande design →</NuxtLink>
+      <!-- Desktop's pilot status (phones keep the banner); the full disclaimers are in the footer -->
+      <p class="flex items-center gap-2 px-2 text-xs text-krita-dim">
+        <span class="kicker rounded-full bg-guld px-2 py-0.5 text-navy-950">Pilot</span>
+        <span aria-hidden="true">·</span>
+        Ett supporterprojekt
       </p>
+      <!-- The prototype only: back to the site as it is, to compare -->
+      <NuxtLink v-if="links.prototype" to="/" class="block px-2 text-xs font-semibold text-krita-dim underline-offset-2 hover:text-krita hover:underline">Nuvarande design →</NuxtLink>
     </div>
   </div>
 </template>
