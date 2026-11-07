@@ -17,14 +17,14 @@ exist, so it takes effect on the next build, never on a running deploy.
 | `/laktaren/<handle>` | today's page | the same address, in the shell |
 | `/#snacket`, `/#story-…`, `/#post-…` | in-page sections | phones: in-page sections · desktop: sent to the view |
 
-On Netlify, set the variable under **Site configuration → Environment
-variables**, scoped to the **Deploy Previews** context only (and Branch
-deploys, if wanted), then trigger a new deploy. Production stays unchanged
-until the variable is also set for the Production context.
+Deploy previews (pull requests) get it from `netlify.toml`
+(`[context.deploy-preview.environment]`); production and branch deploys
+don't. To switch production on, add `APP_SHELL = "1"` under
+`[context.production.environment]` (or set it in Netlify's UI for the
+Production context) and deploy. Values in `netlify.toml` win over the UI.
 
-**Rollback:** remove the variable (or scope it away from Production) and
-redeploy, or use Netlify's "Publish deploy" on the last deploy built without
-it, which is instant. With the shell off, `/snacket`, `/stories` and
+**Rollback:** remove the production setting and redeploy, or use Netlify's
+"Publish deploy" on the last deploy built without it, which is instant. With the shell off, `/snacket`, `/stories` and
 `/lyssna` redirect to the front page's sections, so links shared while it
 was on keep working. A new deploy replaces the cached pages.
 
