@@ -36,7 +36,12 @@ When a supporter changes their handle, the database keeps the old one in `profil
 ### Links
 
 - Names and avatars on posts and comments link to the author's page.
-- Clicking `@handle` on a post in the feed opens the compose dialog with the mention in the draft. On a wall, where there's no composer, handles and mentions are plain text.
+- Clicking the author's `@handle` in a post's header opens the compose dialog with the mention in the draft (a reply). On a wall, where there's no composer, it's plain text.
+- **@mentions** in a post's or comment's text link to the supporter mentioned, everywhere, once they're confirmed to be a supporter the viewer may see (`app/lib/mentions.ts`, `MentionLink.vue`). A mention is a real link, so new tabs and the browser's own menu work.
+  - Authors already on the page are confirmed at once. Any other handle is looked up by that exact handle, in batches, under the database's own rules: the current handle first, then a former one through its alias, which leads to the supporter it permanently belongs to, at their current address.
+  - Anything else (no such supporter, a profile that isn't public yet, a lookup that failed) stays text. Nothing about it is shown.
+  - Answers are per viewer (you can always see your own profile), and are forgotten when the account changes.
+- **Suggestions while writing:** `@` plus the start of a handle or name in the composer suggests supporters (avatar, name, @handle), only from the authors of the posts and comments already loaded. There's no directory of supporters. Keyboard, mouse and touch work like the `#` Story suggestions: Enter is a new line until the arrows choose someone, and Escape closes them. Choosing puts `@handle ` in place of what was typed and keeps the rest of the draft. An e-mail address, or an `@` that matches nobody, is just text.
 
 ## What is public, and when
 

@@ -5,10 +5,12 @@ import { frozenLead } from '~/lib/posts'
 /*
  * One post in Snacket på stan, with its real reactions and comments.
  * The author's name and avatar lead to their page (by user id); their
- * @handle inserts a mention, where there is a composer to insert it into.
+ * @handle in the header starts a reply (the composer with the mention
+ * ready), where there is a composer. @mentions in the text lead to the
+ * supporter mentioned, when they're a supporter you may see (MentionLink).
  * On a supporter's own wall: `onWall` (no link to the page you're on, and
- * no mention buttons, since there's no composer there).
- * `noMentions` alone: links, but no mention buttons (a preview without a composer).
+ * no reply button, since there's no composer there).
+ * `noMentions` alone: links, but no reply button (a preview without a composer).
  */
 const props = defineProps<{ post: FeedPost, onWall?: boolean, noMentions?: boolean }>()
 const emit = defineEmits<{ mention: [handle: string], removed: [id: string] }>()
@@ -89,8 +91,7 @@ async function remove() {
 
     <p class="mt-3 whitespace-pre-line text-[1.02rem] leading-relaxed">
       <template v-for="(t, i) in tokens" :key="i">
-        <span v-if="t.type === 'mention' && (onWall || noMentions)" class="font-semibold text-himmel">@{{ t.value }}</span>
-        <button v-else-if="t.type === 'mention'" class="font-semibold text-himmel hover:underline" :title="`Svara @${t.value}`" @click="emit('mention', t.value)">@{{ t.value }}</button>
+        <MentionLink v-if="t.type === 'mention'" :handle="t.value" />
         <button v-else-if="t.type === 'tag'" class="font-semibold text-guld hover:underline" @click="showTag(t.value)">#{{ t.value }}</button>
         <template v-else>{{ t.value }}</template>
       </template>

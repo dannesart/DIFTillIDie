@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { Sport, Story } from '#shared/types/domain'
+import type { PublicAuthor } from '#shared/utils/profile'
 import { focusDestination } from '~/lib/composerState'
+import { insertMention, matchSupporters } from '~/lib/mentions'
 import { POST_MAX, postLength } from '~/lib/posts'
-import { createInlineLookup } from '~/lib/storyLookup'
+import { createCaretLookup, createInlineLookup } from '~/lib/storyLookup'
 
 /*
  * The one post composer, in the compose dialog (ComposeDialog), two ways:
@@ -50,6 +52,7 @@ const left = computed(() => POST_MAX - postLength(body.value))
 function onFocusOut(e: FocusEvent) {
   if (focusDestination(form.value, e.relatedTarget) !== 'outside') return
   lookup.close()
+  people.close()
   picking.value = false
 }
 watch(body, () => (error.value = null))
@@ -72,9 +75,34 @@ const bifoga = useTemplateRef<HTMLButtonElement>('bifoga')
 /** What screen readers last heard about attaching: chosen or dismissed. */
 const attachNews = ref('')
 
+/*
+ * `@` + the start of a handle or name: supporters to mention, from the
+ * authors of the posts and comments on the page (lib/mentions). Choosing one
+ * puts their @handle in its place; carrying on writing keeps the text as typed.
+ */
+const { candidates } = useMentions()
+const people = createCaretLookup({ mark: '@', search: q => matchSupporters(candidates.value, q), enabled: () => true })
+const peopleId = `${hintId}-people`
+const peopleList = useTemplateRef<{ optionId: (i: number) => string }>('peopleList')
+
 function syncLookup() {
   const t = textarea.value
-  if (t) lookup.sync(t.value, t.selectionStart, t.selectionEnd)
+  if (!t) return
+  lookup.sync(t.value, t.selectionStart, t.selectionEnd)
+  people.sync(t.value, t.selectionStart, t.selectionEnd)
+}
+
+function choosePerson(p: PublicAuthor) {
+  const t = people.trigger.value
+  if (!t) return
+  const r = insertMention(body.value, t, p.handle)
+  people.close()
+  body.value = r.text
+  attachNews.value = `Nämnde @${p.handle}.`
+  nextTick(() => {
+    textarea.value?.focus()
+    textarea.value?.setSelectionRange(r.caret, r.caret)
+  })
 }
 
 function attach(story: Story) {
@@ -96,7 +124,9 @@ function chooseInline(story: Story) {
 
 function onTextKey(e: KeyboardEvent) {
   if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
-  const r = lookup.key(e.key)
+  // One mark at the caret at a time, so at most one of them is open.
+  const mentioning = people.open.value
+  const r = mentioning ? people.key(e.key) : lookup.key(e.key)
   if (r === false) return
   e.preventDefault()
   if (e.key === 'Escape') {
@@ -104,7 +134,10 @@ function onTextKey(e: KeyboardEvent) {
     e.stopPropagation()
     attachNews.value = 'Förslagen stängda.'
   }
-  if (typeof r === 'object') chooseInline(r)
+  if (typeof r === 'object') {
+    if (mentioning) choosePerson(r as PublicAuthor)
+    else chooseInline(r as Story)
+  }
 }
 
 function choosePicked(story: Story) {
@@ -126,6 +159,10 @@ function closePicker() {
 }
 
 const lookupStatus = computed(() => {
+  if (people.open.value) {
+    const n = people.results.value.length
+    return `${n} ${n === 1 ? 'supporter' : 'supportrar'} att nämna. Pil ned och Enter för att välja, eller skriv vidare.`
+  }
   if (!lookup.open.value) return attachNews.value
   const q = lookup.trigger.value?.query
   const n = lookup.results.value.length
@@ -213,8 +250,8 @@ defineExpose({ focus })
           :class="aboutStory ? 'pt-1 text-[0.95rem]' : 'pt-2.5 text-base'"
           :aria-describedby="hintId"
           aria-autocomplete="list"
-          :aria-controls="lookup.open.value && lookup.results.value.length ? lookupId : undefined"
-          :aria-activedescendant="lookup.open.value && lookup.active.value >= 0 ? lookupList?.optionId(lookup.active.value) : undefined"
+          :aria-controls="people.open.value ? peopleId : lookup.open.value && lookup.results.value.length ? lookupId : undefined"
+          :aria-activedescendant="people.open.value ? (people.active.value >= 0 ? peopleList?.optionId(people.active.value) : undefined) : lookup.open.value && lookup.active.value >= 0 ? lookupList?.optionId(lookup.active.value) : undefined"
           @keydown="onTextKey"
           @keydown.meta.enter.prevent="submit"
           @keydown.ctrl.enter.prevent="submit"
@@ -241,6 +278,18 @@ defineExpose({ focus })
         compact
         @choose="chooseInline"
         @hover="lookup.active.value = $event"
+      />
+    </CaretPopup>
+    <!-- `@` + text: supporters to mention, the same way -->
+    <CaretPopup v-if="people.open.value && people.trigger.value" :textarea="textarea" :at="people.trigger.value.start" :text="body">
+      <SupporterOptions
+        :id="peopleId"
+        ref="peopleList"
+        :supporters="people.results.value"
+        :active="people.active.value"
+        label="Supportrar att nämna"
+        @choose="choosePerson"
+        @hover="people.active.value = $event"
       />
     </CaretPopup>
     <p class="sr-only" aria-live="polite">{{ lookupStatus }}</p>
