@@ -53,10 +53,5 @@ const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('sv-SE', {
         </li>
       </ul>
     </section>
-
-    <p class="rounded-2xl bg-guld/10 px-4 py-3 text-xs leading-relaxed text-krita-dim">
-      <span class="font-bold text-guld">Pilot.</span>
-      Allt här är på riktigt: nyheter, poddar, matcher och Snacket på stan.
-    </p>
   </div>
 </template>
