@@ -32,6 +32,26 @@ const links = useSectionLinks()
 const roomy = computed(() => links.value.shows('snacket') || links.value.shows('stories'))
 // Lyssna already is the podcasts.
 const episodes = computed(() => !links.value.shows('lyssna'))
+
+/*
+ * One vertical scrollbar: the page's. The rail is a sticky column, not a
+ * scroll box of its own. While it fits the window it sticks by its top; when
+ * it is taller (a short window) it sticks by its bottom instead (top = window
+ * height − its height), so it scrolls along with the page until its last item
+ * is in view, and nothing in it is ever out of reach.
+ */
+const rail = ref<HTMLElement>()
+const railHeight = ref(0)
+let railObserver: ResizeObserver | undefined
+onMounted(() => {
+  railObserver = new ResizeObserver(([entry]) => (railHeight.value = entry!.target.getBoundingClientRect().height))
+  if (rail.value) railObserver.observe(rail.value)
+})
+onBeforeUnmount(() => railObserver?.disconnect())
+const railTop = computed(() => `min(0px, calc(100dvh - ${railHeight.value}px))`)
+
+// The prototype's own scrollbar colours (main.css), on desktop only; gone again when you leave it.
+useHead({ htmlAttrs: { class: 'app-shell' } })
 </script>
 
 <template>
@@ -46,7 +66,8 @@ const episodes = computed(() => !links.value.shows('lyssna'))
       </p>
     </div>
 
-    <aside class="sticky top-0 hidden h-dvh overflow-y-auto border-r border-white/8 bg-natt/70 lg:block">
+    <!-- Fits any ordinary window; scrolls on its own only when it can't (a short window with the player docked at its foot) -->
+    <aside class="shell-scroll sticky top-0 hidden h-dvh overflow-y-auto border-r border-white/8 bg-natt/70 lg:block">
       <ShellNav />
     </aside>
 
@@ -55,11 +76,13 @@ const episodes = computed(() => !links.value.shows('lyssna'))
     </main>
 
     <aside
-      class="sticky top-0 hidden h-dvh overflow-y-auto border-l border-white/8 bg-natt/40"
+      class="hidden border-l border-white/8 bg-natt/40"
       :class="roomy ? '2xl:block' : 'xl:block'"
       aria-label="På gång"
     >
-      <ShellRail :episodes="episodes" />
+      <div ref="rail" class="sticky" :style="{ top: railTop }">
+        <ShellRail :episodes="episodes" />
+      </div>
     </aside>
 
     <div class="lg:hidden">

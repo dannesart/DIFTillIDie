@@ -49,8 +49,10 @@ function readTalk(s: Story) {
 const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
 
 /*
- * Three desktop placements of the centre, kept side by side for comparison
- * (?hem=centrerad | vanster, default mitt). Below lg they are identical.
+ * Desktop placements of the centre (?hem=centrerad | vanster | mitt, default
+ * bred). Below lg they are identical.
+ * - bred: the whole space between the sidebars, with Stories' gutter and
+ *   Stories' maximum width (80rem), so the two views line up.
  * - centrerad: the first version, 56rem centred in the main column.
  * - vanster: 56rem anchored to the sidebar, with Stories' gutter.
  * - mitt: 60rem, with the column's spare room split 1 : 2 between the
@@ -58,11 +60,12 @@ const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
  */
 const route = useRoute()
 const LAYOUTS = {
+  bred: { outer: 'lg:max-w-7xl', inner: '' },
   centrerad: { outer: 'lg:px-10', inner: '' },
   vanster: { outer: 'lg:mx-0', inner: '' },
   mitt: { outer: 'lg:max-w-none lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,60rem)_minmax(0,2fr)]', inner: 'lg:col-start-2' },
 }
-const layout = computed(() => LAYOUTS[route.query.hem as keyof typeof LAYOUTS] ?? LAYOUTS.mitt)
+const layout = computed(() => LAYOUTS[route.query.hem as keyof typeof LAYOUTS] ?? LAYOUTS.bred)
 </script>
 
 <template>

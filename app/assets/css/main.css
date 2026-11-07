@@ -50,6 +50,59 @@
   scroll-margin-top: calc(env(safe-area-inset-top) + var(--header-h) + 1rem);
 }
 
+/*
+ * The desktop app-shell prototype's scrollbars (the page's, and the sidebar's
+ * when a short window makes it scroll): a quiet navy track and a muted
+ * sky-blue thumb that brightens under the pointer. Only in the prototype
+ * (AppShell.vue sets .app-shell on <html>) and only from lg; the site's own
+ * pages and phones keep the browser's scrollbars.
+ */
+@media (min-width: 1024px) {
+  .app-shell {
+    --scroll-track: var(--color-navy-950);
+    /* ≥ 3:1 against the track, as a control should be; brighter under the pointer. */
+    --scroll-thumb: color-mix(in srgb, var(--color-himmel) 50%, var(--color-navy-900));
+    --scroll-thumb-hover: color-mix(in srgb, var(--color-himmel) 75%, var(--color-navy-900));
+  }
+  /* Chromium and Safari: shaped thumbs with a hover state. */
+  .app-shell::-webkit-scrollbar,
+  .app-shell .shell-scroll::-webkit-scrollbar {
+    width: 12px;
+    background: var(--scroll-track);
+  }
+  .app-shell .shell-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .app-shell::-webkit-scrollbar-thumb,
+  .app-shell .shell-scroll::-webkit-scrollbar-thumb {
+    border: 3px solid var(--scroll-track);
+    border-radius: 999px;
+    background: var(--scroll-thumb);
+  }
+  .app-shell .shell-scroll::-webkit-scrollbar-thumb {
+    border-width: 2px;
+  }
+  .app-shell::-webkit-scrollbar-thumb:hover,
+  .app-shell .shell-scroll::-webkit-scrollbar-thumb:hover,
+  .app-shell::-webkit-scrollbar-thumb:active,
+  .app-shell .shell-scroll::-webkit-scrollbar-thumb:active {
+    background: var(--scroll-thumb-hover);
+  }
+  /* Firefox: the standard properties (no thumb hover there, so it brightens while the area is hovered). */
+  @supports not selector(::-webkit-scrollbar) {
+    .app-shell,
+    .app-shell .shell-scroll {
+      scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+    }
+    .app-shell .shell-scroll {
+      scrollbar-width: thin;
+    }
+    .app-shell .shell-scroll:hover {
+      scrollbar-color: var(--scroll-thumb-hover) var(--scroll-track);
+    }
+  }
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
