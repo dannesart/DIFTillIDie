@@ -36,7 +36,7 @@ When a supporter changes their handle, the database keeps the old one in `profil
 ### Links
 
 - Names and avatars on posts and comments link to the author's page.
-- Clicking `@handle` on a post in the feed still inserts a mention in the composer. On a wall, where there's no composer, handles and mentions are plain text.
+- Clicking `@handle` on a post in the feed opens the compose dialog with the mention in the draft. On a wall, where there's no composer, handles and mentions are plain text.
 
 ## What is public, and when
 

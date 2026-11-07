@@ -61,7 +61,8 @@ Everything in Snacket på stan is real and stored in Supabase (see [snacket-post
 | Auth still restoring | A moment's wait; no local content shown. |
 
 - **Still local and per owner:**
-  - **Story drafts.** The guest keeps `djurgarn:drafts:v1`, and each account has `djurgarn:drafts:v1:account:<user id>`. Switching account clears a half-typed post or comment and closes an open Story dialog.
+  - **Story drafts.** The guest keeps `djurgarn:drafts:v1`, and each account has `djurgarn:drafts:v1:account:<user id>`. Switching account clears a half-typed comment and closes an open compose dialog.
+  - **The Snacket draft** (text, sport, attached Story; see [snacket-posts.md](snacket-posts.md)) works the same way: `djurgarn:post-draft:v1` for the guest, `djurgarn:post-draft:v1:account:<user id>` for each account.
   - **Posts written before Snacket became real**, under `djurgarn:snacket:v1` (guest) or `djurgarn:snacket:v1:account:<user id>`, are **dormant**: the app no longer reads them, and never publishes, migrates or deletes them.
 
 ## Registration modes (future): signing in is not permission
@@ -167,6 +168,7 @@ Locally, copy [`.env.example`](../.env.example) to `.env`. If those variables ar
     - Sign out → the draft isn't offered.
     - Sign in as someone else → it isn't offered either.
     - Sign back in as yourself → it's back.
+    - The same with a Snacket draft: "Ditt utkast" shows in Snacket's entry only for the account that wrote it.
 
 Real posts have their own two-device plan in [snacket-posts.md](snacket-posts.md#manual-two-device-test-plan-after-applying-the-migration).
 

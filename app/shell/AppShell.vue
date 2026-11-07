@@ -25,7 +25,7 @@ const AppHeader = defineLazyHydrationComponent('mediaQuery', () => import('~/com
 const MobileNav = defineLazyHydrationComponent('mediaQuery', () => import('~/components/MobileNav.vue'))
 
 const { load } = useSnacket()
-const { load: loadDrafts } = useStoryCompose()
+const { load: loadDrafts } = useCompose()
 onMounted(() => {
   load()
   loadDrafts()
@@ -108,7 +108,7 @@ function skipToContent() {
       </div>
     </aside>
 
-    <StoryComposeDialog />
+    <ComposeDialog />
     <!-- Opened from the footer's install card, which is on every view -->
     <InstallGuide />
     <MobileNav v-if="screen.mobile.value" :hydrate-on-media-query="MOBILE_QUERY" />

@@ -8,14 +8,18 @@ One shared journey: a signed-in supporter publishes a post, Supabase stores it, 
 
 Snacket på stan is one feed: posts published by signed-in supporters, stored in Supabase, visible to everyone. It shows **Nyast** (newest first) by default, or **Hetast** ([below](#hetast--nyast)). Hashtags, filters and Story counts come only from these posts. (Until [Mission #14](#retired-demo-snack) a separate, labelled Demo-snack with fictional supporters sat below it.)
 
+- **Writing happens in the compose dialog** (`ComposeDialog`: a centred card on desktop, a bottom sheet on phones), opened from the compact "Vad snackas det om på stan?" at the top of Snacket, or by clicking an @handle on a post (the mention is put in the draft, ready to write after). The same dialog is "Snacka om detta" for a Story; each keeps its own draft.
+  - **The draft** (text, sport, attached Story) survives Escape, ✕, a tap outside and a reload, and is kept per account in this browser (`djurgarn:post-draft:v1:account:<user id>`), like the Story drafts. Switching account closes the dialog and never shows one supporter's draft to another. While a draft is waiting, the entry shows it ("Ditt utkast", "Fortsätt").
+  - **A fresh draft** starts from what you're browsing: the sport filter, and the Story whose posts you're reading. A draft in progress is never changed by browsing.
 - **The composer publishes for real, or it isn't offered.**
-  - Signed out, there's no text box. Instead: "Vill du snacka? Logga in…".
+  - Signed out, there's no text box. Instead: "Vill du snacka? Logga in…" (an @handle opens sign-in straight away).
   - Signed in without a profile, the text box is there, but the button is "Välj läktarnamn först".
   - Signed in with a profile, "Publicera". Under the button: *"Syns för alla i Snacket på stan, även för den som inte är inloggad."*
 - **Publishing states:**
   - **While publishing:** "Publicerar…", the text is read-only, and a second click does nothing.
-  - **Success:** only when Supabase returns the stored row. Then the composer clears and collapses, the feed goes back to Nyast with any filters cleared, and the page scrolls to the new post once it has rendered, stopping below the sticky header. There's no optimistic insert.
-  - **Failure:** a calm message, and **the text stays exactly as typed**. In the "Snacka om detta" dialog the text is the Story's saved draft, so it also survives closing the dialog. That dialog only shows "Ute på stan!" after confirmation.
+  - **Success:** only when Supabase returns the stored row. Then the draft clears (the sport stays as the next default), the dialog shows "Ute på stan!", and the feed goes back to Nyast with any filters cleared, so the post is at the top. "Visa inlägget" closes the dialog and scrolls to it, stopping below the sticky header. There's no optimistic insert.
+  - **Failure:** a calm message, and **the draft stays exactly as it was** (text, sport, Story), saved, so it also survives closing the dialog.
+  - **While a post is on its way** the dialog can't be closed (Escape, ✕ and the backdrop wait), so its result always lands; if a browser closes it anyway, the composer stays alive until Supabase answers.
 - **Feed states:** loading placeholders (never invented content), an empty state ("Bli den första Djurgårdaren som skriver här!"), an error with "Försök igen", and "Hämta nya inlägg".
   - If a refresh fails while posts are shown, they stay with a note that they may be stale.
   - The feed also refetches when you return to the tab after more than a minute, which is handy for the two-device test.
@@ -37,7 +41,7 @@ The familiar two-tab control sits above the feed. **Nyast** is the default: newe
 - **No jumping.** The order is a snapshot. It's taken when Hetast is chosen and when Supabase delivers fresh totals (`statsLoadedAt`, after posts load or refresh).
   - Your own reaction or comment updates the counts in place but never re-sorts, so a post doesn't move away from under you.
   - Posts newer than the snapshot go first.
-- **Publishing** from the main composer switches back to Nyast and reveals the new post. Posting from a Story's dialog leaves the feed as it is.
+- **Publishing** a Snacket post switches back to Nyast, so the new post is at the top. Posting from a Story's dialog leaves the feed as it is.
 
 ### Attaching a Story
 
@@ -49,7 +53,7 @@ A post can be about one Story. It's stored as the post's `story_id`, which is a 
   - **The popup floats at the `#`.** It isn't a box in the page, so nothing below moves when it opens or closes.
     - **Finding the `#`:** a hidden copy of the textarea (same width, font and wrapping; `app/lib/caretPopup.ts`) shows where the `#` lands, including on later lines and after the textarea has scrolled.
     - **Placement:** below that line, or above it when there isn't room. It stays inside the visual viewport, which counts a phone keyboard, and follows page scrolling, resizing and the keyboard. It hides while the `#` is scrolled out of the textarea.
-    - **Teleported to `#teleports`:** the composer card's `backdrop-filter` would otherwise make `position: fixed` relative to the card.
+    - **Teleported into the compose dialog** (or to `#teleports` outside one): everything outside a modal `<dialog>` is inert and beneath it, and a surrounding `backdrop-filter` would make `position: fixed` relative to that box.
     - **Focus:** pressing in it never takes focus from the textarea.
   - **Choosing** (arrow keys + Enter, or a tap) removes the `#text`, keeps the rest of the draft, puts the caret where the word was, and shows the Story as the removable "Om: …" chip.
   - **Escape** hides the suggestions for that word and keeps the text and the composer.
@@ -193,7 +197,7 @@ Posts need visible authors, which the profiles migration anticipated ("public di
 | Migration | [`supabase/migrations/20261103144226_posts.sql`](../supabase/migrations/20261103144226_posts.sql) |
 | Store: read, publish, delete, error messages | [`app/lib/posts.ts`](../app/lib/posts.ts), provided by [`app/plugins/auth.client.ts`](../app/plugins/auth.client.ts), used via `useCommunity()` |
 | Feed, filters and Story counts | [`app/composables/useSnacket.ts`](../app/composables/useSnacket.ts): `feed` (filtered) and `all` |
-| UI | `SnacketSection`, `PostComposer`, `PostCard`, `StoryComposeDialog` |
+| UI | `SnacketSection`, `PostComposer`, `PostCard`, `ComposeDialog` |
 
 - **Posts are fetched in the browser.** The server never renders them, so the CDN-cached homepage stays identical for everyone and the feed is always fresh.
 - **The feed query is:** `posts.select('id, body, sport, story_id, story_ref, created_at, author:profiles!posts_author_id_fkey(id, display_name, handle, avatar)')`, newest first, limit 50. On a database without the supporter-profiles migration yet (`42703`), it retries without `avatar` ([supporter-profiles.md](supporter-profiles.md)).

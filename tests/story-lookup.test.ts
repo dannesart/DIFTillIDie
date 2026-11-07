@@ -286,15 +286,3 @@ describe('the `#` suggestions', () => {
   })
 })
 
-describe('focus while attaching', () => {
-  it('moving into the suggestions or the Bifoga search keeps an empty composer open', () => {
-    let storyId = ''
-    const c = createComposerOpen(() => !storyId)
-    c.enter() // Bifoga clicked in an empty composer
-    c.leave('inside') // focus to the search field
-    c.enter()
-    storyId = 'story-a' // chosen; the search field disappears
-    c.leave('nowhere')
-    expect(c.open.value).toBe(true)
-  })
-})
