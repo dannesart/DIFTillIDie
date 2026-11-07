@@ -1,10 +1,17 @@
-import type { PodcastEpisode } from '#shared/types/domain'
+import type { PodcastEpisode, PodcastResponse } from '#shared/types/domain'
+import type { StoredSession } from '~/lib/playbackSession'
+import { clearSession, planRestore, readSession, writeSession } from '~/lib/playbackSession'
 
 /*
  * One player, many controls, any show. The single <audio> element lives in
  * PodcastAudio (mounted once for the whole page) and registers itself here;
  * the show cards and the mini-player all read and drive the same state, so
  * only one stream can ever play. Playback only starts from a click.
+ *
+ * Where you were is remembered in this browser (lib/playbackSession): saved
+ * every few seconds while playing, and on pause, seek and leaving the page.
+ * The next visit brings the episode back paused at that point (restore);
+ * Play carries on from there.
  */
 
 export interface PlayingShow {
@@ -14,6 +21,20 @@ export interface PlayingShow {
 
 // The element itself is browser-only, so it lives outside useState.
 let audioEl: HTMLAudioElement | null = null
+/**
+ * Where to start once the audio can seek: a restored position (or a seek made
+ * before anything loaded). The element can't seek until its metadata is in,
+ * and with preload="none" that's only once Play is pressed.
+ */
+let pendingSeek: number | null = null
+let lastSave = 0
+const SAVE_EVERY_MS = 5000
+
+/** This browser's storage, if it may be used at all (it can be blocked). */
+function storage(): StoredSession | undefined {
+  try { return window.localStorage }
+  catch { return undefined }
+}
 
 export function usePodcastPlayer() {
   const current = useState<PodcastEpisode | null>('player-current', () => null)
@@ -37,16 +58,71 @@ export function usePodcastPlayer() {
     failed.value = 'Ljudet kunde inte spelas här. Lyssna hos podden i stället.'
   }
 
+  /** Remember where we are (episode, show, position). */
+  function persist() {
+    const ep = current.value
+    const show = currentShow.value
+    if (!ep?.audioUrl || !show) return
+    lastSave = Date.now()
+    writeSession(storage(), { showId: show.id, showTitle: show.title, episode: ep, position: pendingSeek ?? audioEl?.currentTime ?? position.value, duration: duration.value || undefined })
+  }
+
   function attach(el: HTMLAudioElement) {
     if (audioEl === el) return
     audioEl = el
     el.addEventListener('play', () => (playing.value = true))
-    el.addEventListener('pause', () => (playing.value = false))
-    el.addEventListener('ended', () => (playing.value = false))
-    el.addEventListener('timeupdate', () => (position.value = el.currentTime))
-    el.addEventListener('loadedmetadata', () => (duration.value = el.duration || duration.value))
+    el.addEventListener('pause', () => {
+      playing.value = false
+      persist()
+    })
+    // Finished: nothing to come back to (the pause just before it saved the end; this forgets it).
+    el.addEventListener('ended', () => {
+      playing.value = false
+      clearSession(storage())
+    })
+    el.addEventListener('timeupdate', () => {
+      // Until a restored position is applied, the element's 0 isn't where we are.
+      if (pendingSeek !== null) return
+      position.value = el.currentTime
+      if (!el.paused && Date.now() - lastSave >= SAVE_EVERY_MS) persist()
+    })
+    el.addEventListener('seeked', persist)
+    el.addEventListener('loadedmetadata', () => {
+      if (Number.isFinite(el.duration) && el.duration > 0) duration.value = el.duration
+      // Now it can seek: pick up where we were.
+      if (pendingSeek !== null) {
+        const at = Math.min(pendingSeek, duration.value || pendingSeek)
+        pendingSeek = null
+        if (at > 0) el.currentTime = at
+        position.value = at
+      }
+    })
     el.addEventListener('error', () => current.value && onError())
+    // Leaving (closing the tab, reloading, a phone putting the page away).
+    window.addEventListener('pagehide', persist)
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && persist())
     setupMediaSession()
+  }
+
+  /**
+   * Bring back the last episode, paused where it was. Never plays: that's the
+   * supporter's Play. Only when nothing has been chosen yet on this visit.
+   */
+  function restore(shows: PodcastResponse[] | undefined) {
+    const el = audioEl
+    if (!el || current.value) return
+    const plan = planRestore(readSession(storage()), shows)
+    if (plan.action === 'forget') return clearSession(storage())
+    if (plan.action !== 'restore') return
+    current.value = plan.episode
+    currentShow.value = plan.show
+    duration.value = plan.duration ?? 0
+    position.value = plan.position
+    pendingSeek = plan.position || null
+    // With preload="none" this fetches nothing until Play.
+    el.src = plan.episode.audioUrl!
+    selectedShow.value ??= plan.show.id
+    updateMediaSession()
   }
 
   function detach(el: HTMLAudioElement) {
@@ -67,18 +143,30 @@ export function usePodcastPlayer() {
     current.value = target
     if (show) currentShow.value = show
     position.value = 0
+    pendingSeek = null
     duration.value = target.durationSeconds ?? 0
     el.src = target.audioUrl
     updateMediaSession()
+    // Another episode replaces what was remembered.
+    persist()
     await el.play().catch(onError)
   }
 
   function seekTo(seconds: number) {
-    if (!audioEl || !duration.value) return
-    audioEl.currentTime = Math.min(Math.max(0, seconds), duration.value)
+    const el = audioEl
+    if (!el || !duration.value) return
+    const at = Math.min(Math.max(0, seconds), duration.value)
+    // Nothing loaded yet (a restored episode before Play): start there once it can.
+    if (el.readyState < HTMLMediaElement.HAVE_METADATA) {
+      pendingSeek = at
+      position.value = at
+      persist()
+      return
+    }
+    el.currentTime = at
   }
 
-  const seekBy = (delta: number) => audioEl && seekTo(audioEl.currentTime + delta)
+  const seekBy = (delta: number) => audioEl && seekTo((pendingSeek ?? audioEl.currentTime) + delta)
 
   /** Click on a progress bar → jump to that point. */
   function seekFromClick(e: MouseEvent) {
@@ -92,12 +180,14 @@ export function usePodcastPlayer() {
     if (e.key === 'ArrowLeft') seekBy(-15)
   }
 
-  /** Close the mini-player: pause and forget the episode. */
+  /** Close the mini-player: pause and forget the episode, here and in what's remembered. */
   function stop() {
     audioEl?.pause()
     current.value = null
     currentShow.value = null
     position.value = 0
+    pendingSeek = null
+    clearSession(storage())
   }
 
   // Lock-screen / headset controls via the Media Session API, where supported.
@@ -116,7 +206,7 @@ export function usePodcastPlayer() {
     navigator.mediaSession.metadata = new MediaMetadata({ title: current.value.title, artist: showTitle.value, album: showTitle.value })
   }
 
-  return { current, currentShow, showTitle, playing, position, duration, progress, failed, visibleShow, selectedShow, playerInView, attach, detach, toggle, seekTo, seekBy, seekFromClick, seekFromKey, stop }
+  return { current, currentShow, showTitle, playing, position, duration, progress, failed, visibleShow, selectedShow, playerInView, attach, detach, restore, toggle, seekTo, seekBy, seekFromClick, seekFromKey, stop }
 }
 
 export function clock(sec: number): string {
