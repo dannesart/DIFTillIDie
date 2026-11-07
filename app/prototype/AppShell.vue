@@ -73,6 +73,8 @@ useHead({ htmlAttrs: { class: 'app-shell' } })
 
     <main id="innehall" class="min-w-0">
       <NuxtPage :page-key="r => r.path" />
+      <!-- On every screen: it says this is a supporter project, not the club's channel, and whose the content is -->
+      <AppFooter />
     </main>
 
     <aside
@@ -85,9 +87,6 @@ useHead({ htmlAttrs: { class: 'app-shell' } })
       </div>
     </aside>
 
-    <div class="lg:hidden">
-      <AppFooter />
-    </div>
     <StoryComposeDialog />
     <MobileNav />
     <StripeBurst />
