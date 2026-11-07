@@ -133,6 +133,7 @@ Rules:
 
 - **Show picker:** accessible tabs, with an equaliser on the show that's playing. It starts on the freshest episode, or on the night show after dark.
 - **One audio element** for the whole page, in `PodcastAudio.vue`. Starting any episode replaces the current stream, and the mini-player follows whichever show is playing.
+- **Where you were is remembered** in this browser (`app/lib/playbackSession.ts`): the episode, its show and the position, saved every few seconds while playing and on pause, seek and leaving the page. After a refresh, a browser restart or a new deploy the episode is back in the mini-player, **paused** at that point; Play carries on. Another episode replaces it; closing the player or finishing the episode forgets it. An older episode that has left the show's latest feed still resumes from what was kept, as long as the show is on the site.
 - **Audio** streams from the MP3 enclosure each show publishes in its RSS feed for podcast players. It's credited to the show and linked to its own page and listening links.
 - **If a show's feed can't be reached,** its tab says so and offers direct listening links.
 - **Adding a show** means adding an entry to `PODCAST_SHOWS` in [`server/lib/podcast.ts`](server/lib/podcast.ts).
