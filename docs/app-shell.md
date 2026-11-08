@@ -3,9 +3,13 @@
 Every page is laid out by the app shell ([`app/shell/AppShell.vue`](../app/shell/AppShell.vue),
 routes in [`modules/app-shell.ts`](../modules/app-shell.ts)).
 
-- **Desktop, from 1024 px:** a persistent sidebar holds the sections, sport,
-  your account and the pilot status. The middle shows one view at a time.
-  From 1280 px a rail shows the next match and the newest episodes.
+- **Desktop, from 1024 px:** a persistent sidebar for navigation and
+  identity: the sections, then the pilot status and your account at its
+  foot. The middle shows one view at a time. From 1280 px (1536 px on
+  Snacket and Stories, which have their own side column) a rail shows the
+  next match, the newest episodes and, below them, what's playing. Where
+  there's no rail, the mini-player floats bottom right instead. Desktop has
+  no sport switch, so its sport filter is always "Allt".
 - **Phones and tablets:** the long front page, header, bottom nav and pilot
   banner.
 - **Every screen:** the footer, with its full disclaimers.

@@ -4,9 +4,11 @@
  * paused mid-listen) and the main player is scrolled out of view.
  * It drives the same <audio> element as the main player.
  *
- * Two places, one player: on phones and tablets it floats above the bottom
- * nav (app.vue); on desktop it's `docked` in the sidebar's own layout,
- * below the sport filter (ShellNav). Both read the same player state.
+ * Two places, one player, never both on screen: `docked` in the desktop
+ * rail, under the newest episodes (ShellRail), wherever the rail is shown;
+ * floating everywhere else (app.vue): above the bottom nav on phones and
+ * tablets, bottom right on a desktop too narrow for the rail. Both read the
+ * same player state and drive the same <audio>.
  */
 const props = defineProps<{ docked?: boolean }>()
 const { current, currentShow, showTitle, playing, position, duration, progress, playerInView, selectedShow, toggle, seekFromClick, seekFromKey, stop } = usePodcastPlayer()
@@ -20,6 +22,8 @@ const visible = computed(() => !!current.value && !playerInView.value && (props.
 // Back to the playing show's own player — switching the picker to it if needed.
 // (On desktop "Lyssna" is a view of its own: go there.)
 const links = useSectionLinks()
+// Where the rail (and so the docked player) appears: xl, or 2xl on Snacket and Stories.
+const railLate = useRailLate()
 function backToPlayer() {
   if (currentShow.value) selectedShow.value = currentShow.value.id
   if (!links.value.shows('lyssna')) return void navigateTo(links.value.section('lyssna'))
@@ -29,7 +33,7 @@ function backToPlayer() {
 
 <template>
   <!-- Keeps the footer from hiding under the floating player at the very bottom of the page (phones and tablets) -->
-  <div v-if="current && !docked" aria-hidden="true" class="h-[4.5rem] lg:hidden" />
+  <div v-if="current && !docked" aria-hidden="true" class="h-[4.5rem]" :class="railLate ? '2xl:hidden' : 'xl:hidden'" />
 
   <Transition
     enter-active-class="transition duration-500 ease-out-expo"
@@ -39,7 +43,7 @@ function backToPlayer() {
   >
     <aside
       v-if="visible && current"
-      :class="docked ? 'mt-6' : 'fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem] lg:hidden'"
+      :class="docked ? '' : ['fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem]', railLate ? '2xl:hidden' : 'xl:hidden']"
       aria-label="Spelare"
     >
       <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-navy-900/90 shadow-[0_24px_60px_-24px_rgb(3_9_21/0.95)] backdrop-blur-xl">

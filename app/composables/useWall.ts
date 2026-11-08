@@ -19,6 +19,17 @@ export function useWall(address: string) {
  */
 export const supporterPath = (handle: string) => `/laktaren/${handle}`
 
+/**
+ * Snacket and Stories bring their own side columns, so on their pages the
+ * shell's rail (next match, episodes, the docked mini-player) waits for a
+ * wider screen: 2xl instead of xl. The floating mini-player is the fallback
+ * below that, so exactly one of them is on screen.
+ */
+export function useRailLate() {
+  const links = useSectionLinks()
+  return computed(() => links.value.here('snacket') || links.value.here('stories'))
+}
+
 /** Section and supporter addresses for the page you're on (see lib/sectionLinks). */
 export function useSectionLinks() {
   const route = useRoute()
