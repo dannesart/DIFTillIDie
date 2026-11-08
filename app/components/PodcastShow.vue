@@ -10,7 +10,7 @@ import type { PodcastEpisode, PodcastResponse } from '#shared/types/domain'
 const props = defineProps<{ podcast: PodcastResponse, highlight?: boolean }>()
 
 const root = useTemplateRef<HTMLElement>('root')
-const { current, currentShow, playing, position, duration, progress, failed, visibleShow, toggle: togglePlayer, seekFromClick: seek, seekFromKey: onSeekKey } = usePodcastPlayer()
+const { current, currentShow, playing, position, duration, progress, failed, visibleShow, toggle: togglePlayer, seekFromClick: seek, seekFromKey: onSeekKey, progressFor } = usePodcastPlayer()
 const showAll = ref(false)
 
 const title = computed(() => props.podcast.show?.title ?? props.podcast.status.outlet)
@@ -95,6 +95,8 @@ onBeforeUnmount(() => {
             <div class="min-w-0 flex-1">
               <p class="kicker text-guld">Senaste avsnittet · <TimeAgo :at="latest.publishedAt" /><template v-if="latest.durationSeconds"> · {{ minutes(latest.durationSeconds) }}</template></p>
               <p class="mt-1 font-display text-2xl font-semibold leading-tight">{{ latest.title }}</p>
+              <!-- Its own listening progress (the playing one shows its live position below) -->
+              <EpisodeProgressMark v-if="!isCurrent(latest)" :progress="progressFor(latest)" />
               <p v-if="latest.excerpt" class="mt-2 text-sm leading-relaxed text-krita-dim">{{ latest.excerpt }}</p>
             </div>
           </div>
@@ -134,6 +136,7 @@ onBeforeUnmount(() => {
             <div class="min-w-0 flex-1">
               <p class="truncate font-semibold">{{ ep.title }}</p>
               <p class="text-xs text-krita-dim"><TimeAgo :at="ep.publishedAt" /><template v-if="ep.durationSeconds"> · {{ minutes(ep.durationSeconds) }}</template><template v-if="isCurrent(ep)"> · {{ clock(position) }}</template></p>
+              <EpisodeProgressMark v-if="!isCurrent(ep)" :progress="progressFor(ep)" />
             </div>
             <a :href="ep.url" target="_blank" rel="noopener" class="shrink-0 text-xs font-semibold text-krita-dim hover:text-himmel">Öppna ↗</a>
           </li>

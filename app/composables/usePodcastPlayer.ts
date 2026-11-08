@@ -1,6 +1,8 @@
 import type { PodcastEpisode, PodcastResponse } from '#shared/types/domain'
 import type { StoredSession } from '~/lib/playbackSession'
 import { clearSession, planRestore, readSession, writeSession } from '~/lib/playbackSession'
+import type { EpisodeProgress, ListeningHistory } from '~/lib/listeningHistory'
+import { episodeProgress, listenedStep, readHistory, recordProgress, seedFromSession, switchEpisode, writeHistory } from '~/lib/listeningHistory'
 
 /*
  * One player, many controls, any show. The single <audio> element lives in
@@ -12,6 +14,11 @@ import { clearSession, planRestore, readSession, writeSession } from '~/lib/play
  * every few seconds while playing, and on pause, seek and leaving the page.
  * The next visit brings the episode back paused at that point (restore);
  * Play carries on from there.
+ *
+ * Each episode's own progress is kept too (lib/listeningHistory): starting
+ * another episode first notes where the outgoing one was, under its own id,
+ * then starts the new one from its own point. The lists show what's
+ * part-heard and what's done. Closing the player keeps that history.
  */
 
 export interface PlayingShow {
@@ -27,6 +34,9 @@ let audioEl: HTMLAudioElement | null = null
  * and with preload="none" that's only once Play is pressed.
  */
 let pendingSeek: number | null = null
+/** Seconds actually played since the current episode's progress was last noted (jumps don't count). */
+let pendingListen = 0
+let listenFrom: number | null = null
 let lastSave = 0
 const SAVE_EVERY_MS = 5000
 
@@ -47,6 +57,9 @@ export function usePodcastPlayer() {
   const visibleShow = useState<string | null>('player-visible-show', () => null)
   /** Which show is selected in "Lyssna & titta". */
   const selectedShow = useState<string | null>('podcast-selected', () => null)
+  /** Each episode's progress (read from this browser once the page is ready; see restore). */
+  const history = useState<ListeningHistory>('listening-history', () => ({}))
+  const historyLoaded = useState('listening-history-loaded', () => false)
 
   const showTitle = computed(() => currentShow.value?.title ?? '')
   const progress = computed(() => (duration.value ? Math.min(100, (position.value / duration.value) * 100) : 0))
@@ -58,13 +71,35 @@ export function usePodcastPlayer() {
     failed.value = 'Ljudet kunde inte spelas här. Lyssna hos podden i stället.'
   }
 
-  /** Remember where we are (episode, show, position). */
+  /** Where the current episode is: a position not yet applied counts, the element's own 0 doesn't. */
+  const where = () => pendingSeek ?? audioEl?.currentTime ?? position.value
+
+  /** Note the current episode's progress in its history entry. */
+  function noteProgress(ended = false) {
+    const ep = current.value
+    if (!ep) return
+    history.value = recordProgress(history.value, ep.id, { position: ended ? duration.value : where(), duration: duration.value || undefined, listened: pendingListen, ended, now: Date.now() })
+    pendingListen = 0
+    writeHistory(storage(), history.value)
+  }
+
+  /** Remember where we are (episode, show, position), and the episode's own progress. */
   function persist() {
     const ep = current.value
     const show = currentShow.value
     if (!ep?.audioUrl || !show) return
     lastSave = Date.now()
-    writeSession(storage(), { showId: show.id, showTitle: show.title, episode: ep, position: pendingSeek ?? audioEl?.currentTime ?? position.value, duration: duration.value || undefined })
+    writeSession(storage(), { showId: show.id, showTitle: show.title, episode: ep, position: where(), duration: duration.value || undefined })
+    noteProgress()
+  }
+
+  /** The progress an episode list shows: live for the one playing, from the history for the rest. */
+  function progressFor(ep: PodcastEpisode): EpisodeProgress {
+    const entry = history.value[ep.id]
+    if (current.value?.id === ep.id && duration.value) {
+      return episodeProgress({ ...(entry ?? { listened: 0, completed: false, updatedAt: 0 }), position: position.value, duration: duration.value }, ep.durationSeconds)
+    }
+    return episodeProgress(entry, ep.durationSeconds)
   }
 
   function attach(el: HTMLAudioElement) {
@@ -75,17 +110,25 @@ export function usePodcastPlayer() {
       playing.value = false
       persist()
     })
-    // Finished: nothing to come back to (the pause just before it saved the end; this forgets it).
+    // Finished: the episode's history says how (completed, or only reached by jumping); the session goes.
     el.addEventListener('ended', () => {
       playing.value = false
+      noteProgress(true)
+      listenFrom = null
       clearSession(storage())
     })
     el.addEventListener('timeupdate', () => {
       // Until a restored position is applied, the element's 0 isn't where we are.
       if (pendingSeek !== null) return
       position.value = el.currentTime
+      if (!el.paused) {
+        pendingListen += listenedStep(listenFrom ?? el.currentTime, el.currentTime)
+        listenFrom = el.currentTime
+      }
       if (!el.paused && Date.now() - lastSave >= SAVE_EVERY_MS) persist()
     })
+    // A jump isn't listening: count again from where it lands.
+    el.addEventListener('seeking', () => (listenFrom = null))
     el.addEventListener('seeked', persist)
     el.addEventListener('loadedmetadata', () => {
       if (Number.isFinite(el.duration) && el.duration > 0) duration.value = el.duration
@@ -110,6 +153,14 @@ export function usePodcastPlayer() {
    */
   function restore(shows: PodcastResponse[] | undefined) {
     const el = audioEl
+    if (!historyLoaded.value) {
+      historyLoaded.value = true
+      // A session saved before there was a history becomes its first entry, kept straight away.
+      const stored = readHistory(storage())
+      const seeded = seedFromSession(stored, readSession(storage()), Date.now())
+      history.value = { ...seeded, ...history.value }
+      if (seeded !== stored) writeHistory(storage(), history.value)
+    }
     if (!el || current.value) return
     const plan = planRestore(readSession(storage()), shows)
     if (plan.action === 'forget') return clearSession(storage())
@@ -140,11 +191,18 @@ export function usePodcastPlayer() {
       else el.pause()
       return
     }
+    // The outgoing episode's progress first, under its own id; the new one starts from its own point.
+    const outgoing = current.value
+    const sw = switchEpisode(history.value, outgoing && { id: outgoing.id, position: where(), duration: duration.value || undefined, listened: pendingListen }, target.id, Date.now())
+    history.value = sw.history
+    writeHistory(storage(), history.value)
+    pendingListen = 0
+    listenFrom = null
     current.value = target
     if (show) currentShow.value = show
-    position.value = 0
-    pendingSeek = null
-    duration.value = target.durationSeconds ?? 0
+    position.value = sw.startAt
+    pendingSeek = sw.startAt || null
+    duration.value = history.value[target.id]?.duration ?? target.durationSeconds ?? 0
     el.src = target.audioUrl
     updateMediaSession()
     // Another episode replaces what was remembered.
@@ -180,9 +238,11 @@ export function usePodcastPlayer() {
     if (e.key === 'ArrowLeft') seekBy(-15)
   }
 
-  /** Close the mini-player: pause and forget the episode, here and in what's remembered. */
+  /** Close the mini-player: pause and forget the active episode (its progress stays in the history). */
   function stop() {
     audioEl?.pause()
+    noteProgress()
+    listenFrom = null
     current.value = null
     currentShow.value = null
     position.value = 0
@@ -206,7 +266,7 @@ export function usePodcastPlayer() {
     navigator.mediaSession.metadata = new MediaMetadata({ title: current.value.title, artist: showTitle.value, album: showTitle.value })
   }
 
-  return { current, currentShow, showTitle, playing, position, duration, progress, failed, visibleShow, selectedShow, playerInView, attach, detach, restore, toggle, seekTo, seekBy, seekFromClick, seekFromKey, stop }
+  return { current, currentShow, showTitle, playing, position, duration, progress, failed, visibleShow, selectedShow, playerInView, history, progressFor, attach, detach, restore, toggle, seekTo, seekBy, seekFromClick, seekFromKey, stop }
 }
 
 export function clock(sec: number): string {
