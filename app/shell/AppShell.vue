@@ -55,6 +55,10 @@ const episodes = computed(() => !links.value.here('lyssna'))
  * it is taller (a short window) it sticks by its bottom instead (top = window
  * height − its height), so it scrolls along with the page until its last item
  * is in view, and nothing in it is ever out of reach.
+ * Its last item, the docked mini-player, is itself sticky to the window's
+ * foot (MiniPlayer), so while the rail is taller than the window the player
+ * stays in view over the rail's lower part, and settles back under the
+ * episodes once the rail's own foot is reached.
  */
 const rail = useTemplateRef<HTMLElement>('rail')
 const railHeight = ref(0)

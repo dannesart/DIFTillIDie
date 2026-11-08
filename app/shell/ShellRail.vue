@@ -12,7 +12,7 @@ defineProps<{ episodes?: boolean }>()
 
 const links = useSectionLinks()
 const { data } = usePodcasts()
-const { current, playing, toggle } = usePodcastPlayer()
+const { current, playing, toggle, progressFor } = usePodcastPlayer()
 
 const latest = computed(() => (data.value?.shows ?? [])
   .flatMap(s => s.episodes.slice(0, 3).map(ep => ({ ep, show: { id: s.id, title: s.show?.title ?? s.status.outlet } })))
@@ -50,6 +50,7 @@ const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('sv-SE', {
           <span class="min-w-0">
             <span class="line-clamp-2 text-sm font-semibold leading-snug">{{ ep.title }}</span>
             <span class="block truncate text-xs text-krita-dim">{{ show.title }} · {{ day(ep.publishedAt) }}</span>
+            <EpisodeProgressMark :progress="progressFor(ep)" />
           </span>
         </li>
       </ul>

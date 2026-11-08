@@ -121,15 +121,16 @@ function downloadIcs() {
           </div>
         </div>
 
+        <!-- Compact, one line each; they wrap onto a new row rather than squeeze -->
         <div class="mt-5 flex flex-wrap gap-2">
-          <button class="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/12 px-4 py-3 text-sm font-semibold transition hover:border-himmel hover:text-himmel" @click="downloadIcs">
+          <button class="flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-white/12 px-4 py-2 text-sm font-semibold transition hover:border-himmel hover:text-himmel" aria-label="Lägg i kalendern" @click="downloadIcs">
             <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
-            Lägg i kalendern
+            Kalender
           </button>
-          <a :href="fixture.officialUrl" target="_blank" rel="noopener" class="flex items-center justify-center gap-1 rounded-full border border-white/12 px-4 py-3 text-sm font-semibold transition hover:border-himmel hover:text-himmel">
+          <a :href="fixture.officialUrl" target="_blank" rel="noopener" class="flex items-center justify-center gap-1 whitespace-nowrap rounded-full border border-white/12 px-4 py-2 text-sm font-semibold transition hover:border-himmel hover:text-himmel">
             Matchinfo <span aria-hidden="true">↗</span>
           </a>
-          <a v-if="fixture.ticketsUrl && isAway(fixture)" :href="fixture.ticketsUrl" target="_blank" rel="noopener" class="flex items-center justify-center gap-1 rounded-full border border-guld/40 px-4 py-3 text-sm font-semibold text-guld transition hover:border-guld hover:bg-guld/10">
+          <a v-if="fixture.ticketsUrl && isAway(fixture)" :href="fixture.ticketsUrl" target="_blank" rel="noopener" class="flex items-center justify-center gap-1 whitespace-nowrap rounded-full border border-guld/40 px-4 py-2 text-sm font-semibold text-guld transition hover:border-guld hover:bg-guld/10">
             Bortabiljetter <span aria-hidden="true">↗</span>
           </a>
         </div>

@@ -5,7 +5,9 @@
  * It drives the same <audio> element as the main player.
  *
  * Two places, one player, never both on screen: `docked` in the desktop
- * rail, under the newest episodes (ShellRail), wherever the rail is shown;
+ * rail, under the newest episodes (ShellRail), wherever the rail is shown
+ * (sticky to the window's foot while the rail is taller than the window;
+ * see AppShell's rail);
  * floating everywhere else (app.vue): above the bottom nav on phones and
  * tablets, bottom right on a desktop too narrow for the rail. Both read the
  * same player state and drive the same <audio>.
@@ -48,7 +50,7 @@ function backToPlayer() {
     -->
     <aside
       v-if="visible && current"
-      :class="docked ? '' : ['fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem] lg:w-[300px]', railLate ? '2xl:hidden' : 'xl:hidden']"
+      :class="docked ? 'sticky bottom-4 z-10' : ['fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem] lg:w-[300px]', railLate ? '2xl:hidden' : 'xl:hidden']"
       aria-label="Spelare"
     >
       <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-navy-900/90 shadow-[0_24px_60px_-24px_rgb(3_9_21/0.95)] backdrop-blur-xl">
