@@ -7,16 +7,16 @@ import NavIcon from './NavIcon.vue'
  * The shell's persistent sidebar: the place you're in, always one click
  * from the others. Everything here already exists on the site (the header's
  * sport switch, the bottom nav's sections, the account); it only moves.
- * The mini-player docks at its foot (see MiniPlayer.vue).
+ * Activity above, identity below: the mini-player under the sport filter
+ * while something's playing, then free space, then the pilot status and,
+ * last, who you are.
  */
 const route = useRoute()
 const links = useSectionLinks()
 const { sport } = useSport()
 const { status, profile, profileStatus } = useAuth()
 const accountOpen = useAccountDialog()
-const { current, playing } = usePodcastPlayer()
-const demoNow = useDemoNow()
-const days = computed(() => daysSinceFounding(demoNow.value).toLocaleString('sv-SE'))
+const { playing } = usePodcastPlayer()
 
 const sections: { id: SectionId, label: string }[] = [
   { id: 'hem', label: 'Hem' },
@@ -40,7 +40,8 @@ const accountLabel = computed(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col px-4 pb-4 pt-6" :class="current && 'pb-24'">
+  <!-- min-h-full: a short window makes the sidebar scroll rather than squeeze or overlap -->
+  <div class="flex min-h-full flex-col px-4 pb-4 pt-6">
     <NuxtLink :to="links.view('hem')" class="group flex items-center gap-3 px-2" aria-label="Djurgår’n tills jag dör – hem">
       <span class="stripes block h-10 w-7 rounded-md [--stripe:5px] transition-transform duration-500 ease-spring group-hover:-rotate-6" />
       <span class="leading-none">
@@ -111,8 +112,17 @@ const accountLabel = computed(() => {
       </div>
     </div>
 
-    <div class="mt-auto space-y-4">
-      <!-- Who you are here -->
+    <!-- What's playing (gone, space and all, while the show's own player is in view) -->
+    <MiniPlayer docked />
+
+    <div class="mt-auto space-y-4 pt-8">
+      <!-- Desktop's pilot status (phones keep the banner); the full disclaimers are in the footer -->
+      <p class="flex items-center gap-2 px-2 text-xs text-krita-dim">
+        <span class="kicker rounded-full bg-guld px-2 py-0.5 text-navy-950">Pilot</span>
+        <span aria-hidden="true">·</span>
+        Ett supporterprojekt
+      </p>
+      <!-- Who you are here: last, at the foot -->
       <button
         v-if="status !== 'unavailable'"
         class="flex w-full items-center gap-3 rounded-2xl border border-white/8 bg-navy-900/60 p-2.5 text-left transition hover:border-himmel/50"
@@ -128,15 +138,6 @@ const accountLabel = computed(() => {
         </span>
       </button>
 
-      <p class="px-2 text-xs leading-relaxed text-krita-dim">
-        <span class="font-display text-sm font-bold text-krita tabular-nums">{{ days }}</span> dagar sedan 12 mars 1891.
-      </p>
-      <!-- Desktop's pilot status (phones keep the banner); the full disclaimers are in the footer -->
-      <p class="flex items-center gap-2 px-2 text-xs text-krita-dim">
-        <span class="kicker rounded-full bg-guld px-2 py-0.5 text-navy-950">Pilot</span>
-        <span aria-hidden="true">·</span>
-        Ett supporterprojekt
-      </p>
     </div>
   </div>
 </template>

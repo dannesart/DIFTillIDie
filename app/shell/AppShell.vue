@@ -84,7 +84,7 @@ function skipToContent() {
       <AppHeader :hydrate-on-media-query="MOBILE_QUERY" />
     </div>
 
-    <!-- Fits any ordinary window; scrolls on its own only when it can't (a short window with the player docked at its foot) -->
+    <!-- Fits any ordinary window; scrolls on its own only when it can't (a short window, with a podcast playing) -->
     <aside v-if="screen.desktop.value" class="shell-scroll sticky top-0 hidden h-dvh overflow-y-auto border-r border-white/8 bg-natt/70 lg:block">
       <ShellNav :hydrate-on-media-query="DESKTOP_QUERY" />
     </aside>
