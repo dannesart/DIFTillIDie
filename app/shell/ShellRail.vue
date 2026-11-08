@@ -3,9 +3,10 @@ import type { PodcastEpisode } from '#shared/types/domain'
 
 /*
  * The shell's contextual sidebar: what's coming up while you read.
- * The next match (the hero's card) and the newest real episodes, which play
- * through the page's one <audio> element like everywhere else. Optional: it
- * only appears where the screen has room for it (see AppShell.vue).
+ * The next match (the hero's card), the newest real episodes, and what's
+ * playing (the docked mini-player), all through the page's one <audio>
+ * element like everywhere else. Optional: it only appears where the screen
+ * has room for it (see AppShell.vue); below that the mini-player floats.
  */
 defineProps<{ episodes?: boolean }>()
 
@@ -53,5 +54,8 @@ const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('sv-SE', {
         </li>
       </ul>
     </section>
+
+    <!-- What's playing: only while an episode is chosen and its show's own player isn't in view; no space otherwise -->
+    <MiniPlayer docked />
   </div>
 </template>

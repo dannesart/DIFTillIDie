@@ -3,18 +3,27 @@
  * Follows the supporter around the page while an episode is playing (or
  * paused mid-listen) and the main player is scrolled out of view.
  * It drives the same <audio> element as the main player.
+ *
+ * Two places, one player, never both on screen: `docked` in the desktop
+ * rail, under the newest episodes (ShellRail), wherever the rail is shown;
+ * floating everywhere else (app.vue): above the bottom nav on phones and
+ * tablets, bottom right on a desktop too narrow for the rail. Both read the
+ * same player state and drive the same <audio>.
  */
+const props = defineProps<{ docked?: boolean }>()
 const { current, currentShow, showTitle, playing, position, duration, progress, playerInView, selectedShow, toggle, seekFromClick, seekFromKey, stop } = usePodcastPlayer()
 
 // On phones, step aside while someone is typing (the keyboard needs the space).
 const typing = useTyping()
 const small = useMedia('(max-width: 639px)')
 
-const visible = computed(() => !!current.value && !playerInView.value && !(typing.value && small.value))
+const visible = computed(() => !!current.value && !playerInView.value && (props.docked || !(typing.value && small.value)))
 
 // Back to the playing show's own player — switching the picker to it if needed.
 // (On desktop "Lyssna" is a view of its own: go there.)
 const links = useSectionLinks()
+// Where the rail (and so the docked player) appears: xl, or 2xl on Snacket and Stories.
+const railLate = useRailLate()
 function backToPlayer() {
   if (currentShow.value) selectedShow.value = currentShow.value.id
   if (!links.value.shows('lyssna')) return void navigateTo(links.value.section('lyssna'))
@@ -23,8 +32,8 @@ function backToPlayer() {
 </script>
 
 <template>
-  <!-- Keeps the footer from hiding under the player at the very bottom of the page -->
-  <div v-if="current" aria-hidden="true" class="h-[4.5rem]" />
+  <!-- Keeps the footer from hiding under the floating player at the very bottom of the page (phones and tablets) -->
+  <div v-if="current && !docked" aria-hidden="true" class="h-[4.5rem]" :class="railLate ? '2xl:hidden' : 'xl:hidden'" />
 
   <Transition
     enter-active-class="transition duration-500 ease-out-expo"
@@ -32,9 +41,14 @@ function backToPlayer() {
     leave-active-class="transition duration-300 ease-in"
     leave-to-class="opacity-0 motion-safe:translate-y-6"
   >
+    <!--
+      Floating on a desktop without the rail: as wide as Snacket's side column
+      (SnacketSection's 300px), whose right edge it shares, so there it sits
+      over that column and never over the feed, its comments or their buttons.
+    -->
     <aside
       v-if="visible && current"
-      class="fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem] lg:bottom-3 lg:left-3 lg:right-auto lg:w-[calc(var(--shell-nav-w)-1.5rem)]"
+      :class="docked ? '' : ['fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem] lg:w-[300px]', railLate ? '2xl:hidden' : 'xl:hidden']"
       aria-label="Spelare"
     >
       <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-navy-900/90 shadow-[0_24px_60px_-24px_rgb(3_9_21/0.95)] backdrop-blur-xl">

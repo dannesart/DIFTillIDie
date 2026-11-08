@@ -36,7 +36,16 @@ const links = useSectionLinks()
 const screen = useScreenParts()
 
 // Snacket and Stories bring their own side columns: the rail waits for a wider screen there.
-const roomy = computed(() => links.value.here('snacket') || links.value.here('stories'))
+const roomy = useRailLate()
+
+/*
+ * Desktop has no sport switch (the sidebar is navigation and identity), so
+ * the sport filter is "Allt" there: one chosen in a phone-sized window never
+ * stays on, unseen, hiding content once the window is wide again.
+ */
+const { sport } = useSport()
+const desktop = useMedia(DESKTOP_QUERY)
+watch(desktop, wide => wide && (sport.value = 'alla'), { immediate: true })
 // Lyssna already is the podcasts.
 const episodes = computed(() => !links.value.here('lyssna'))
 
@@ -84,7 +93,7 @@ function skipToContent() {
       <AppHeader :hydrate-on-media-query="MOBILE_QUERY" />
     </div>
 
-    <!-- Fits any ordinary window; scrolls on its own only when it can't (a short window with the player docked at its foot) -->
+    <!-- Fits any ordinary window; scrolls on its own only when it can't (a short window, with a podcast playing) -->
     <aside v-if="screen.desktop.value" class="shell-scroll sticky top-0 hidden h-dvh overflow-y-auto border-r border-white/8 bg-natt/70 lg:block">
       <ShellNav :hydrate-on-media-query="DESKTOP_QUERY" />
     </aside>
