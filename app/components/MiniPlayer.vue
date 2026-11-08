@@ -41,9 +41,14 @@ function backToPlayer() {
     leave-active-class="transition duration-300 ease-in"
     leave-to-class="opacity-0 motion-safe:translate-y-6"
   >
+    <!--
+      Floating on a desktop without the rail: as wide as Snacket's side column
+      (SnacketSection's 300px), whose right edge it shares, so there it sits
+      over that column and never over the feed, its comments or their buttons.
+    -->
     <aside
       v-if="visible && current"
-      :class="docked ? '' : ['fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem]', railLate ? '2xl:hidden' : 'xl:hidden']"
+      :class="docked ? '' : ['fixed inset-x-2 bottom-[calc(var(--nav-h)+0.5rem)] z-40 sm:inset-x-auto sm:bottom-[calc(var(--nav-h)+1.5rem)] sm:right-6 sm:w-[23rem] lg:w-[300px]', railLate ? '2xl:hidden' : 'xl:hidden']"
       aria-label="Spelare"
     >
       <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-navy-900/90 shadow-[0_24px_60px_-24px_rgb(3_9_21/0.95)] backdrop-blur-xl">
