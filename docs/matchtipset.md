@@ -24,6 +24,7 @@ Everything here is enforced by the database: constraints, triggers and the funct
 | **The deadline** | `locks_at` is the verified scheduled puck drop, checked with the database clock (`clock_timestamp()`). |
 | **Before the deadline** | `reschedule` moves the game and the deadline together, either way, but never into the past. |
 | **After the deadline** | The deadline **never moves later**, so nothing reopens, even after a postponement (`reschedule` then moves only the game). It may move **earlier** only via `correct_deadline`, with evidence. |
+| **Postponed before the deadline, no new date** | Predictions are **paused**. The deadline is withdrawn (`locks_at` is null), so the old time passing changes nothing: no submissions, nothing revealed, nothing counted on the leaderboard. Picks made before the pause are kept and still count. When the new date is known, `reschedule` makes it the deadline and predictions **resume**. Because nothing was ever revealed, nothing reopens. A deadline that has already passed can never be withdrawn (a trigger refuses it). |
 | **Append-only predictions** | Each submission is a new revision. The revision is numbered under a lock on that supporter and match. The time is read *after* that lock. Rows are never updated. |
 | **The pick that counts** | The **highest revision submitted before the current `locks_at`**. It's derived when it's read and never stored. If the deadline is corrected to an earlier time, the later submissions stop counting, and an earlier submission that was valid counts again. |
 | **Points** | Derived from the effective pick and the current verified result. A corrected result changes every score and rank deterministically. A void match gives no points to anyone. |
@@ -39,7 +40,7 @@ All of these require a signed-in supporter. `anon` can execute none of them.
 | `matchtips_consent_version()` | The consent text version that joining requires. |
 | `matchtips_join(consent_version)` / `matchtips_leave(confirmed)` / `matchtips_me()` | Opt in, opt out (returns the number of submissions removed), and current status. |
 | `matchtips_submit(match, home, away)` | A new revision. There's no author, time or revision parameter. Refuses with `55000` once locked or void. |
-| `matchtips_matches(season)` | The schedule, deadline, state and result, plus `deadline_corrected` with its reason and source. |
+| `matchtips_matches(season)` | The schedule, deadline, state and result, plus `deadline_corrected` with its reason and source. `status = 'postponed'` with `locks_at` null means **paused**: show "Uppskjuten – tippningen öppnar igen när nytt datum är klart". |
 | `matchtips_my_picks(season)` | **Your own** picks: the effective pick and points, plus your latest submission and `latest_counts`. |
 | `matchtips_picks(match)` | Everyone's effective picks and points, **after the deadline only** (empty before). |
 | `matchtips_leaderboard(season)` | Rank (shared on ties), handle, points, matches tipped, exact scores and right outcomes. Only locked, non-void matches count. |
@@ -98,7 +99,9 @@ select matchtips_ops.postpone('<match id>', '<source>', 'Uppskjuten, nytt datum 
 ```
 - **Before the deadline:** the game and the deadline move together.
 - **After the deadline:** the picks stay sealed and visible, and only the game moves.
-- **Postponed with no date:** the deadline stays where it was. Reschedule once a date is known.
+- **Postponed before the deadline with no date:** `postpone` **pauses** predictions and withdraws the deadline. Nothing is revealed, even when the old time passes. `reschedule` to the new date (it must be in the future) resumes them with that date as the deadline.
+- **Postponed after the deadline with no date:** `postpone` keeps the deadline, and the picks stay sealed and visible. `reschedule` once a date is known.
+- **A paused match that was played after all, at its old time:** there's no deadline to correct. Void it, because fairness can't be established.
 - **Never played, or no longer the same matchup:** void it.
 
 ### The deadline was wrong: correct it, or void it
@@ -145,6 +148,17 @@ from matchtips.match_log order by id desc limit 20;
 
 The **Matchtipset match is authoritative for its own deadline and settlement.** The MatchCard (`/api/fixtures`: dif.se's calendar for football, the hand-kept `MANUAL_FIXTURES` in [`server/lib/fixtures.ts`](../server/lib/fixtures.ts) for hockey) stays a separate display. Nothing syncs the two, and nothing pretends they agree. The tipping UI must always show its own deadline.
 
+**What the database enforces, and what is operator procedure:**
+
+| Database-enforced | Operator procedure (not enforced) |
+|---|---|
+| Only the owner can create matches or change their schedule. | Checking the official source and the MatchCard before entering a match, on every change, and on match day. |
+| **One active (non-void) match per `fixture_ref`** (a partial unique index). This catches the same fixture entered twice, or two matches reconciled to the same fixture. | Deciding whether the fixture and the match really are the same game. A changed id (hockey ids contain the date), a missing fixture, or a match entered **without** a `fixture_ref` isn't caught. |
+| Every check you record is logged with its outcome, source, reason and operator. | Recording the check at all. **`create_match` opens predictions immediately**, and a `fixture_missing` or `fixture_differs` outcome does **not** block submissions. |
+| The deadline rules: never later once passed, earlier only with a source, pausing only before it. | Resolving a mismatch (reschedule, correct, void or fix the MatchCard) before the match is entered. |
+
+A database gate (for example "no predictions until a `consistent` check is recorded") was considered and not added. The operator would declare the outcome themselves, so it would enforce that a row exists, not that the check happened. And the match would still have to be entered before it could be checked. For this owner-operated pilot, the order of work below is the guarantee: **check first, then `create_match`**.
+
 **When to check:** before entering or opening a match, on **every schedule change** you learn of, and on **match day**.
 1. Check the **official source** (difhockey.se or shl.se): date, time, and home and away teams.
 2. Open `https://diftillidie.netlify.app/api/fixtures` and find the fixture. Hockey ids contain the date, so a rescheduled game gets a **new id**.
@@ -159,7 +173,7 @@ The **Matchtipset match is authoritative for its own deadline and settlement.** 
    - Re-verify against the official source.
    - Fix the side that's wrong: `reschedule` / `correct_deadline` / `void` for Matchtipset; a reviewed code change to `MANUAL_FIXTURES` for the MatchCard (a deploy).
    - Record the outcome with a reason.
-   - Until it's resolved, **don't enter or open the match**. If it's already open and the deadline is in doubt, prefer voiding to guessing.
+   - Until it's resolved, **don't enter the match** (entering it opens it). If it's already open and the deadline is in doubt, `postpone` it (which pauses it before its deadline), or void it. Don't guess.
 
 A missing fixture isn't by itself an error (`loadFixtures()` drops past games, and hockey is hand-kept), but it always needs the official-source check and a recorded outcome.
 
@@ -168,8 +182,8 @@ A missing fixture isn't by itself an error (`loadFixtures()` drops past games, a
 | Suite | Runs | Covers |
 |---|---|---|
 | `tests/matchtipset-db.test.ts` | `npm test`, locally and in CI: the real migrations in PGlite ([harness](../tests/db/supabase-harness.ts)) | **Grants and exposure:** schemas, tables and functions per role, RLS, `search_path`. **Opt-in and opt-out.** **Append-only revisions.** **Forged author, time or points.** **Locked and void matches.** **Secrecy before the deadline.** **Effective picks only.** **The corrected-deadline scenario.** **Never-later deadlines.** **Postponements.** **Results:** consistency, corrections, scoring and leaderboard ties. **The log:** content and append-only. **Account deletion.** It also runs the pgTAP file through a shim. |
-| `supabase/tests/matchtipset_rls.test.sql` | `supabase test db`, in CI on a fresh local stack. Rolled back. | The same boundaries on real Supabase: 50 assertions. |
-| `tests/matchtipset-stack.test.ts` | CI only (`MATCHTIPSET_STACK=local`; refuses non-local URLs) | **Real concurrency through the API:** 20 parallel submissions, a deadline correction racing submissions, leaving mid-flight. **REST/GraphQL exposure** of the schemas. **Anonymous refusal.** **Deletion via the Auth admin API.** |
+| `supabase/tests/matchtipset_rls.test.sql` | `supabase test db`, in CI on a fresh local stack. Rolled back. | The same boundaries on real Supabase, plus pausing and resuming a postponed match and the duplicate-reference check: 60 assertions. |
+| `tests/matchtipset-stack.test.ts` | CI only (`MATCHTIPSET_STACK=local`; refuses non-local URLs) | **Real concurrency through the API:** 20 parallel submissions; a deadline correction racing submissions (whether they overlap isn't controlled); a **deterministic interleaving**, where the submission is held waiting on an uncommitted correction's lock and then refused; and leaving mid-flight. **Pausing a postponed match through the API.** **REST/GraphQL exposure** of the schemas. **Anonymous refusal.** **Deletion via the Auth admin API.** |
 
 CI: [`.github/workflows/database.yml`](../.github/workflows/database.yml) starts a disposable stack from [`supabase/config.toml`](../supabase/config.toml), which is local-only, and needs no secrets.
 
@@ -211,7 +225,8 @@ To be completed and reviewed **before** this migration touches the hosted projec
 
 - **Operator attribution is declared, and the audit record isn't tamper-proof** (see above).
 - **Commit time vs submission time:** the submission time is read after the serialization lock, a moment before the insert commits. A submission that starts a few microseconds before the deadline can commit just after it. The revision is the definitive order. Timestamps are only used for the deadline comparison and aren't promised to be unique.
-- **A race with a correction:** a submission accepted while an earlier deadline was being committed is judged on read against the corrected deadline, so it doesn't count.
+- **A race with a correction:** a submission that waits on an in-flight correction re-reads the committed deadline and is refused (tested deterministically). One accepted just before is judged on read against the corrected deadline, so it doesn't count. The random-burst race test doesn't control whether the two actually overlap.
+- **Reconciliation is procedure, not a gate** (see [MatchCard reconciliation](#matchcard-reconciliation)). Only duplicate active `fixture_ref`s are refused by the database.
 - **Account deletion and leaving shift ranks.** No rows are kept for ranking continuity.
 - **Up to 50 revisions** per supporter per match.
 - **Not in the pilot:** football, SDHL, playoffs, cups, automatic import (see #7), an admin UI, a verifier role, moving picks between duplicate matches, reopening, guest/public visibility, averages, monthly or per-round tables, tiebreakers and notifications.

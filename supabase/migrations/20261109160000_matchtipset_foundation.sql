@@ -18,6 +18,14 @@
 --    deadline correction backed by a source (the game really started before
 --    the time we published). Without such evidence the operator voids.
 --
+--  - Postponed BEFORE the deadline with no new date yet: predictions are
+--    PAUSED. The deadline is withdrawn (locks_at null), so the old time
+--    passing changes nothing: no submissions, nothing revealed, nothing
+--    counted. Picks made before the pause are kept and still count. When the
+--    new date is known, rescheduling sets it as the deadline and predictions
+--    resume; nothing was ever revealed, so nothing reopens. Never played:
+--    void. (Postponed AFTER the deadline: picks stay sealed and visible.)
+--
 --  - Predictions are append-only. Every submission is a new revision,
 --    numbered under a per-supporter-per-match lock; nothing is ever updated.
 --    The pick that counts (the "effective pick") is derived when it's read:
@@ -71,7 +79,8 @@ create table matchtips.matches (
   -- When the game is, as verified (display and settlement). A postponement moves it.
   scheduled_start  timestamptz not null,
   -- The prediction deadline (see the header): never later than scheduled_start.
-  locks_at         timestamptz not null,
+  -- Null only while postponed before it with no new date: predictions paused.
+  locks_at         timestamptz,
   status           text not null default 'scheduled',
   void_reason      text,
   -- The verified 60-minute score and how the game was decided; null until verified.
@@ -94,6 +103,7 @@ create table matchtips.matches (
     and char_length(away_team) between 2 and 60 and away_team = btrim(away_team)
   ),
   constraint matches_lock_not_after_start check (locks_at <= scheduled_start),
+  constraint matches_lock_known check (locks_at is not null or status in ('postponed', 'void')),
   constraint matches_status check (status in ('scheduled', 'postponed', 'void')),
   constraint matches_void_reason check ((status = 'void') = (void_reason is not null)),
   constraint matches_result_complete check (
@@ -112,6 +122,11 @@ create table matchtips.matches (
   constraint matches_official_url check (official_url ~ '^https://[^[:space:]]{3,}$' and char_length(official_url) <= 500),
   constraint matches_fixture_ref check (fixture_ref ~ '^[A-Za-z0-9_.:@-]{1,200}$')
 );
+
+-- One active match per MatchCard fixture: catches the same game entered twice.
+-- (A changed or missing fixture id still needs the operator's check.)
+create unique index matches_fixture_ref_active on matchtips.matches (fixture_ref)
+  where fixture_ref is not null and status <> 'void';
 
 comment on table matchtips.matches is 'Matchtipset matches: durable identity, verified schedule, the prediction deadline (locks_at) and the verified 60-minute result. Changed only through matchtips_ops.';
 
@@ -203,6 +218,10 @@ begin
     if old.locks_at <= clock_timestamp() and new.locks_at > old.locks_at then
       raise exception 'the deadline has passed and cannot move later' using errcode = '42501';
     end if;
+    -- Pausing (withdrawing the deadline) only before it has passed.
+    if new.locks_at is null and old.locks_at <= clock_timestamp() then
+      raise exception 'the deadline has passed: a postponement keeps it' using errcode = '42501';
+    end if;
     if (new.result_home_60, new.result_away_60, new.decided_in) is distinct from (old.result_home_60, old.result_away_60, old.decided_in)
       or new.result_revision <> old.result_revision then
       if new.result_revision <> old.result_revision + 1 or new.result_home_60 is null then
@@ -261,7 +280,7 @@ declare
   m matchtips.matches;
 begin
   select * into m from matchtips.matches x where x.id = new.match_id;
-  if new.submitted_at > clock_timestamp() or m.status = 'void' or new.submitted_at >= m.locks_at then
+  if new.submitted_at > clock_timestamp() or m.status = 'void' or m.locks_at is null or new.submitted_at >= m.locks_at then
     raise exception 'a prediction must be submitted before the deadline' using errcode = '55000';
   end if;
   return new;
@@ -295,12 +314,13 @@ $$;
 comment on function matchtips.points(int, int, int, int) is '3 for the exact 60-minute score, otherwise 1 for the right outcome (home win, draw, away win), otherwise 0. Null until there is a result.';
 
 -- The pick that counts: the highest revision submitted before the CURRENT deadline.
+-- While paused (no deadline), all of them count: every one predates the pause.
 create view matchtips.effective_picks with (security_invoker = true) as
 select distinct on (s.match_id, s.profile_id)
   s.match_id, s.profile_id, s.revision, s.home_goals, s.away_goals, s.submitted_at
 from matchtips.prediction_submissions s
 join matchtips.matches m on m.id = s.match_id
-where s.submitted_at < m.locks_at
+where m.locks_at is null or s.submitted_at < m.locks_at
 order by s.match_id, s.profile_id, s.revision desc;
 
 -- Points only for a played (not void, not postponed) match with a verified result.
@@ -422,6 +442,9 @@ begin
     raise exception 'no such match' using errcode = 'P0002';
   end if;
 
+  if m.locks_at is null then
+    raise exception 'predictions are paused: the match is postponed' using errcode = '55000';
+  end if;
   -- Database time, read after the locks.
   t := clock_timestamp();
   if m.status = 'void' or t >= m.locks_at then
@@ -464,7 +487,7 @@ begin
   end if;
   return query
   select m.id, m.season, m.home_team, m.away_team,
-    m.scheduled_start, m.locks_at, now() >= m.locks_at,
+    m.scheduled_start, m.locks_at, coalesce(now() >= m.locks_at, false),
     m.status, m.void_reason,
     m.result_home_60, m.result_away_60, m.decided_in, m.result_revision,
     r.source_url, r.reason,
@@ -507,7 +530,7 @@ begin
   -- submission when a corrected deadline means it doesn't count.
   return query
   select l.match_id, sp.home_goals, sp.away_goals, sp.points,
-    l.home_goals, l.away_goals, l.submitted_at, l.submitted_at < m.locks_at
+    l.home_goals, l.away_goals, l.submitted_at, coalesce(l.submitted_at < m.locks_at, true)
   from (
     select distinct on (s.match_id) s.match_id, s.home_goals, s.away_goals, s.submitted_at
     from matchtips.prediction_submissions s
@@ -534,7 +557,7 @@ begin
   if (select auth.uid()) is null then
     raise exception 'sign in to use Matchtipset' using errcode = '42501';
   end if;
-  -- Nothing at all before the deadline: no picks, no count.
+  -- Nothing at all before the deadline, or while paused (no deadline): no picks, no count.
   return query
   select pr.handle, sp.home_goals, sp.away_goals, sp.points
   from matchtips.scored_picks sp
@@ -660,8 +683,8 @@ begin
 end
 $$;
 
--- Before the deadline: the game moves, and the deadline with it.
--- After it: a postponement; the game moves, the deadline never does.
+-- Before the deadline, or while paused: the game moves, and the deadline with it
+-- (a paused match resumes). After it: the game moves, the deadline never does.
 create function matchtips_ops.reschedule(p_match uuid, p_new_start timestamptz, p_source_url text, p_reason text, p_operator text)
 returns matchtips.matches
 language plpgsql
@@ -678,7 +701,7 @@ begin
   if old_m.result_revision > 0 then raise exception 'the match has a result: correct the result instead' using errcode = '55000'; end if;
   if p_new_start is null then raise exception 'a new start time is required' using errcode = '22023'; end if;
 
-  if clock_timestamp() < old_m.locks_at then
+  if old_m.locks_at is null or clock_timestamp() < old_m.locks_at then
     if p_new_start <= clock_timestamp() then
       raise exception 'the new start has passed: if the game really started earlier, use correct_deadline' using errcode = '22023';
     end if;
@@ -699,7 +722,9 @@ begin
 end
 $$;
 
--- Postponed with no new date yet. The deadline stays as it is.
+-- Postponed with no new date yet. Before the deadline: predictions pause and
+-- the deadline is withdrawn, so its passing changes nothing. After it: the
+-- deadline stays, and the picks stay sealed and visible.
 create function matchtips_ops.postpone(p_match uuid, p_source_url text, p_reason text, p_operator text)
 returns matchtips.matches
 language plpgsql
@@ -714,9 +739,13 @@ begin
   if not found then raise exception 'no such match' using errcode = 'P0002'; end if;
   if old_m.status = 'void' then raise exception 'a void match is final' using errcode = '55000'; end if;
   if old_m.result_revision > 0 then raise exception 'the match has a result' using errcode = '55000'; end if;
-  update matchtips.matches x set status = 'postponed' where x.id = p_match returning * into m;
+  if old_m.status = 'postponed' then raise exception 'the match is already postponed' using errcode = '55000'; end if;
+  update matchtips.matches x
+  set status = 'postponed',
+      locks_at = case when clock_timestamp() < x.locks_at then null else x.locks_at end
+  where x.id = p_match returning * into m;
   perform matchtips_ops.end_op(p_match, 'postponed',
-    jsonb_build_object('status', old_m.status), jsonb_build_object('status', m.status),
+    jsonb_build_object('status', old_m.status, 'locks_at', old_m.locks_at), jsonb_build_object('status', m.status, 'locks_at', m.locks_at),
     p_source_url, p_reason, p_operator);
   return m;
 end
@@ -739,6 +768,9 @@ begin
   select * into old_m from matchtips.matches x where x.id = p_match for update;
   if not found then raise exception 'no such match' using errcode = 'P0002'; end if;
   if old_m.status = 'void' then raise exception 'a void match is final' using errcode = '55000'; end if;
+  if old_m.locks_at is null then
+    raise exception 'the match is paused with no deadline: reschedule it, or void it' using errcode = '55000';
+  end if;
   if p_evidenced_start is null or p_evidenced_start >= old_m.locks_at then
     raise exception 'a correction only moves the deadline earlier' using errcode = '22023';
   end if;

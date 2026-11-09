@@ -390,6 +390,83 @@ describe('schedule', () => {
   })
 })
 
+// ── 6b. Postponed BEFORE the deadline, new date not yet known ───────────────
+describe('postponed before the deadline', () => {
+  const postpone = (m: string) => db.query('select matchtips_ops.postpone($1, $2, $3, $4)', [m, SRC, 'Uppskjuten, nytt datum ej klart', 'daniel'])
+  const state = (m: string) => one<{ status: string, locks_at: Date | null }>('select status, locks_at from matchtips.matches where id = $1', [m])
+
+  it('pauses predictions: no submissions, nothing revealed or counted; picks made before the pause are kept', async () => {
+    const m = await createMatch(60)
+    await submit(JARN, m, 2, 1)
+    await postpone(m)
+    expect(await state(m)).toEqual({ status: 'postponed', locks_at: null })
+    expect(await user(JARN, () => codeOf(db.query('select public.matchtips_submit($1, 3, 1)', [m])))).toBe('55000')
+    expect(await user(MATTIAS, () => codeOf(db.query('select public.matchtips_submit($1, 0, 0)', [m])))).toBe('55000')
+    expect(await picks(MATTIAS, m)).toEqual([])
+    expect(await myPicks(JARN)).toEqual([expect.objectContaining({ pick_home: 2, pick_away: 1, latest_counts: true })])
+    expect(await user(MATTIAS, () => one('select locks_at, locked, status from public.matchtips_matches($1)', [SEASON]))).toEqual({ locks_at: null, locked: false, status: 'postponed' })
+    expect((await board(MATTIAS)).map(r => r.tipped)).toEqual([0, 0])
+    // Even past the functions: no submission while paused.
+    expect(await codeOf(fixtureSubmission(m, MATTIAS, 1, 1, 1, 0))).toBe('55000')
+  })
+
+  it('the old deadline passing changes nothing; the new date resumes predictions with a new deadline, and nothing was revealed in between', async () => {
+    const m = await createMatch(0.03) // ~2 seconds from now
+    await submit(JARN, m, 2, 1)
+    await postpone(m)
+    await new Promise(r => setTimeout(r, 2500)) // the original deadline has now passed
+    expect(await picks(MATTIAS, m)).toEqual([])
+    expect(await user(JARN, () => codeOf(db.query('select public.matchtips_submit($1, 3, 1)', [m])))).toBe('55000')
+    expect((await board(MATTIAS)).map(r => r.tipped)).toEqual([0, 0])
+
+    await db.query(`select matchtips_ops.reschedule($1, now() + interval '7 days', $2, 'Nytt datum enligt shl.se', 'daniel')`, [m, SRC])
+    const resumed = await one<{ status: string, open: boolean }>(`select status, locks_at = scheduled_start and locks_at > now() + interval '6 days' as open from matchtips.matches where id = $1`, [m])
+    expect(resumed).toEqual({ status: 'scheduled', open: true })
+    expect((await submit(JARN, m, 3, 1)).revision).toBe(2)
+    expect((await submit(MATTIAS, m, 0, 0)).revision).toBe(1)
+    expect(await picks(LOTTA, m)).toEqual([])
+    expect((await log(m)).map(l => [l.action, (l.new_values as Row).locks_at === null])).toEqual([['created', false], ['postponed', true], ['rescheduled', false]])
+  })
+
+  it('a paused match: no result, no deadline correction, no second postponement; voiding it works', async () => {
+    const m = await createMatch(60)
+    await postpone(m)
+    expect(await codeOf(postpone(m))).toBe('55000')
+    expect(await codeOf(db.query(`select matchtips_ops.correct_deadline($1, now() - interval '1 minute', $2, 'Spelades ändå', 'daniel')`, [m, SRC]))).toBe('55000')
+    expect(await codeOf(db.query(`select matchtips_ops.reschedule($1, now() - interval '1 minute', $2, 'Redan', 'daniel')`, [m, SRC]))).toBe('22023')
+    await db.query('select matchtips_ops.void_match($1, $2, $3, $4)', [m, SRC, 'Spelas inte denna säsong', 'daniel'])
+    expect(await state(m)).toEqual({ status: 'void', locks_at: null })
+  })
+
+  it('a passed deadline can never be withdrawn: postponing after it keeps it, and a direct pause is refused', async () => {
+    const m = await fixtureMatch({ startMin: -5 })
+    await postpone(m)
+    expect((await state(m)).locks_at).not.toBeNull()
+    expect(await codeOf(db.transaction(async (tx) => {
+      await tx.query(`select set_config('matchtips.via_ops', 'on', true)`)
+      await tx.query(`update matchtips.matches set locks_at = null where id = $1`, [m])
+    }))).toBe('42501')
+  })
+})
+
+// ── 6c. MatchCard references ────────────────────────────────────────────────
+describe('fixture references', () => {
+  const create = (ref: string | null, min = 60) => db.query(
+    `select matchtips_ops.create_match($1, 'Djurgården', 'Färjestad BK', now() + $2::numeric * interval '1 minute', $3, $4, 'Verifierad', 'daniel') as id`,
+    [SEASON, min, SRC, ref])
+
+  it('one active match per fixture reference; a void match frees it; no reference is fine for many', async () => {
+    const first = (await create('dif-abc@dif.se')).rows[0] as { id: string }
+    expect(await codeOf(create('dif-abc@dif.se', 90))).toBe('23505')
+    await create(null)
+    await create(null, 90)
+    const other = (await create('dif-def@dif.se', 120)).rows[0] as { id: string }
+    expect(await codeOf(db.query(`select matchtips_ops.record_reconciliation($1, 'dif-abc@dif.se', 'consistent', $2, 'Fel match', 'daniel')`, [other.id, SRC]))).toBe('23505')
+    await db.query('select matchtips_ops.void_match($1, $2, $3, $4)', [first.id, SRC, 'Dubblett', 'daniel'])
+    expect(await codeOf(create('dif-abc@dif.se', 150))).toBe('ok')
+  })
+})
+
 // ── 7. Results, corrections, scoring, leaderboard ───────────────────────────
 describe('results and scoring', () => {
   it('scores 3 exact / 1 right outcome / 0 otherwise, on the 60-minute score', async () => {

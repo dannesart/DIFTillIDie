@@ -15,7 +15,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(50);
+select plan(60);
 
 insert into auth.users (id, email) values
   ('81818181-8181-4181-8181-818181818181', 'rlstest-ada@example.test'),
@@ -110,6 +110,34 @@ select set_config('request.jwt.claims', '{"role":"anon"}', true);
 select throws_ok($$ select * from public.matchtips_picks(current_setting('rlstest.open')::uuid) $$, '42501', null, 'anon cannot read picks');
 select throws_ok($$ select * from public.matchtips_leaderboard('2026/27') $$, '42501', null, 'anon cannot read the leaderboard');
 reset role;
+
+-- ── Postponed before the deadline, no new date: paused, then resumed ─────
+select lives_ok($$ select matchtips_ops.postpone(current_setting('rlstest.open')::uuid, 'https://www.difhockey.se/game-schedule', 'Uppskjuten, nytt datum ej klart', 'rlstest') $$,
+  'the owner postpones the open match before its deadline');
+select is((select locks_at from matchtips.matches where id = current_setting('rlstest.open')::uuid), null::timestamptz, 'its deadline is withdrawn: predictions are paused');
+select throws_ok($$ select matchtips_ops.correct_deadline(current_setting('rlstest.open')::uuid, now() - interval '1 minute', 'https://www.shl.se/rlstest', 'Spelades ändå', 'rlstest') $$,
+  '55000', null, 'a paused match has no deadline to correct');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"81818181-8181-4181-8181-818181818181","role":"authenticated"}', true);
+select throws_ok($$ select public.matchtips_submit(current_setting('rlstest.open')::uuid, 4, 1) $$, '55000', null, 'Ada cannot predict while paused');
+select results_eq($$ select (pick_home || '-' || pick_away || '/' || latest_counts) from public.matchtips_my_picks('2026/27') $$, array['3-1/true'], 'Ada''s pick from before the pause is kept');
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"82828282-8282-4282-8282-828282828282","role":"authenticated"}', true);
+select is_empty($$ select * from public.matchtips_picks(current_setting('rlstest.open')::uuid) $$, 'Bo sees nothing for the paused match');
+reset role;
+select lives_ok($$ select matchtips_ops.reschedule(current_setting('rlstest.open')::uuid, now() + interval '8 days', 'https://www.difhockey.se/game-schedule', 'Nytt datum', 'rlstest') $$,
+  'the new date resumes the match');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"81818181-8181-4181-8181-818181818181","role":"authenticated"}', true);
+select is((select revision from public.matchtips_submit(current_setting('rlstest.open')::uuid, 4, 1)), 3, 'Ada can predict again, until the new deadline');
+reset role;
+
+-- ── One active match per MatchCard fixture ───────────────────────────────
+select lives_ok($$ select matchtips_ops.create_match('2026/27', 'Djurgården', 'Rlstest BK', now() + interval '2 days', 'https://www.difhockey.se/game-schedule', 'rlstest-fixture-1', 'pgTAP: referens', 'rlstest') $$,
+  'a match with a fixture reference');
+select throws_ok($$ select matchtips_ops.create_match('2026/27', 'Djurgården', 'Rlstest BK', now() + interval '3 days', 'https://www.difhockey.se/game-schedule', 'rlstest-fixture-1', 'pgTAP: dubblett', 'rlstest') $$,
+  '23505', null, 'a second active match with the same fixture reference is refused');
 
 -- ── A locked match whose published deadline was wrong (fixture) ──────────
 -- Published 19:00 (an hour ago); it really started 18:00. Ada: 2–1 at 17:30,

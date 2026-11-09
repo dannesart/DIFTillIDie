@@ -108,6 +108,42 @@ describe.skipIf(!enabled)('Matchtipset on a local Supabase stack', () => {
     expect(shown.data).toEqual(valid.length ? [{ handle: bo.handle, pick_home: valid[0]!.home_goals, pick_away: valid[0]!.away_goals, points: null }] : [])
   })
 
+  it('deterministic: a submission that waits on an uncommitted correction is judged against the corrected deadline', async () => {
+    const gus = await supporter('gus')
+    const match = await openMatch()
+    expect((await gus.client.rpc('matchtips_submit', { p_match: match, p_home: 1, p_away: 0 })).error).toBeNull()
+    let pending: Promise<{ error: { code?: string } | null }> | undefined
+    let waited = false
+    await sql.begin(async (tx) => {
+      // The correction holds the match row until this transaction commits.
+      await tx`select matchtips_ops.correct_deadline(${match}, clock_timestamp(), ${SRC}, 'CI: deterministisk rättning', 'ci')`
+      pending = start(gus.client.rpc('matchtips_submit', { p_match: match, p_home: 5, p_away: 0 }))
+      // Wait until the submission is provably blocked on that lock.
+      for (let i = 0; i < 100 && !waited; i++) {
+        const [w] = await sql`select count(*)::int as n from pg_stat_activity where wait_event_type = 'Lock' and query ilike '%matchtips_submit%'`
+        waited = w!.n > 0
+        if (!waited) await new Promise(r => setTimeout(r, 50))
+      }
+    })
+    expect(waited).toBe(true)
+    expect((await pending!).error?.code).toBe('55000')
+    const [n] = await sql`select count(*)::int as n from matchtips.prediction_submissions where match_id = ${match}`
+    expect(n!.n).toBe(1)
+  })
+
+  it('postponed before the deadline: the API refuses submissions and reveals nothing until a new date', async () => {
+    const hal = await supporter('hal')
+    const ivy = await supporter('ivy')
+    const match = await openMatch()
+    await hal.client.rpc('matchtips_submit', { p_match: match, p_home: 2, p_away: 2 })
+    await sql`select matchtips_ops.postpone(${match}, ${SRC}, 'CI: uppskjuten', 'ci')`
+    expect((await hal.client.rpc('matchtips_submit', { p_match: match, p_home: 3, p_away: 2 })).error?.code).toBe('55000')
+    expect((await ivy.client.rpc('matchtips_picks', { p_match: match })).data).toEqual([])
+    await sql`select matchtips_ops.reschedule(${match}, now() + interval '3 days', ${SRC}, 'CI: nytt datum', 'ci')`
+    expect((await hal.client.rpc('matchtips_submit', { p_match: match, p_home: 3, p_away: 2 })).error).toBeNull()
+    expect((await ivy.client.rpc('matchtips_picks', { p_match: match })).data).toEqual([])
+  })
+
   it('leaving while submissions are in flight leaves nothing behind', async () => {
     const dan = await supporter('dan')
     const match = await openMatch()
