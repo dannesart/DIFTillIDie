@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { accountEntry } from '~/lib/accountEntry'
+
 /*
  * Bottom navigation for phones and tablets (the header's links only show
  * from lg up). On the front page, plain in-page anchors with a scroll-spy
@@ -17,9 +19,12 @@ const items: { id: Section, label: string }[] = [
 const active = ref<Section>('hem')
 const route = useRoute()
 const onHome = computed(() => route.path === '/')
-const { status: authStatus, profile } = useAuth()
+const { status: authStatus, profile, profileStatus } = useAuth()
 const accountOpen = useAccountDialog()
-const hasAccount = computed(() => authStatus.value !== 'unavailable')
+const links = useSectionLinks()
+const entry = computed(() => accountEntry(authStatus.value, profileStatus.value, profile.value?.handle, links.value.supporter))
+const hasAccount = computed(() => entry.value.kind !== 'none')
+const onMine = computed(() => entry.value.kind === 'profile' && route.path === entry.value.to)
 const { playing } = usePodcastPlayer()
 const typing = useTyping()
 const desktop = useMedia('(min-width: 1024px)')
@@ -132,9 +137,25 @@ function go(id: Section) {
           <span v-if="item.id === 'lyssna' && playing" class="sr-only">(spelar nu)</span>
         </a>
       </li>
-      <!-- Your account: opens the account dialog (not a section) -->
+      <!-- You: your läktarplats once you have a profile (the account dialog is on it), until then the account dialog -->
       <li v-if="hasAccount">
+        <NuxtLink
+          v-if="entry.kind === 'profile'"
+          :to="entry.to"
+          :aria-current="onMine ? 'page' : undefined"
+          class="relative flex h-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold transition-colors motion-safe:active:scale-95"
+          :class="onMine ? 'text-himmel' : 'text-krita-dim hover:text-krita'"
+        >
+          <span
+            aria-hidden="true"
+            class="stripes absolute top-0 h-[3px] w-8 rounded-b-full [--stripe:4px] transition-opacity duration-300"
+            :class="onMine ? 'opacity-100' : 'opacity-0'"
+          />
+          <AccountGlyph compact class="size-6" />
+          Du
+        </NuxtLink>
         <button
+          v-else
           class="relative flex h-full w-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold text-krita-dim transition-colors hover:text-krita motion-safe:active:scale-95"
           aria-haspopup="dialog"
           @click="accountOpen = true"

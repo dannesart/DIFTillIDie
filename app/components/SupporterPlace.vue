@@ -119,7 +119,11 @@ const postsLabel = computed(() => {
       <div class="px-5 pb-6 sm:px-7">
         <div class="-mt-12 flex items-end justify-between gap-3 sm:-mt-14">
           <Avatar :name="profile.displayName" :design="profile.avatar" size="xl" class="ring-4! ring-navy-900!" />
-          <button v-if="own" class="mb-1 rounded-full border border-white/15 bg-navy-900/80 px-4 py-2 text-sm font-bold backdrop-blur transition hover:border-himmel hover:text-himmel" @click="editor.edit()">Ändra profil</button>
+          <!-- Yours: edit it, and your account (where Logga ut is) -->
+          <div v-if="own" class="mb-1 flex flex-wrap justify-end gap-2">
+            <button class="rounded-full border border-white/15 bg-navy-900/80 px-4 py-2 text-sm font-bold backdrop-blur transition hover:border-himmel hover:text-himmel" @click="editor.edit()">Ändra profil</button>
+            <button class="rounded-full border border-white/15 bg-navy-900/80 px-4 py-2 text-sm font-bold text-krita-dim backdrop-blur transition hover:border-himmel hover:text-himmel" aria-haspopup="dialog" @click="accountOpen = true">Konto</button>
+          </div>
         </div>
         <p class="kicker mt-4 text-himmel">På läktaren</p>
         <h1 id="supporter-name" class="mt-1 break-words font-display text-4xl font-bold leading-none tracking-tight sm:text-5xl">{{ profile.displayName }}</h1>
