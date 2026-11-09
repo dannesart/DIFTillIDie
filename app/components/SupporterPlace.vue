@@ -108,7 +108,9 @@ const postsLabel = computed(() => {
 
   <template v-else-if="profile">
     <!-- The supporter -->
-    <section class="card overflow-hidden" aria-labelledby="supporter-name">
+    <section class="card relative overflow-hidden" aria-labelledby="supporter-name">
+      <!-- Phones: your settings (desktop has them beside the sidebar's profile card) -->
+      <AccountSettingsButton v-if="own" class="absolute right-3 top-3 z-10 backdrop-blur lg:hidden" />
       <div class="relative h-28 sm:h-36" aria-hidden="true">
         <div class="stripes absolute inset-0 [--stripe:18px]" />
         <div class="absolute inset-0 bg-gradient-to-b from-transparent via-navy-950/20 to-navy-900" />

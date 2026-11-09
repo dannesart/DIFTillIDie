@@ -4,6 +4,8 @@ import {
   AUTH_STORAGE_KEY, PENDING_KEY, PROFILE_DESIGN_UNAVAILABLE, RESEND_COOLDOWN_S, createAuth, normalizeCode, normalizeEmail, profileErrorMessage,
   retryAfterSeconds, sendErrorMessage, validateEmail, verifyErrorMessage,
 } from '../app/lib/auth'
+import { accountEntry } from '../app/lib/accountEntry'
+import { sectionLinks } from '../app/lib/sectionLinks'
 import { normalizeHandle, validateDisplayName, validateHandle } from '../shared/utils/profile'
 
 /* A fake Supabase client: just the calls the auth store makes, all recorded. */
@@ -292,6 +294,15 @@ describe('signing out', () => {
     expect(calls.find(c => c.method === 'signOut')!.args).toEqual([{ scope: 'local' }])
     expect(auth.status.value).toBe('signed-out')
     expect(auth.profile.value).toBeNull()
+  })
+
+  it("takes \"you\" in the navigation from your läktarplats back to the sign-in dialog", async () => {
+    const auth = createAuth(fakeClient({ session: session(), profile: row }).client, { storage: memoryStorage() })
+    await auth.init(); await tick(); await auth.whenProfileLoaded()
+    const entry = () => accountEntry(auth.status.value, auth.profileStatus.value, auth.profile.value?.handle, sectionLinks('/').supporter)
+    expect(entry()).toEqual({ kind: 'profile', to: '/laktaren/kaminen81' })
+    await auth.signOut()
+    expect(entry()).toEqual({ kind: 'dialog' })
   })
 
   it('still ends signed out locally when the network is down', async () => {

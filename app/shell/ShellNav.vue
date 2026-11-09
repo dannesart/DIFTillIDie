@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { SectionId } from '~/lib/sectionLinks'
+import { accountEntry } from '~/lib/accountEntry'
 import NavIcon from './NavIcon.vue'
 
 /*
@@ -21,8 +22,8 @@ const sections: { id: SectionId, label: string }[] = [
   { id: 'lyssna', label: 'Lyssna' },
 ]
 
-const mine = computed(() => (profile.value ? links.value.supporter(profile.value.handle) : null))
-const onMine = computed(() => !!mine.value && route.path === mine.value)
+const entry = computed(() => accountEntry(status.value, profileStatus.value, profile.value?.handle, links.value.supporter))
+const onMine = computed(() => entry.value.kind === 'profile' && route.path === entry.value.to)
 const accountLabel = computed(() => {
   if (status.value !== 'signed-in') return 'Logga in'
   if (profileStatus.value === 'missing') return 'Välj läktarnamn'
@@ -60,29 +61,6 @@ const accountLabel = computed(() => {
             <span v-if="s.id === 'lyssna' && playing" class="sr-only">(spelar nu)</span>
           </NuxtLink>
         </li>
-        <li v-if="status !== 'unavailable'">
-          <NuxtLink
-            v-if="mine"
-            :to="mine"
-            :aria-current="onMine ? 'page' : undefined"
-            class="relative flex items-center gap-3.5 rounded-2xl px-3 py-2.5 text-[0.95rem] font-semibold transition-colors"
-            :class="onMine ? 'bg-white/[0.07] text-krita' : 'text-krita-dim hover:bg-white/[0.04] hover:text-krita'"
-          >
-            <span aria-hidden="true" class="stripes absolute inset-y-2 left-0 w-[3px] rounded-r-full [--stripe:4px] transition-opacity" :class="onMine ? 'opacity-100' : 'opacity-0'" />
-            <AccountGlyph compact class="size-5!" />
-            Min läktare
-          </NuxtLink>
-          <!-- No place of your own yet: the way in is the account dialog -->
-          <button
-            v-else
-            class="flex w-full items-center gap-3.5 rounded-2xl px-3 py-2.5 text-left text-[0.95rem] font-semibold text-krita-dim transition-colors hover:bg-white/[0.04] hover:text-krita"
-            aria-haspopup="dialog"
-            @click="accountOpen = true"
-          >
-            <AccountGlyph compact class="size-5!" />
-            Min läktare
-          </button>
-        </li>
       </ul>
     </nav>
 
@@ -93,9 +71,25 @@ const accountLabel = computed(() => {
         <span aria-hidden="true">·</span>
         Ett supporterprojekt
       </p>
-      <!-- Who you are here: last, at the foot -->
+      <!-- Who you are here: last, at the foot. With a profile it's the way to your läktarplats, and beside it (never inside) your settings (Issue #14). -->
+      <div v-if="entry.kind === 'profile' && profile" class="flex items-center gap-2">
+        <NuxtLink
+          :to="entry.to"
+          :aria-current="onMine ? 'page' : undefined"
+          class="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border bg-navy-900/60 p-2.5 transition hover:border-himmel/50"
+          :class="onMine ? 'border-himmel/50' : 'border-white/8'"
+        >
+          <Avatar :name="profile.displayName" :design="profile.avatar" size="sm" />
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-semibold">{{ profile.displayName }}</span>
+            <span class="block truncate text-xs text-krita-dim">@{{ profile.handle }}</span>
+          </span>
+        </NuxtLink>
+        <AccountSettingsButton />
+      </div>
+      <!-- Signed out, choosing a name, or still loading: the account dialog -->
       <button
-        v-if="status !== 'unavailable'"
+        v-else-if="entry.kind === 'dialog'"
         class="flex w-full items-center gap-3 rounded-2xl border border-white/8 bg-navy-900/60 p-2.5 text-left transition hover:border-himmel/50"
         aria-haspopup="dialog"
         @click="accountOpen = true"
