@@ -25,3 +25,7 @@ logs
 
 # Netlify
 .netlify
+
+# Supabase CLI local state
+supabase/.temp
+supabase/.branches
