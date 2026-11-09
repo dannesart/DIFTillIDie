@@ -3,7 +3,7 @@ import { nextTick, ref } from 'vue'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { TipMatch } from '../app/lib/matchtips'
 import {
-  createMatchtips, decidedLabel, lateNote, matchPhase, matchtipsetEnabled, parseGoals, pointsLabel, submitErrorMessage, toMatch, toMyPick, toStanding,
+  createMatchtips, decidedLabel, lateNote, matchPhase, parseGoals, pointsLabel, submitErrorMessage, toMatch, toMyPick, toStanding,
 } from '../app/lib/matchtips'
 
 /*
@@ -254,12 +254,5 @@ describe('the store', () => {
     expect(tips.myPicks.value).toEqual({})
     expect(tips.participating.value).toBe(false)
     expect(tips.status.value).toBe('signed-out')
-  })
-})
-
-describe('the launch gate', () => {
-  it('is off unless explicitly "on"', () => {
-    expect([undefined, '', 'off', 'true', '1', 'ON', false].map(matchtipsetEnabled)).toEqual([false, false, false, false, false, false, false])
-    expect(matchtipsetEnabled('on')).toBe(true)
   })
 })

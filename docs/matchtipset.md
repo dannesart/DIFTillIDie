@@ -9,7 +9,7 @@ Overtime and shootouts don't count. There's no betting and no prizes.
 
 > **Status:**
 > - **Database foundation:** applied to djurgarn-dev on 9 Nov 2026 (Issue #11; the design and decisions are in #6).
-> - **Supporter UI:** built (Issue #13), but **not launched**. It stays behind a default-off gate; see [The supporter UI](#the-supporter-ui).
+> - **Supporter UI:** built on the unmerged PR #15 branch (Issue #13), **not launched**. The release gate is the PR itself: it isn't merged until launch is approved. See [The supporter UI](#the-supporter-ui).
 > - **Matches:** none entered yet.
 
 - Migration: [`20261109160000_matchtipset_foundation.sql`](../supabase/migrations/20261109160000_matchtipset_foundation.sql).
@@ -68,18 +68,12 @@ When `latest_counts` is false, show the supporter (and only them) something like
 - **The table** shows rank (shared on ties), handle, points, matches tipped, exact scores and right outcomes. It's labelled as a pilot from its first match, not a full season. Leaving is behind a confirmation dialog: "Behåll mina tips" has focus, and the dialog explains that all tips, including older versions, are deleted while the account stays.
 - **Nothing personal is server-rendered.** The store loads in the browser only (`useMatchtips`), like a supporter's wall.
 
-### The launch gate (a UI gate, not a security boundary)
-- **Off by default.** `NUXT_PUBLIC_MATCHTIPSET` must be exactly `on` (runtime config `public.matchtipset`).
-- **Off means:**
-  - `/matchtipset` answers **404**, both from the server and on client-side navigation;
-  - the sidebar and bottom-nav links aren't rendered;
-  - nothing calls the functions.
-- **What it doesn't do:** it **doesn't change the database.** `public.matchtips_join` and the other functions remain executable by any signed-in user calling the API directly, by design. With no matches entered, nobody can make a tip. Server-enforced "participation closed" would be a separate, reviewed migration.
-- **To launch,** after approval:
-  1. Set `NUXT_PUBLIC_MATCHTIPSET=on` for the production context in Netlify.
-  2. Redeploy. The front page and section views are CDN-cached (ISR), and their nav only shows the link after a fresh deploy.
-- **Deploy previews** use the same hosted database, so they stay gated too. Enabling the gate there would let a reviewer's real account join for real.
-- **For visual review:** the UI was checked against the production build with every Supabase call mocked in the browser (a fake host), not with hosted data.
+### Release: the unmerged PR is the gate
+- **No feature flag.** `/matchtipset` and its nav links (sidebar and bottom nav) are simply part of the branch, so it's there at once in local development (`npm run dev`).
+- **Production is unchanged until the PR is merged,** and it's merged only once launch is approved. If the UI ever needs to be merged before launch, a **production-only** rollout gate is a separate, deliberate decision.
+- **Not a security boundary.** Neither the branch nor a hidden link limits the database: `public.matchtips_join` and the other functions are executable by any signed-in user calling the API directly, by design. With no matches entered, nobody can make a tip. Server-enforced "participation closed" would be a separate, reviewed migration.
+- **Netlify deploy previews of the PR** (`deploy-preview-<n>--diftillidie.netlify.app`) serve `/matchtipset` against the **hosted** database, to anyone with the link. Signed-in visitors there see the real (empty) state and could join for real by clicking "Gå med" (a real participant row; leaving deletes it). Visiting alone writes nothing.
+- **Full UI states with data** (open, paused, corrected, settled, the table) are reviewed with mocks or a local stack, never with fake matches or participants in hosted `djurgarn-dev`. The UI was checked against the production build with every Supabase call mocked in the browser (a fake host).
 
 ## Operator runbook (SQL editor)
 
@@ -217,7 +211,7 @@ A missing fixture isn't by itself an error (`loadFixtures()` drops past games, a
 |---|---|---|
 | `tests/matchtipset-db.test.ts` | `npm test`, locally and in CI: the real migrations in PGlite ([harness](../tests/db/supabase-harness.ts)) | **Grants and exposure:** schemas, tables and functions per role, RLS, `search_path`. **Opt-in and opt-out.** **Append-only revisions.** **Forged author, time or points.** **Locked and void matches.** **Secrecy before the deadline.** **Effective picks only.** **The corrected-deadline scenario.** **Never-later deadlines.** **Postponements.** **Results:** consistency, corrections, scoring and leaderboard ties. **The log:** content and append-only. **Account deletion.** It also runs the pgTAP file through a shim. |
 | `supabase/tests/matchtipset_rls.test.sql` | `supabase test db`, in CI on a fresh local stack. Rolled back. | The same boundaries on real Supabase, plus pausing and resuming a postponed match and the duplicate-reference check: 60 assertions. |
-| `tests/matchtipset-ui.test.ts` | `npm test` | **The UI's store and words, against a fake Data API:** guests make no requests, joining only on a click, phases (open, locked, paused, postponed, settled, void), a server-denied submit reloading the real state, the corrected-deadline note, pending vs verified points, ties, confirmed leave, account switching, and the gate. |
+| `tests/matchtipset-ui.test.ts` | `npm test` | **The UI's store and words, against a fake Data API:** guests make no requests, joining only on a click, phases (open, locked, paused, postponed, settled, void), a server-denied submit reloading the real state, the corrected-deadline note, pending vs verified points, ties, confirmed leave, and account switching. |
 | `tests/matchtipset-stack.test.ts` | CI only (`MATCHTIPSET_STACK=local`; refuses non-local URLs) | **Real concurrency through the API:** 20 parallel submissions; a deadline correction racing submissions (whether they overlap isn't controlled); a **deterministic interleaving**, where the submission is held waiting on an uncommitted correction's lock and then refused; and leaving mid-flight. **Pausing a postponed match through the API.** **REST/GraphQL exposure** of the schemas. **Anonymous refusal.** **Deletion via the Auth admin API.** **The UI store end to end** (join, tip, corrected deadline, result, paused match, leave) against the real functions. |
 
 CI: [`.github/workflows/database.yml`](../.github/workflows/database.yml) starts a disposable stack from [`supabase/config.toml`](../supabase/config.toml), which is local-only, and needs no secrets.

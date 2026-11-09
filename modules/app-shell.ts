@@ -12,7 +12,7 @@ import type { NuxtPage } from 'nuxt/schema'
  *   /snacket, /stories,  a section's own view (desktop; on a phone the same
  *   /lyssna              address shows the view in the phone's surroundings)
  *   /laktaren/<handle>   a supporter's place on the stands
- *   /matchtipset         Matchtipset (404 until its launch gate is on)
+ *   /matchtipset         Matchtipset
  */
 const VIEWS = ['snacket', 'stories', 'lyssna'] as const
 

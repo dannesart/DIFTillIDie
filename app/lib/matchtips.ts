@@ -342,6 +342,3 @@ export function createMatchtips(client: SupabaseClient | null, auth: Pick<AuthSt
 }
 
 export type MatchtipsStore = ReturnType<typeof createMatchtips>
-
-/** The product launch gate (NUXT_PUBLIC_MATCHTIPSET=on). A UI gate only: the database functions stay as they are. */
-export const matchtipsetEnabled = (flag: unknown) => flag === 'on' || flag === true

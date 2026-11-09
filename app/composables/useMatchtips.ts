@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createMatchtips, matchtipsetEnabled } from '~/lib/matchtips'
+import { createMatchtips } from '~/lib/matchtips'
 
 /**
  * Matchtipset for the page you're on (lib/matchtips). Loaded in the browser
@@ -10,6 +10,3 @@ export function useMatchtips() {
   const client = useNuxtApp().$supabase as SupabaseClient | null | undefined
   return createMatchtips(client ?? null, import.meta.client ? useAuth() : null)
 }
-
-/** Is Matchtipset launched here? (NUXT_PUBLIC_MATCHTIPSET=on; off by default.) */
-export const useMatchtipsetEnabled = () => computed(() => matchtipsetEnabled(useRuntimeConfig().public.matchtipset))

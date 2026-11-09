@@ -21,9 +21,6 @@ const { status: authStatus, profile } = useAuth()
 const accountOpen = useAccountDialog()
 const hasAccount = computed(() => authStatus.value !== 'unavailable')
 const { playing } = usePodcastPlayer()
-// Matchtipset: only once it's launched (see useMatchtipsetEnabled).
-const tipset = useMatchtipsetEnabled()
-const columns = computed(() => ['grid-cols-4', 'grid-cols-5', 'grid-cols-6'][Number(hasAccount.value) + Number(tipset.value)])
 const typing = useTyping()
 const desktop = useMedia('(min-width: 1024px)')
 // The keyboard needs the space while typing on a phone or tablet.
@@ -93,7 +90,7 @@ function go(id: Section) {
     :class="hidden && 'translate-y-full'"
     :inert="hidden || undefined"
   >
-    <ul class="mx-auto grid h-16 max-w-xl" :class="columns">
+    <ul class="mx-auto grid h-16 max-w-xl" :class="hasAccount ? 'grid-cols-6' : 'grid-cols-5'">
       <li v-for="item in items" :key="item.id">
         <a
           :href="(onHome ? '' : '/') + (item.id === 'hem' ? '#' : `#${item.id}`)"
@@ -136,7 +133,7 @@ function go(id: Section) {
         </a>
       </li>
       <!-- Matchtipset: its own page, not a front-page section -->
-      <li v-if="tipset">
+      <li>
         <NuxtLink
           to="/matchtipset"
           :aria-current="route.path === '/matchtipset' ? 'page' : undefined"

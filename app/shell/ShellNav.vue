@@ -13,8 +13,6 @@ const links = useSectionLinks()
 const { status, profile, profileStatus } = useAuth()
 const accountOpen = useAccountDialog()
 const { playing } = usePodcastPlayer()
-// Matchtipset: only once it's launched (see useMatchtipsetEnabled).
-const tipset = useMatchtipsetEnabled()
 const onTipset = computed(() => route.path === '/matchtipset')
 
 const sections: { id: SectionId, label: string }[] = [
@@ -63,7 +61,7 @@ const accountLabel = computed(() => {
             <span v-if="s.id === 'lyssna' && playing" class="sr-only">(spelar nu)</span>
           </NuxtLink>
         </li>
-        <li v-if="tipset">
+        <li>
           <NuxtLink
             to="/matchtipset"
             :aria-current="onTipset ? 'page' : undefined"
