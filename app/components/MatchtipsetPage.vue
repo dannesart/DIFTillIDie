@@ -42,7 +42,8 @@ async function join() {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <!-- A size container: the match grid follows the space the shell leaves, not the window -->
+  <div class="@container space-y-6">
     <header>
       <p class="kicker text-himmel">Pilot · SHL 2026/27 · Djurgården herr</p>
       <h1 class="section-title mt-2">Matchtipset</h1>
@@ -51,17 +52,8 @@ async function join() {
       </p>
     </header>
 
-    <!-- The rules, for everyone -->
-    <section class="card p-5 sm:p-6" aria-labelledby="mt-rules">
-      <h2 id="mt-rules" class="font-display text-xl font-bold">Så räknas det</h2>
-      <p class="mt-2 font-semibold text-guld">{{ SIXTY_MINUTES }}</p>
-      <ul class="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-        <li class="rounded-2xl bg-white/[0.04] px-4 py-3"><span class="font-display text-2xl font-bold text-himmel">3 p</span><br>exakt resultat</li>
-        <li class="rounded-2xl bg-white/[0.04] px-4 py-3"><span class="font-display text-2xl font-bold text-himmel">1 p</span><br>rätt utgång: hemma, oavgjort eller borta</li>
-        <li class="rounded-2xl bg-white/[0.04] px-4 py-3"><span class="font-display text-2xl font-bold text-himmel">0 p</span><br>annars</li>
-      </ul>
-      <p class="mt-3 text-sm text-krita-dim">Du kan ändra ditt tips fram till matchens deadline, som är nedsläppet. Fram till dess ser bara du ditt tips.</p>
-    </section>
+    <!-- The rules, for everyone: the scoring always, the details on request on a phone -->
+    <MatchtipsetRules />
 
     <!-- Guests: an invitation, nothing else -->
     <section v-if="signedOut" class="card px-6 py-10 text-center">
@@ -98,7 +90,7 @@ async function join() {
       <!-- Taking part: a deliberate choice, with what it means spelled out -->
       <section v-if="!participating" class="card p-5 sm:p-6" aria-labelledby="mt-join">
         <h2 id="mt-join" class="font-display text-xl font-bold">Vill du vara med?</h2>
-        <ul class="mt-3 space-y-2 text-sm">
+        <ul class="mt-3 max-w-prose space-y-2 text-sm">
           <li v-if="profile">Ditt läktarnamn <strong>@{{ profile.handle }}</strong> syns i tabellen för andra inloggade supportrar.</li>
           <li>Ditt tips syns bara för dig fram till deadline. Efter deadline ser inloggade supportrar tipset som gäller – aldrig dina tidigare versioner.</li>
           <li>{{ SIXTY_MINUTES }}</li>
@@ -134,7 +126,8 @@ async function join() {
           <p class="font-semibold">Inga matcher att tippa ännu</p>
           <p class="mx-auto mt-2 max-w-md text-sm text-krita-dim">Piloten har inte startat. När den gör det lägger vi in nästa riktiga match här, kontrollerad mot det officiella spelschemat.</p>
         </div>
-        <ul v-else class="mt-3 space-y-4">
+        <!-- Two columns once the middle is wide enough, and there's more than one match -->
+        <ul v-else class="mt-3 grid items-start gap-4" :class="matches.length > 1 && '@4xl:grid-cols-2'">
           <li v-for="m in matches" :key="m.id">
             <MatchtipsetMatch
               :match="m"
