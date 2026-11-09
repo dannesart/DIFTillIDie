@@ -71,20 +71,22 @@ const accountLabel = computed(() => {
         <span aria-hidden="true">·</span>
         Ett supporterprojekt
       </p>
-      <!-- Who you are here: last, at the foot. With a profile it's the way to your läktarplats (Issue #14). -->
-      <NuxtLink
-        v-if="entry.kind === 'profile' && profile"
-        :to="entry.to"
-        :aria-current="onMine ? 'page' : undefined"
-        class="flex w-full items-center gap-3 rounded-2xl border bg-navy-900/60 p-2.5 transition hover:border-himmel/50"
-        :class="onMine ? 'border-himmel/50' : 'border-white/8'"
-      >
-        <Avatar :name="profile.displayName" :design="profile.avatar" size="sm" />
-        <span class="min-w-0 flex-1">
-          <span class="block truncate text-sm font-semibold">{{ profile.displayName }}</span>
-          <span class="block truncate text-xs text-krita-dim">@{{ profile.handle }}</span>
-        </span>
-      </NuxtLink>
+      <!-- Who you are here: last, at the foot. With a profile it's the way to your läktarplats, and beside it (never inside) your settings (Issue #14). -->
+      <div v-if="entry.kind === 'profile' && profile" class="flex items-center gap-2">
+        <NuxtLink
+          :to="entry.to"
+          :aria-current="onMine ? 'page' : undefined"
+          class="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border bg-navy-900/60 p-2.5 transition hover:border-himmel/50"
+          :class="onMine ? 'border-himmel/50' : 'border-white/8'"
+        >
+          <Avatar :name="profile.displayName" :design="profile.avatar" size="sm" />
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-semibold">{{ profile.displayName }}</span>
+            <span class="block truncate text-xs text-krita-dim">@{{ profile.handle }}</span>
+          </span>
+        </NuxtLink>
+        <AccountSettingsButton />
+      </div>
       <!-- Signed out, choosing a name, or still loading: the account dialog -->
       <button
         v-else-if="entry.kind === 'dialog'"

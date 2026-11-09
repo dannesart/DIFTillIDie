@@ -11,7 +11,7 @@ We first tried Google OAuth. Google's consent screen showed the random Supabase 
 | Code flow, session, profile state | [`app/lib/auth.ts`](../app/lib/auth.ts) |
 | Supabase client, browser only | [`app/plugins/auth.client.ts`](../app/plugins/auth.client.ts) |
 | UI | `AccountDialog`, `SignInWithCode`, `ProfileForm`, `AccountButton` (desktop header), "Du" tab in `MobileNav` |
-| Where "you" leads | [`app/lib/accountEntry.ts`](../app/lib/accountEntry.ts): with a profile, the sidebar card and "Du" go to your läktarplats, where "Konto" opens `AccountDialog` (Ändra profil, Logga ut). Otherwise they open `AccountDialog` (sign in, choose a name, retry). |
+| Where "you" leads | [`app/lib/accountEntry.ts`](../app/lib/accountEntry.ts): with a profile, the sidebar card and "Du" go to your läktarplats. Your settings are a separate gear, `AccountSettingsButton`, which opens `AccountDialog` (Ändra profil, Logga ut): beside the sidebar card on desktop, on your own läktarplats on phones. Without a profile, the card and "Du" open `AccountDialog` themselves (sign in, choose a name, retry). |
 | Profile rules (shared with the database) | [`shared/utils/profile.ts`](../shared/utils/profile.ts) |
 | Database | [`supabase/migrations/20261102234401_profiles.sql`](../supabase/migrations/20261102234401_profiles.sql) |
 | E-mail template | [`supabase/templates/otp-code.html`](../supabase/templates/otp-code.html) |

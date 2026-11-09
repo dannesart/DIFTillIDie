@@ -108,7 +108,9 @@ const postsLabel = computed(() => {
 
   <template v-else-if="profile">
     <!-- The supporter -->
-    <section class="card overflow-hidden" aria-labelledby="supporter-name">
+    <section class="card relative overflow-hidden" aria-labelledby="supporter-name">
+      <!-- Phones: your settings (desktop has them beside the sidebar's profile card) -->
+      <AccountSettingsButton v-if="own" class="absolute right-3 top-3 z-10 backdrop-blur lg:hidden" />
       <div class="relative h-28 sm:h-36" aria-hidden="true">
         <div class="stripes absolute inset-0 [--stripe:18px]" />
         <div class="absolute inset-0 bg-gradient-to-b from-transparent via-navy-950/20 to-navy-900" />
@@ -119,11 +121,7 @@ const postsLabel = computed(() => {
       <div class="px-5 pb-6 sm:px-7">
         <div class="-mt-12 flex items-end justify-between gap-3 sm:-mt-14">
           <Avatar :name="profile.displayName" :design="profile.avatar" size="xl" class="ring-4! ring-navy-900!" />
-          <!-- Yours: edit it, and your account (where Logga ut is) -->
-          <div v-if="own" class="mb-1 flex flex-wrap justify-end gap-2">
-            <button class="rounded-full border border-white/15 bg-navy-900/80 px-4 py-2 text-sm font-bold backdrop-blur transition hover:border-himmel hover:text-himmel" @click="editor.edit()">Ändra profil</button>
-            <button class="rounded-full border border-white/15 bg-navy-900/80 px-4 py-2 text-sm font-bold text-krita-dim backdrop-blur transition hover:border-himmel hover:text-himmel" aria-haspopup="dialog" @click="accountOpen = true">Konto</button>
-          </div>
+          <button v-if="own" class="mb-1 rounded-full border border-white/15 bg-navy-900/80 px-4 py-2 text-sm font-bold backdrop-blur transition hover:border-himmel hover:text-himmel" @click="editor.edit()">Ändra profil</button>
         </div>
         <p class="kicker mt-4 text-himmel">På läktaren</p>
         <h1 id="supporter-name" class="mt-1 break-words font-display text-4xl font-bold leading-none tracking-tight sm:text-5xl">{{ profile.displayName }}</h1>
