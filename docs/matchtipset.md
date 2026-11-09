@@ -76,6 +76,20 @@ When `latest_counts` is false, show the supporter (and only them) something like
 - **Netlify deploy previews of the PR** (`deploy-preview-<n>--diftillidie.netlify.app`) serve `/matchtipset` against the **hosted** database, to anyone with the link. Signed-in visitors there see the real (empty) state and could join for real by clicking "Gå med" (a real participant row; leaving deletes it). Visiting alone writes nothing.
 - **Full UI states with data** (open, paused, corrected, settled, the table) are reviewed with mocks or a local stack, never with fake matches or participants in hosted `djurgarn-dev`. The UI was checked against the production build with every Supabase call mocked in the browser (a fake host).
 
+### Local journey preview (test data, nothing hosted)
+To try the whole journey by hand: an open match, saving and changing a tip, the deadline passing, a verified result, and the table.
+```sh
+npm run build
+npm run preview:matchtipset
+```
+- **App:** http://localhost:3916/matchtipset. Sign in with **any e-mail address and the code `123456`**; a local profile is made for it.
+- **Operator panel:** http://127.0.0.1:3917/. It stands in for the SQL-editor steps: let a deadline pass, register or correct a verified 60-minute result, reset the test data. It also has an operator-only view of every submitted tip. Reload the app after an action.
+- **The test data:**
+  - two **TEST** supporters (`test_jarnis`, `test_mattias`);
+  - a played match (Djurgården–Växjö, 3–3 after 60, overtime);
+  - an open match two hours ahead (Färjestad–Djurgården), already tipped by the test supporters (hidden until the deadline).
+- **Isolation:** [`scripts/matchtipset-preview.mjs`](../scripts/matchtipset-preview.mjs) runs the production build with its Supabase URL set to a mock on `127.0.0.1`, and refuses any other URL. The built server never reads `.env`, and everything is held in memory and gone on Ctrl+C. The mock copies the database's Matchtipset rules closely enough to try the UI, but it isn't the database: the database's own tests are what prove the rules.
+
 ## Operator runbook (SQL editor)
 
 The owner runs every operation in the Supabase **SQL editor**, through the functions in `matchtips_ops`. No API role can call them.

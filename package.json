@@ -14,7 +14,8 @@
     "postinstall": "nuxt prepare",
     "test": "vitest run",
     "test:live": "vitest run tests/live.test.ts",
-    "test:acceptance": "vitest run tests/acceptance-publish.test.ts"
+    "test:acceptance": "vitest run tests/acceptance-publish.test.ts",
+    "preview:matchtipset": "node scripts/matchtipset-preview.mjs"
   },
   "dependencies": {
     "@nuxt/fonts": "^1.2.0",
