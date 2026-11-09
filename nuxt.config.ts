@@ -24,6 +24,10 @@ export default defineNuxtConfig({
       // Only the *publishable* key belongs here — it's meant for browsers.
       supabaseUrl: '',
       supabaseKey: '',
+      // Matchtipset's launch gate: off unless NUXT_PUBLIC_MATCHTIPSET=on. A UI gate
+      // only (the route answers 404, the nav hides it); the database functions are
+      // unchanged by it. See docs/matchtipset.md, "The supporter UI".
+      matchtipset: '',
     },
   },
 

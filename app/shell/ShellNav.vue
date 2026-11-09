@@ -13,6 +13,9 @@ const links = useSectionLinks()
 const { status, profile, profileStatus } = useAuth()
 const accountOpen = useAccountDialog()
 const { playing } = usePodcastPlayer()
+// Matchtipset: only once it's launched (see useMatchtipsetEnabled).
+const tipset = useMatchtipsetEnabled()
+const onTipset = computed(() => route.path === '/matchtipset')
 
 const sections: { id: SectionId, label: string }[] = [
   { id: 'hem', label: 'Hem' },
@@ -58,6 +61,18 @@ const accountLabel = computed(() => {
               <span class="w-[2px] rounded-full bg-guld" /><span class="w-[2px] rounded-full bg-guld" /><span class="w-[2px] rounded-full bg-guld" />
             </span>
             <span v-if="s.id === 'lyssna' && playing" class="sr-only">(spelar nu)</span>
+          </NuxtLink>
+        </li>
+        <li v-if="tipset">
+          <NuxtLink
+            to="/matchtipset"
+            :aria-current="onTipset ? 'page' : undefined"
+            class="relative flex items-center gap-3.5 rounded-2xl px-3 py-2.5 text-[0.95rem] font-semibold transition-colors"
+            :class="onTipset ? 'bg-white/[0.07] text-krita' : 'text-krita-dim hover:bg-white/[0.04] hover:text-krita'"
+          >
+            <span aria-hidden="true" class="stripes absolute inset-y-2 left-0 w-[3px] rounded-r-full [--stripe:4px] transition-opacity" :class="onTipset ? 'opacity-100' : 'opacity-0'" />
+            <span :class="onTipset ? 'text-himmel' : ''"><NavIcon id="matchtipset" /></span>
+            Matchtipset
           </NuxtLink>
         </li>
         <li v-if="status !== 'unavailable'">

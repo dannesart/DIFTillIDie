@@ -2,7 +2,7 @@
 import type { SectionId } from '~/lib/sectionLinks'
 
 /* The bottom nav's glyphs (components/MobileNav.vue), for the shell's sidebar. */
-defineProps<{ id: SectionId }>()
+defineProps<{ id: SectionId | 'matchtipset' }>()
 </script>
 
 <template>
@@ -17,6 +17,10 @@ defineProps<{ id: SectionId }>()
   <!-- Snacket: a speech bubble -->
   <svg v-else-if="id === 'snacket'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
     <path d="M4 5h16v11H10l-5 4v-4H4z" /><circle cx="9" cy="10.5" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="10.5" r="1" fill="currentColor" stroke="none" /><circle cx="15" cy="10.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+  <!-- Matchtipset: a tip slip -->
+  <svg v-else-if="id === 'matchtipset'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="4" y="3.5" width="16" height="17" rx="2.5" /><path d="M8 9.5h3M13 9.5h3M8 14.5l2 2 4-4.5" />
   </svg>
   <!-- Lyssna: headphones -->
   <svg v-else viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

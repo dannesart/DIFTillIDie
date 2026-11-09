@@ -7,9 +7,10 @@ Supporters tip the **60-minute score** of DIF men's **SHL regular-season** games
 
 Overtime and shootouts don't count. There's no betting and no prizes.
 
-> **Status:** the database foundation only (Issue #11; the design and decisions are in #6).
-> - There's no UI yet.
-> - The migration is **not applied** to the hosted project. It's applied by hand after review; see [Release checklist](#release-checklist).
+> **Status:**
+> - **Database foundation:** applied to djurgarn-dev on 9 Nov 2026 (Issue #11; the design and decisions are in #6).
+> - **Supporter UI:** built (Issue #13), but **not launched**. It stays behind a default-off gate; see [The supporter UI](#the-supporter-ui).
+> - **Matches:** none entered yet.
 
 - Migration: [`20261109160000_matchtipset_foundation.sql`](../supabase/migrations/20261109160000_matchtipset_foundation.sql).
 - Tests: [`tests/matchtipset-db.test.ts`](../tests/matchtipset-db.test.ts), [`supabase/tests/matchtipset_rls.test.sql`](../supabase/tests/matchtipset_rls.test.sql) and [`tests/matchtipset-stack.test.ts`](../tests/matchtipset-stack.test.ts).
@@ -46,6 +47,39 @@ All of these require a signed-in supporter. `anon` can execute none of them.
 | `matchtips_leaderboard(season)` | Rank (shared on ties), handle, points, matches tipped, exact scores and right outcomes. Only locked, non-void matches count. |
 
 When `latest_counts` is false, show the supporter (and only them) something like **"Räknas inte – matchens starttid har rättats"**, with the corrected deadline and source from `matchtips_matches`. Never word it as if they knew it was late.
+
+## The supporter UI
+
+`/matchtipset` (`app/shell/views/Matchtipset.vue`, `components/Matchtipset*.vue`, store [`app/lib/matchtips.ts`](../app/lib/matchtips.ts)): the rules, joining, the matches, your tip, everyone's tips after the deadline, and the table. Everything shown comes from the nine supporter functions. Nothing is invented, and nothing the database decides (deadline, validity, visibility, points) is decided in the browser.
+
+- **Guests** see the rules and a sign-in invitation. The page makes **no** Matchtipset request for them.
+- **Signed in:**
+  - **Joining:** an explicit click on a consent card. The card states that the handle is visible to signed-in supporters, that tips are hidden until the deadline and only the counting tip is shown after it, the 60-minute rule, and that leaving deletes everything. It shows the consent version from `matchtips_consent_version()`. Visiting never joins.
+  - **No matches:** says so honestly ("Inga matcher att tippa ännu").
+- **A match card** shows home and away as officially listed, the **database's deadline** (never the MatchCard's time), and its phase:
+  - **open:** your tip form;
+  - **paused:** postponed before the deadline, so no form and nothing revealed;
+  - **locked** and **postponed after the deadline;**
+  - **settled:** the verified 60-minute result, how the game was decided, the source, and "Resultatet har rättats" for a corrected result;
+  - **void.**
+
+  It also shows **"Deadline rättad"** with the reason and source, and the late-tip note (`lateNote`), which only the affected supporter sees.
+- **A refused submission** (`55000`, …) shows the database's reason and reloads the real state. The browser clock only closes a form whose deadline has passed; the database always decides.
+- **The table** shows rank (shared on ties), handle, points, matches tipped, exact scores and right outcomes. It's labelled as a pilot from its first match, not a full season. Leaving is behind a confirmation dialog: "Behåll mina tips" has focus, and the dialog explains that all tips, including older versions, are deleted while the account stays.
+- **Nothing personal is server-rendered.** The store loads in the browser only (`useMatchtips`), like a supporter's wall.
+
+### The launch gate (a UI gate, not a security boundary)
+- **Off by default.** `NUXT_PUBLIC_MATCHTIPSET` must be exactly `on` (runtime config `public.matchtipset`).
+- **Off means:**
+  - `/matchtipset` answers **404**, both from the server and on client-side navigation;
+  - the sidebar and bottom-nav links aren't rendered;
+  - nothing calls the functions.
+- **What it doesn't do:** it **doesn't change the database.** `public.matchtips_join` and the other functions remain executable by any signed-in user calling the API directly, by design. With no matches entered, nobody can make a tip. Server-enforced "participation closed" would be a separate, reviewed migration.
+- **To launch,** after approval:
+  1. Set `NUXT_PUBLIC_MATCHTIPSET=on` for the production context in Netlify.
+  2. Redeploy. The front page and section views are CDN-cached (ISR), and their nav only shows the link after a fresh deploy.
+- **Deploy previews** use the same hosted database, so they stay gated too. Enabling the gate there would let a reviewer's real account join for real.
+- **For visual review:** the UI was checked against the production build with every Supabase call mocked in the browser (a fake host), not with hosted data.
 
 ## Operator runbook (SQL editor)
 
@@ -183,7 +217,8 @@ A missing fixture isn't by itself an error (`loadFixtures()` drops past games, a
 |---|---|---|
 | `tests/matchtipset-db.test.ts` | `npm test`, locally and in CI: the real migrations in PGlite ([harness](../tests/db/supabase-harness.ts)) | **Grants and exposure:** schemas, tables and functions per role, RLS, `search_path`. **Opt-in and opt-out.** **Append-only revisions.** **Forged author, time or points.** **Locked and void matches.** **Secrecy before the deadline.** **Effective picks only.** **The corrected-deadline scenario.** **Never-later deadlines.** **Postponements.** **Results:** consistency, corrections, scoring and leaderboard ties. **The log:** content and append-only. **Account deletion.** It also runs the pgTAP file through a shim. |
 | `supabase/tests/matchtipset_rls.test.sql` | `supabase test db`, in CI on a fresh local stack. Rolled back. | The same boundaries on real Supabase, plus pausing and resuming a postponed match and the duplicate-reference check: 60 assertions. |
-| `tests/matchtipset-stack.test.ts` | CI only (`MATCHTIPSET_STACK=local`; refuses non-local URLs) | **Real concurrency through the API:** 20 parallel submissions; a deadline correction racing submissions (whether they overlap isn't controlled); a **deterministic interleaving**, where the submission is held waiting on an uncommitted correction's lock and then refused; and leaving mid-flight. **Pausing a postponed match through the API.** **REST/GraphQL exposure** of the schemas. **Anonymous refusal.** **Deletion via the Auth admin API.** |
+| `tests/matchtipset-ui.test.ts` | `npm test` | **The UI's store and words, against a fake Data API:** guests make no requests, joining only on a click, phases (open, locked, paused, postponed, settled, void), a server-denied submit reloading the real state, the corrected-deadline note, pending vs verified points, ties, confirmed leave, account switching, and the gate. |
+| `tests/matchtipset-stack.test.ts` | CI only (`MATCHTIPSET_STACK=local`; refuses non-local URLs) | **Real concurrency through the API:** 20 parallel submissions; a deadline correction racing submissions (whether they overlap isn't controlled); a **deterministic interleaving**, where the submission is held waiting on an uncommitted correction's lock and then refused; and leaving mid-flight. **Pausing a postponed match through the API.** **REST/GraphQL exposure** of the schemas. **Anonymous refusal.** **Deletion via the Auth admin API.** **The UI store end to end** (join, tip, corrected deadline, result, paused match, leave) against the real functions. |
 
 CI: [`.github/workflows/database.yml`](../.github/workflows/database.yml) starts a disposable stack from [`supabase/config.toml`](../supabase/config.toml), which is local-only, and needs no secrets.
 

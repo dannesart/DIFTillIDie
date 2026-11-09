@@ -21,6 +21,9 @@ const { status: authStatus, profile } = useAuth()
 const accountOpen = useAccountDialog()
 const hasAccount = computed(() => authStatus.value !== 'unavailable')
 const { playing } = usePodcastPlayer()
+// Matchtipset: only once it's launched (see useMatchtipsetEnabled).
+const tipset = useMatchtipsetEnabled()
+const columns = computed(() => ['grid-cols-4', 'grid-cols-5', 'grid-cols-6'][Number(hasAccount.value) + Number(tipset.value)])
 const typing = useTyping()
 const desktop = useMedia('(min-width: 1024px)')
 // The keyboard needs the space while typing on a phone or tablet.
@@ -90,7 +93,7 @@ function go(id: Section) {
     :class="hidden && 'translate-y-full'"
     :inert="hidden || undefined"
   >
-    <ul class="mx-auto grid h-16 max-w-xl" :class="hasAccount ? 'grid-cols-5' : 'grid-cols-4'">
+    <ul class="mx-auto grid h-16 max-w-xl" :class="columns">
       <li v-for="item in items" :key="item.id">
         <a
           :href="(onHome ? '' : '/') + (item.id === 'hem' ? '#' : `#${item.id}`)"
@@ -131,6 +134,21 @@ function go(id: Section) {
           {{ item.label }}
           <span v-if="item.id === 'lyssna' && playing" class="sr-only">(spelar nu)</span>
         </a>
+      </li>
+      <!-- Matchtipset: its own page, not a front-page section -->
+      <li v-if="tipset">
+        <NuxtLink
+          to="/matchtipset"
+          :aria-current="route.path === '/matchtipset' ? 'page' : undefined"
+          class="relative flex h-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold transition-colors motion-safe:active:scale-95"
+          :class="route.path === '/matchtipset' ? 'text-himmel' : 'text-krita-dim hover:text-krita'"
+        >
+          <span aria-hidden="true" class="stripes absolute top-0 h-[3px] w-8 rounded-b-full [--stripe:4px] transition-opacity duration-300" :class="route.path === '/matchtipset' ? 'opacity-100' : 'opacity-0'" />
+          <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="3.5" width="16" height="17" rx="2.5" /><path d="M8 9.5h3M13 9.5h3M8 14.5l2 2 4-4.5" />
+          </svg>
+          Tipset
+        </NuxtLink>
       </li>
       <!-- Your account: opens the account dialog (not a section) -->
       <li v-if="hasAccount">

@@ -12,6 +12,7 @@ import type { NuxtPage } from 'nuxt/schema'
  *   /snacket, /stories,  a section's own view (desktop; on a phone the same
  *   /lyssna              address shows the view in the phone's surroundings)
  *   /laktaren/<handle>   a supporter's place on the stands
+ *   /matchtipset         Matchtipset (404 until its launch gate is on)
  */
 const VIEWS = ['snacket', 'stories', 'lyssna'] as const
 
@@ -29,6 +30,7 @@ export default defineNuxtModule({
           { name: 'index', path: '', file: view('Home') },
           ...VIEWS.map((id): NuxtPage => ({ name: id, path: id, file: view(id[0]!.toUpperCase() + id.slice(1)) })),
           { name: 'laktaren-handle', path: 'laktaren/:handle()', file: view('Laktaren') },
+          { name: 'matchtipset', path: 'matchtipset', file: view('Matchtipset') },
         ],
       })
     })

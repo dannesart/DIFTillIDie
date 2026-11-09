@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { ref } from 'vue'
+import { createMatchtips, matchPhase } from '../app/lib/matchtips'
 
 /*
  * Matchtipset against a real, disposable LOCAL Supabase stack (CI:
@@ -11,6 +13,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
  *  - Exposure: the matchtips schemas aren't reachable through REST or
  *    GraphQL; anonymous requests are refused.
  *  - Account deletion through the real Auth admin API.
+ *  - The supporter UI's store (app/lib/matchtips) against the real functions,
+ *    so the shapes the page relies on are the ones the database returns.
  *
  * It creates users, a match and predictions, so it refuses to run unless
  * MATCHTIPSET_STACK=local and the API is on localhost. Never point it at the
@@ -200,5 +204,53 @@ describe.skipIf(!enabled)('Matchtipset on a local Supabase stack', () => {
     const [logged] = await sql`select count(*)::int as n from matchtips.match_log where match_id = ${match}`
     expect(subs!.n).toBe(0)
     expect(logged!.n).toBe(1)
+  })
+
+  it('the supporter UI store, end to end: join, tip, a corrected deadline, the result, a paused match, leave', async () => {
+    const ux = await supporter('ux', false)
+    const tips = createMatchtips(ux.client, { status: ref('signed-in'), userId: ref(ux.id) })
+    await tips.load()
+    expect(tips.status.value).toBe('ready')
+    expect(tips.participating.value).toBe(false)
+    expect(tips.consentVersion.value).toBe(CONSENT)
+    expect(await tips.join()).toBe(true)
+    expect(tips.participating.value).toBe(true)
+
+    const match = await openMatch()
+    await tips.load()
+    const shown = tips.matches.value.find(m => m.id === match)!
+    expect(matchPhase(shown)).toBe('open')
+    expect(shown).toMatchObject({ homeTeam: 'Djurgården', status: 'scheduled', result: null, deadlineCorrection: null })
+
+    expect(await tips.submit(match, 1, 0)).toBe(true)
+    const [{ t: mid }] = await sql`select clock_timestamp()::text as t`
+    await new Promise(r => setTimeout(r, 30))
+    expect(await tips.submit(match, 4, 4)).toBe(true)
+    await sql`select matchtips_ops.correct_deadline(${match}, ${mid}::timestamptz, ${SRC}, 'CI: startade tidigare', 'ci')`
+    await tips.load()
+    const corrected = tips.matches.value.find(m => m.id === match)!
+    expect(matchPhase(corrected)).toBe('locked')
+    expect(corrected.deadlineCorrection).toEqual({ reason: 'CI: startade tidigare', sourceUrl: SRC })
+    expect(tips.myPicks.value[match]).toMatchObject({ pick: { home: 1, away: 0 }, latest: { home: 4, away: 4 }, latestCounts: false, points: null })
+    expect(await tips.submit(match, 2, 2)).toBe(false)
+    expect(tips.notes.value[match]!.ok).toBe(false)
+
+    await tips.loadPicks(match)
+    expect(tips.picks.value[match]).toEqual([{ handle: ux.handle, home: 1, away: 0, points: null }])
+
+    await sql`select matchtips_ops.record_result(${match}, 1, 0, 'regulation', ${SRC}, 'CI: resultat', 'ci')`
+    await tips.load()
+    expect(matchPhase(tips.matches.value.find(m => m.id === match)!)).toBe('settled')
+    expect(tips.myPicks.value[match]!.points).toBe(3)
+    expect(tips.standings.value.find(s => s.handle === ux.handle)).toMatchObject({ points: 3, tipped: 1, exact: 1, outcomes: 0 })
+
+    const paused = await openMatch(120)
+    await sql`select matchtips_ops.postpone(${paused}, ${SRC}, 'CI: uppskjuten', 'ci')`
+    await tips.load()
+    expect(matchPhase(tips.matches.value.find(m => m.id === paused)!)).toBe('paused')
+
+    expect(await tips.leave()).toBe(2)
+    expect(tips.participating.value).toBe(false)
+    expect(tips.standings.value.some(s => s.handle === ux.handle)).toBe(false)
   })
 })
