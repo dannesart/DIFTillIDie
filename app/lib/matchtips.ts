@@ -197,7 +197,14 @@ export function createMatchtips(client: SupabaseClient | null, auth: Pick<AuthSt
   /** Per match: the outcome of the last save. */
   const notes = ref<Record<string, { ok: boolean, text: string }>>({})
   const error = ref<string | null>(null)
+  /** The latest load(): only it may write what it fetched. */
   let request = 0
+  /**
+   * Whose state this is: bumped when the signed-in supporter changes. A
+   * request started for someone else may still finish at the server, but
+   * never writes into the next supporter's page.
+   */
+  let owner = 0
 
   const call = async <T>(fn: string, args?: Record<string, unknown>): Promise<T> => {
     const { data, error: e } = await client!.rpc(fn, args)
@@ -207,6 +214,10 @@ export function createMatchtips(client: SupabaseClient | null, auth: Pick<AuthSt
 
   function reset() {
     request++
+    owner++
+    joining.value = false
+    leaving.value = false
+    saving.value = null
     participating.value = false
     optedInAt.value = null
     matches.value = []
@@ -238,11 +249,14 @@ export function createMatchtips(client: SupabaseClient | null, auth: Pick<AuthSt
       matches.value = (ms ?? []).map(toMatch)
       myPicks.value = Object.fromEntries((mp ?? []).map(toMyPick).map(p => [p.matchId, p]))
       standings.value = (st ?? []).map(toStanding)
+      // Lists fetched before may show a corrected result or deadline's old picks and points: fetch again on request.
+      picks.value = {}
       error.value = null
       status.value = 'ready'
     }
     catch (e) {
       if (mine !== request) return
+      picks.value = {}
       status.value = missingFunction(e) ? 'unavailable' : 'error'
       error.value = isNetwork(e) ? NETWORK : 'Matchtipset kunde inte hämtas. Försök igen.'
     }
@@ -251,41 +265,46 @@ export function createMatchtips(client: SupabaseClient | null, auth: Pick<AuthSt
   /** Opt in, with the consent version that was shown. Only ever from the supporter's own click. */
   async function join(): Promise<boolean> {
     if (!client || joining.value || !consentVersion.value || participating.value) return false
+    const mine = owner
     joining.value = true
     error.value = null
     try {
       await call('matchtips_join', { p_consent_version: consentVersion.value })
+      if (mine !== owner) return false
       await load()
       return true
     }
     catch (e) {
+      if (mine !== owner) return false
       const code = (e as DataError).code
       error.value = code === '42501' ? 'Välj ett läktarnamn först – det är det som syns i tabellen.' : code === '22023' ? 'Villkoren har ändrats. Läs dem igen innan du går med.' : isNetwork(e) ? NETWORK : 'Det gick inte att gå med. Försök igen.'
       if (code === '22023') void load()
       return false
     }
     finally {
-      joining.value = false
+      if (mine === owner) joining.value = false
     }
   }
 
   /** Leave (after the supporter confirmed): every tip, every version, is deleted. Returns how many. */
   async function leave(): Promise<number | null> {
     if (!client || leaving.value || !participating.value) return null
+    const mine = owner
     leaving.value = true
     error.value = null
     try {
       const removed = await call<number>('matchtips_leave', { p_confirmed: true })
-      picks.value = {}
+      if (mine !== owner) return null
       await load()
       return removed ?? 0
     }
     catch (e) {
+      if (mine !== owner) return null
       error.value = isNetwork(e) ? NETWORK : 'Det gick inte att lämna just nu. Försök igen.'
       return null
     }
     finally {
-      leaving.value = false
+      if (mine === owner) leaving.value = false
     }
   }
 
@@ -298,34 +317,41 @@ export function createMatchtips(client: SupabaseClient | null, auth: Pick<AuthSt
       notes.value = { ...notes.value, [matchId]: { ok: false, text: `Fyll i hela mål, från 0 till ${MAX_GOALS}.` } }
       return false
     }
+    const mine = owner
     saving.value = matchId
     try {
       const rows = await call<{ revision: number, submitted_at: string }[]>('matchtips_submit', { p_match: matchId, p_home: h, p_away: a })
+      if (mine !== owner) return false
       const at = rows?.[0]?.submitted_at ?? new Date().toISOString()
       myPicks.value = { ...myPicks.value, [matchId]: { matchId, pick: { home: h, away: a }, points: null, latest: { home: h, away: a, submittedAt: at }, latestCounts: true } }
       notes.value = { ...notes.value, [matchId]: { ok: true, text: `Sparat: ${h}–${a}. Du kan ändra fram till deadline.` } }
       return true
     }
     catch (e) {
+      if (mine !== owner) return false
       notes.value = { ...notes.value, [matchId]: { ok: false, text: submitErrorMessage(e) } }
       // Locked, paused or gone in the meantime: show the database's state.
       if (['55000', 'P0002', '42501'].includes((e as DataError).code ?? '')) void load()
       return false
     }
     finally {
-      saving.value = null
+      if (mine === owner) saving.value = null
     }
   }
 
   /** Everyone's picks for a match: the database returns them only once it has locked. */
   async function loadPicks(matchId: string) {
     if (!client) return
+    // Stale once anything reloads, or someone else signs in (reset() reloads too).
+    const at = request
     picks.value = { ...picks.value, [matchId]: 'loading' }
     try {
       const rows = await call<PickRow[]>('matchtips_picks', { p_match: matchId })
+      if (at !== request) return
       picks.value = { ...picks.value, [matchId]: (rows ?? []).map(r => ({ handle: r.handle, home: r.pick_home, away: r.pick_away, points: r.points })) }
     }
     catch {
+      if (at !== request) return
       picks.value = { ...picks.value, [matchId]: 'error' }
     }
   }

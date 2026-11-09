@@ -28,13 +28,13 @@ const row = (o: Record<string, unknown> = {}) => ({
 const m = (o: Record<string, unknown> = {}): TipMatch => toMatch(row(o) as never)
 
 type Answer = { data?: unknown, error?: { code?: string, message?: string } }
-function fakeClient(answers: Record<string, Answer | ((args: unknown) => Answer)>) {
+function fakeClient(answers: Record<string, Answer | ((args: unknown) => Answer | Promise<Answer>)>) {
   const calls: { fn: string, args: unknown }[] = []
   const client = {
     rpc: async (fn: string, args?: unknown) => {
       calls.push({ fn, args })
       const a = answers[fn]
-      const r = typeof a === 'function' ? a(args) : a
+      const r = typeof a === 'function' ? await a(args) : a
       if (!r) throw new Error(`unexpected rpc ${fn}`)
       return { data: r.data ?? null, error: r.error ?? null }
     },
@@ -42,14 +42,14 @@ function fakeClient(answers: Record<string, Answer | ((args: unknown) => Answer)
   return { client: client as unknown as SupabaseClient, calls }
 }
 const signedIn = (id: string | null = LOTTA) => ({ status: ref<'loading' | 'signed-in' | 'signed-out' | 'unavailable'>(id ? 'signed-in' : 'signed-out'), userId: ref<string | null>(id) })
-const base = (o: Partial<Record<string, Answer | ((a: unknown) => Answer)>> = {}) => ({
+const base = (o: Partial<Record<string, Answer | ((a: unknown) => Answer | Promise<Answer>)>> = {}) => ({
   matchtips_me: { data: [{ participating: false, opted_in_at: null, consent_version: null }] },
   matchtips_consent_version: { data: 'matchtipset-2026-11-09' },
   matchtips_matches: { data: [] },
   matchtips_my_picks: { data: [] },
   matchtips_leaderboard: { data: [] },
   ...o,
-}) as Record<string, Answer | ((a: unknown) => Answer)>
+}) as Record<string, Answer | ((a: unknown) => Answer | Promise<Answer>)>
 
 describe('match phases: the database decides, the clock only closes the form', () => {
   it('open, locked, settled, paused, postponed, void', () => {
@@ -254,5 +254,192 @@ describe('the store', () => {
     expect(tips.myPicks.value).toEqual({})
     expect(tips.participating.value).toBe(false)
     expect(tips.status.value).toBe('signed-out')
+  })
+})
+
+/*
+ * Signing out, or another supporter signing in, while a request is still on
+ * its way: it may finish at the server, but its answer never lands on the
+ * next supporter's page.
+ */
+describe('account switches with requests in flight', () => {
+  const BO = '22222222-2222-4222-8222-222222222222'
+  const LOCKED = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+  /** A promise the test settles by hand. */
+  function deferred() {
+    let resolve!: (a: Answer) => void
+    const promise = new Promise<Answer>(r => (resolve = r))
+    return { promise, resolve }
+  }
+  const settle = () => new Promise(r => setTimeout(r))
+  /** Lotta takes part and has a pick; Bo doesn't take part and has none. `pending` answers are settled by the test. */
+  function world(pending: Record<string, () => Promise<Answer>> = {}) {
+    const auth = signedIn(LOTTA)
+    const lotta = () => auth.userId.value === LOTTA
+    const { client, calls } = fakeClient(base({
+      matchtips_me: () => ({ data: [{ participating: lotta(), opted_in_at: lotta() ? '2026-11-09T17:00:00+00:00' : null }] }),
+      matchtips_matches: { data: [row(), row({ id: LOCKED, locked: true })] },
+      matchtips_my_picks: () => ({ data: lotta() ? [{ match_id: MATCH, pick_home: 1, pick_away: 0, points: null, latest_home: 1, latest_away: 0, latest_submitted_at: '2026-11-12T10:00:00+00:00', latest_counts: true }] : [] }),
+      ...pending,
+    }))
+    return { auth, client, calls }
+  }
+  const signOut = (auth: ReturnType<typeof signedIn>) => {
+    auth.status.value = 'signed-out'
+    auth.userId.value = null
+  }
+  const signInAsBo = (auth: ReturnType<typeof signedIn>) => (auth.userId.value = BO)
+
+  it("Lotta's pending tip resolves after she signs out: nothing of hers comes back", async () => {
+    const submit = deferred()
+    const { auth, client } = world({ matchtips_submit: () => submit.promise })
+    const tips = createMatchtips(client, auth)
+    await tips.load()
+    const saving = tips.submit(MATCH, 4, 2)
+    expect(tips.saving.value).toBe(MATCH)
+    signOut(auth)
+    await settle()
+    submit.resolve({ data: [{ revision: 2, submitted_at: '2026-11-12T12:00:00+00:00' }] })
+    expect(await saving).toBe(false)
+    expect(tips.myPicks.value).toEqual({})
+    expect(tips.notes.value).toEqual({})
+    expect(tips.saving.value).toBeNull()
+    expect(tips.participating.value).toBe(false)
+    expect(tips.status.value).toBe('signed-out')
+  })
+
+  it("Lotta's pending tip resolves after Bo has signed in and loaded: Bo's page shows none of it", async () => {
+    const submit = deferred()
+    const { auth, client } = world({ matchtips_submit: () => submit.promise })
+    const tips = createMatchtips(client, auth)
+    await tips.load()
+    const saving = tips.submit(MATCH, 4, 2)
+    signInAsBo(auth)
+    await settle()
+    expect(tips.status.value).toBe('ready')
+    expect(tips.participating.value).toBe(false)
+    expect(tips.myPicks.value).toEqual({})
+    submit.resolve({ data: [{ revision: 2, submitted_at: '2026-11-12T12:00:00+00:00' }] })
+    await saving
+    expect(tips.myPicks.value).toEqual({})
+    expect(tips.notes.value).toEqual({})
+    expect(tips.saving.value).toBeNull()
+  })
+
+  it("a refusal of Lotta's tip after the switch: no note on Bo's page, no reload on Lotta's behalf", async () => {
+    const submit = deferred()
+    const { auth, client, calls } = world({ matchtips_submit: () => submit.promise })
+    const tips = createMatchtips(client, auth)
+    await tips.load()
+    const saving = tips.submit(MATCH, 4, 2)
+    signInAsBo(auth)
+    await settle()
+    const loads = calls.filter(c => c.fn === 'matchtips_matches').length
+    submit.resolve({ error: { code: '55000', message: 'predictions for this match are locked' } })
+    await saving
+    await settle()
+    expect(tips.notes.value).toEqual({})
+    expect(calls.filter(c => c.fn === 'matchtips_matches').length).toBe(loads)
+  })
+
+  it("Bo can tip while Lotta's old request is still pending, and its end doesn't clear Bo's saving state", async () => {
+    const lotta = deferred()
+    const bo = deferred()
+    const queue = [lotta, bo]
+    const { auth, client } = world({ matchtips_submit: () => queue.shift()!.promise })
+    const tips = createMatchtips(client, auth)
+    await tips.load()
+    const first = tips.submit(MATCH, 4, 2)
+    signInAsBo(auth)
+    await settle()
+    const second = tips.submit(MATCH, 0, 0)
+    expect(tips.saving.value).toBe(MATCH)
+    lotta.resolve({ data: [{ revision: 2, submitted_at: '2026-11-12T12:00:00+00:00' }] })
+    await first
+    expect(tips.saving.value).toBe(MATCH)
+    bo.resolve({ data: [{ revision: 1, submitted_at: '2026-11-12T12:01:00+00:00' }] })
+    expect(await second).toBe(true)
+    expect(tips.myPicks.value[MATCH]).toMatchObject({ pick: { home: 0, away: 0 } })
+    expect(tips.saving.value).toBeNull()
+  })
+
+  it('joining that finishes after the switch never marks Bo as taking part', async () => {
+    const join = deferred()
+    const auth = signedIn(LOTTA)
+    let lottaJoined = false
+    const { client } = fakeClient(base({
+      matchtips_me: () => ({ data: [{ participating: auth.userId.value === LOTTA && lottaJoined, opted_in_at: null }] }),
+      matchtips_join: async () => {
+        const r = await join.promise
+        lottaJoined = true
+        return r
+      },
+    }))
+    const tips = createMatchtips(client, auth)
+    await tips.load()
+    const joining = tips.join()
+    expect(tips.joining.value).toBe(true)
+    signInAsBo(auth)
+    await settle()
+    expect(tips.joining.value).toBe(false)
+    join.resolve({ data: '2026-11-09T17:00:00+00:00' })
+    expect(await joining).toBe(false)
+    await settle()
+    expect(tips.participating.value).toBe(false)
+    expect(tips.error.value).toBeNull()
+  })
+
+  it("leaving that finishes after the switch doesn't touch Bo's state", async () => {
+    const leave = deferred()
+    const { auth, client } = world({ matchtips_leave: () => leave.promise })
+    const tips = createMatchtips(client, auth)
+    await tips.load()
+    expect(tips.participating.value).toBe(true)
+    const leaving = tips.leave()
+    signInAsBo(auth)
+    await settle()
+    leave.resolve({ error: { message: 'Failed to fetch' } })
+    expect(await leaving).toBeNull()
+    expect(tips.error.value).toBeNull()
+    expect(tips.leaving.value).toBe(false)
+  })
+
+  it("everyone's picks fetched while Lotta was signed in never show after she signs out", async () => {
+    const picks = deferred()
+    const { auth, client } = world({ matchtips_picks: () => picks.promise })
+    const tips = createMatchtips(client, auth)
+    await tips.load()
+    const loading = tips.loadPicks(LOCKED)
+    signOut(auth)
+    await settle()
+    picks.resolve({ data: [{ handle: 'lotta', pick_home: 1, pick_away: 0, points: null }] })
+    await loading
+    expect(tips.picks.value).toEqual({})
+  })
+
+  it('a reload forgets fetched pick lists, so a corrected result never shows old points', async () => {
+    let points: number | null = 3
+    const { client } = fakeClient(base({ matchtips_picks: () => ({ data: [{ handle: 'lotta', pick_home: 2, pick_away: 1, points }] }) }))
+    const tips = createMatchtips(client, signedIn())
+    await tips.load()
+    await tips.loadPicks(MATCH)
+    expect(tips.picks.value[MATCH]).toEqual([{ handle: 'lotta', home: 2, away: 1, points: 3 }])
+    points = 0
+    await tips.load()
+    expect(tips.picks.value).toEqual({})
+    await tips.loadPicks(MATCH)
+    expect(tips.picks.value[MATCH]).toEqual([{ handle: 'lotta', home: 2, away: 1, points: 0 }])
+  })
+
+  it('a pick list requested before a reload is dropped when it arrives after it', async () => {
+    const picks = deferred()
+    const { client } = fakeClient(base({ matchtips_picks: () => picks.promise }))
+    const tips = createMatchtips(client, signedIn())
+    await tips.load()
+    const loading = tips.loadPicks(MATCH)
+    await tips.load()
+    picks.resolve({ data: [{ handle: 'lotta', pick_home: 2, pick_away: 1, points: 3 }] })
+    await loading
+    expect(tips.picks.value).toEqual({})
   })
 })
