@@ -1,0 +1,58 @@
+# Database security tests on a fresh, disposable Supabase stack.
+#
+# Builds a local stack from supabase/migrations inside the runner, runs the
+# pgTAP suites (supabase test db) and the API/concurrency tests, then throws
+# it away. It uses no secrets and never connects to the hosted project:
+# migrations are applied to hosted Supabase only by hand, after review
+# (docs/matchtipset.md, "Release checklist").
+
+name: Database
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit and PGlite database tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.1
+
+      - name: Start a disposable local Supabase stack
+        run: supabase start -x studio
+
+      - name: pgTAP security tests (supabase test db)
+        run: supabase test db
+
+      - name: API and concurrency tests against the local stack
+        run: |
+          set -a
+          eval "$(supabase status -o env)"
+          set +a
+          MATCHTIPSET_STACK=local npx vitest run tests/matchtipset-stack.test.ts
+
+      - name: Stop the stack
+        if: always()
+        run: supabase stop --no-backup
