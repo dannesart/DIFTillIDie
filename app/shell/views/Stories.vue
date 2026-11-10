@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/* Shell view: the Stories, the site's own section, as a view of its own. */
+/* Shell view: the Stories, the site's own section, as a page of its own. */
+useHead({ title: 'Stories – Djurgår’n tills jag dör' })
 </script>
 
 <template>

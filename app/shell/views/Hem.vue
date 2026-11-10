@@ -4,10 +4,11 @@ import type { FeedPost } from '~/composables/useSnacket'
 import { frozenLead } from '~/lib/posts'
 
 /*
- * The shell's home on desktop: an overview, not a feed. A small hero, then
- * what's being said on the läktare and what's happening in the Stories, side by side as
- * short previews of the real thing, each leading into its own view. The
- * next match and the podcasts are in the rail, so they aren't repeated here.
+ * The shell's home, on every screen size: an overview, not a feed. A small
+ * hero, then what's being said on the läktare and what's happening in the
+ * Stories, side by side as short previews of the real thing, each leading
+ * into its own page. On desktop the next match and the podcasts are in the
+ * rail, so they aren't repeated here; where there's no rail they follow.
  */
 const links = useSectionLinks()
 const { all, community, countForStory, filter } = useSnacket()
@@ -63,7 +64,8 @@ const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
           {{ greeting }}
         </p>
         <h1 class="mt-3 font-display font-black leading-[0.9] tracking-[-0.03em]">
-          <span class="stripe-text text-5xl sm:text-6xl">Djurgår’n</span>
+          <!-- One unbreakable word, about 5em wide: never wider than the band inside its padding, so a phone or larger text can't cut it (Issue #16) -->
+          <span class="stripe-text leading-none text-[min(3rem,calc((100cqi_-_3rem)/5.2))] sm:text-[min(3.75rem,calc((100cqi_-_4rem)/5.2))]">Djurgår’n</span>
           <span class="mt-1 block text-3xl font-semibold italic text-krita sm:ml-2 sm:mt-0 sm:inline sm:text-4xl">tills jag dör<span class="text-rod">.</span></span>
         </h1>
         <p class="mt-3 max-w-md text-sm leading-relaxed text-krita-dim">
@@ -134,6 +136,9 @@ const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
 
       <!-- On a laptop the rail isn't shown: the next match comes here instead, after the overview -->
       <MatchCard class="mt-8 xl:hidden" />
+
+      <!-- On phones and tablets, the rail's newest episodes too: Hem is their front page (Issue #16) -->
+      <LatestEpisodes heading-id="hem-listen" class="mt-8 lg:hidden" />
     </div>
   </div>
 </template>

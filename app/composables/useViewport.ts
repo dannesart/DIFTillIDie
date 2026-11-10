@@ -39,7 +39,7 @@ export function useMedia(query: string) {
 
 /*
  * For the app shell, which has a desktop part and a phone part on the same
- * page (the sidebars or the header; Hem's overview or the long front page):
+ * page (the sidebars or the header and bottom nav):
  * which of them to build.
  *  - Server HTML: both, since the server can't know the screen. Each part is
  *    then hydrated only on its own screen size (defineLazyHydrationComponent

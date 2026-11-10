@@ -1,78 +1,67 @@
 import { describe, expect, it } from 'vitest'
-import { desktopTarget, sectionLinks } from '../app/lib/sectionLinks'
+import { legacyTarget, sectionLinks } from '../app/lib/sectionLinks'
 
 /*
- * Mission #17: shared components (posts, Stories, the mini-player, the
+ * Shared components (posts, Stories, the mini-player, the bottom nav, the
  * account dialog) work out where sections and supporters live from the
- * current path, and, when a link is followed, the screen size.
+ * current path alone: every section is a page of its own, on every screen
+ * size (Issue #16).
  */
 
 describe('section and supporter links', () => {
-  const phone = { desktop: () => false }
-  const desktop = { desktop: () => true }
-
-  it('keeps the classic links, which work on every screen size', () => {
+  it('lead to the pages, from wherever you are', () => {
     for (const path of ['/', '/snacket', '/laktaren/jarnmannen']) {
-      for (const screen of [phone, desktop]) {
-        const l = sectionLinks(path, screen)
-        expect(l.section('hem')).toBe('/')
-        expect(l.section('snacket')).toBe('/#snacket')
-        expect(l.section('stories')).toBe('/#stories')
-        expect(l.section('lyssna')).toBe('/#lyssna')
-        expect(l.story('story-1')).toBe('/#story-1')
-        expect(l.supporter('difvast')).toBe('/laktaren/difvast')
-      }
+      const l = sectionLinks(path)
+      expect(l.section('hem')).toBe('/')
+      expect(l.section('snacket')).toBe('/snacket')
+      expect(l.section('stories')).toBe('/stories')
+      expect(l.section('lyssna')).toBe('/lyssna')
+      expect(l.view('lyssna')).toBe('/lyssna')
+      expect(l.story('story-1')).toBe('/stories#story-1')
+      expect(l.post('p1')).toBe('/snacket#post-p1')
+      expect(l.supporter('difvast')).toBe('/laktaren/difvast')
     }
   })
 
-  it('gives the sidebar the views, and knows which one it is on by address alone', () => {
-    const l = sectionLinks('/stories/', phone)
-    expect(l.view('stories')).toBe('/stories')
-    expect(l.view('hem')).toBe('/')
+  it('know which page they are on by address alone', () => {
+    const l = sectionLinks('/stories/')
     expect(l.here('stories')).toBe(true)
     expect(l.here('snacket')).toBe(false)
-    expect(sectionLinks('/', phone).here('hem')).toBe(true)
-    expect(sectionLinks('/', phone).here('snacket')).toBe(false)
-    expect(sectionLinks('/snacketen', phone).here('snacket')).toBe(false)
+    expect(sectionLinks('/').here('hem')).toBe(true)
+    expect(sectionLinks('/').here('snacket')).toBe(false)
+    expect(sectionLinks('/snacketen').here('snacket')).toBe(false)
+    expect(sectionLinks('/laktaren/difvast').here('hem')).toBe(false)
   })
 
-  it("has every section on a phone's front page, and only Hem on desktop's", () => {
-    expect(sectionLinks('/', phone).shows('snacket')).toBe(true)
-    expect(sectionLinks('/', phone).shows('lyssna')).toBe(true)
-    expect(sectionLinks('/laktaren/difvast', phone).shows('snacket')).toBe(false)
-    expect(sectionLinks('/', desktop).shows('snacket')).toBe(false)
-    expect(sectionLinks('/', desktop).shows('hem')).toBe(true)
-    expect(sectionLinks('/snacket', desktop).shows('snacket')).toBe(true)
-    expect(sectionLinks('/laktaren/difvast', desktop).shows('snacket')).toBe(false)
-  })
-
-  it('asks for the screen size only when asked what is shown', () => {
-    let asked = 0
-    const l = sectionLinks('/', { desktop: () => (asked++, true) })
-    l.section('snacket'); l.view('snacket'); l.here('snacket'); l.story('story-1')
-    expect(asked).toBe(0)
-    l.shows('snacket')
-    expect(asked).toBe(1)
+  it('show a section only on its own page: Hem previews, it does not contain them', () => {
+    expect(sectionLinks('/').shows('hem')).toBe(true)
+    expect(sectionLinks('/').shows('snacket')).toBe(false)
+    expect(sectionLinks('/').shows('lyssna')).toBe(false)
+    expect(sectionLinks('/snacket').shows('snacket')).toBe(true)
+    expect(sectionLinks('/laktaren/difvast').shows('snacket')).toBe(false)
   })
 })
 
-describe('classic links followed on a desktop', () => {
-  it("turn the front page's sections into their views", () => {
-    expect(desktopTarget('/', '#snacket')).toEqual({ path: '/snacket' })
-    expect(desktopTarget('/', '#stories')).toEqual({ path: '/stories' })
-    expect(desktopTarget('/', '#lyssna')).toEqual({ path: '/lyssna' })
+describe('old addresses of the one-page front page', () => {
+  it('go to the pages', () => {
+    expect(legacyTarget('/', '#snacket')).toEqual({ path: '/snacket' })
+    expect(legacyTarget('/', '#stories')).toEqual({ path: '/stories' })
+    expect(legacyTarget('/', '#lyssna')).toEqual({ path: '/lyssna' })
+    expect(legacyTarget('/', '#hem')).toEqual({ path: '/' })
   })
 
-  it('take a Story or a post along to its view', () => {
-    expect(desktopTarget('/', '#story-abc')).toEqual({ path: '/stories', hash: '#story-abc' })
-    expect(desktopTarget('/', '#post-1')).toEqual({ path: '/snacket', hash: '#post-1' })
+  it('take a Story or a post along to its page', () => {
+    expect(legacyTarget('/', '#story-abc')).toEqual({ path: '/stories', hash: '#story-abc' })
+    expect(legacyTarget('/', '#post-1')).toEqual({ path: '/snacket', hash: '#post-1' })
   })
 
-  it('leave everything else alone', () => {
-    expect(desktopTarget('/', '')).toBeNull()
-    expect(desktopTarget('/', '#hem')).toBeNull()
-    expect(desktopTarget('/', '#innehall')).toBeNull()
-    expect(desktopTarget('/laktaren/difvast', '#snacket')).toBeNull()
-    expect(desktopTarget('/snacket', '#post-1')).toBeNull()
+  it('leave everything else alone, so a redirect never redirects again', () => {
+    expect(legacyTarget('/', '')).toBeNull()
+    expect(legacyTarget('/', '#innehall')).toBeNull()
+    expect(legacyTarget('/laktaren/difvast', '#snacket')).toBeNull()
+    for (const id of ['#snacket', '#stories', '#lyssna', '#hem', '#story-abc', '#post-1']) {
+      const t = legacyTarget('/', id)!
+      expect(legacyTarget(t.path, t.hash ?? '')).toBeNull()
+    }
   })
 })

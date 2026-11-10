@@ -18,8 +18,8 @@
     { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ],
   "shortcuts": [
-    { "name": "Lyssna", "short_name": "Lyssna", "description": "Poddarna", "url": "/#lyssna", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Stories", "short_name": "Stories", "description": "Det som händer", "url": "/#stories", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Snacket på stan", "short_name": "Snacket", "description": "Snacket på stan", "url": "/#snacket", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Lyssna", "short_name": "Lyssna", "description": "Poddarna", "url": "/lyssna", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Stories", "short_name": "Stories", "description": "Det som händer", "url": "/stories", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Snacket på stan", "short_name": "Snacket", "description": "Snacket på stan", "url": "/snacket", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

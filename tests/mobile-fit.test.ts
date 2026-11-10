@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { parse } from 'vue/compiler-sfc'
 
 /*
- * Phones (Issue #16, P1): on a small screen or with larger text, the front
- * page's hero, the next-match card and the sport filter must stay on the
- * screen, by layout rather than by hiding what doesn't fit. These are the
+ * Phones (Issue #16, P1): on a small screen or with larger text, the
+ * next-match card, the sport filter and Snacket must stay on the screen,
+ * by layout rather than by hiding what doesn't fit. These are the
  * constraints that make that true; the real check (every word and control
  * visible and tappable at 320/390/430 px, 100/125/150% text) is in the PR.
  */
@@ -24,23 +24,20 @@ const text = (n: Node): string => n.type === 2 ? n.content ?? '' : (n.children ?
 const withText = (root: Node, s: string) => all(root).filter(n => n.type === 1 && (n.children ?? []).some(c => c.type === 2 && c.content?.includes(s)))
 const parentOf = (root: Node, child: Node) => all(root).find(n => n.children?.includes(child))!
 
-describe('the front page hero', () => {
-  const hero = template('app/components/HeroMatchday.vue')
-  const grid = all(hero).find(n => classes(n).includes('grid') && classes(n).includes('max-w-7xl'))!
+describe('Hem\'s hero', () => {
+  const hem = template('app/shell/views/Hem.vue')
 
-  it('has one column that can never be wider than the screen', () => {
-    // grid-cols-1 is minmax(0, 1fr): an implicit column would grow to its widest word and take the match card with it.
-    expect(classes(grid)).toContain('grid-cols-1')
-  })
-
-  it('sizes the big word to fit its column, never larger than before', () => {
-    const [word] = withText(hero, 'Djurgår’n')
-    const size = classes(word!).find(c => c.startsWith('text-['))!
-    expect(size).toBe('text-[min(clamp(4rem,15vw,9.5rem),19cqi)]')
-    // cqi is measured against the nearest container: the hero's text column.
-    const column = grid.children!.find(c => c.type === 1)!
-    expect(classes(column)).toContain('@container')
-    expect(all(column)).toContain(word)
+  it('sizes the big word to fit its band, never larger than before', () => {
+    // About 5em wide and unbreakable, in a band that clips: as large as before (3rem, 3.75rem from sm),
+    // but never wider than the band's width (cqi of Hem's @container) inside its padding. Line height 1, as text-5xl/6xl had.
+    const [word] = withText(hem, 'Djurgår’n')
+    expect(classes(word!)).toEqual(expect.arrayContaining([
+      'leading-none',
+      'text-[min(3rem,calc((100cqi_-_3rem)/5.2))]',
+      'sm:text-[min(3.75rem,calc((100cqi_-_4rem)/5.2))]',
+    ]))
+    const container = all(hem).find(n => classes(n).includes('@container'))!
+    expect(all(container)).toContain(word)
   })
 })
 
@@ -120,7 +117,7 @@ describe('Snacket', () => {
 
 describe('no hiding', () => {
   it('fixes the layout instead of clipping the overflow', () => {
-    for (const f of ['app/components/HeroMatchday.vue', 'app/components/AppHeader.vue', 'app/components/SnacketSection.vue', 'app/components/PostCard.vue'])
+    for (const f of ['app/shell/views/Hem.vue', 'app/components/AppHeader.vue', 'app/components/SnacketSection.vue', 'app/components/PostCard.vue'])
       expect(readFileSync(f, 'utf8')).not.toMatch(/overflow-x-(hidden|clip)/)
   })
 })

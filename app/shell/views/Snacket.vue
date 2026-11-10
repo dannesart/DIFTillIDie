@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/* Shell view: Snacket på stan, the site's own section, as a view of its own. */
+/* Shell view: Snacket på stan, the site's own section, as a page of its own. */
+useHead({ title: 'Snacket på stan – Djurgår’n tills jag dör' })
 </script>
 
 <template>

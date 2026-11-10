@@ -4,13 +4,13 @@ import type { NuxtPage } from 'nuxt/schema'
 /*
  * Mission #17: the site's routes, all laid out by the app shell (a
  * persistent sidebar, one view at a time, a rail with the next match and
- * episodes on desktop; the long front page, header and bottom nav on phones).
+ * episodes on desktop; the header and bottom nav on phones).
  * The shell is the parent route, so moving between its views keeps the
  * sidebars, and the one <audio> element in app.vue, in place:
  *
- *   /                    Home: Hem's overview on desktop, the front page on phones
- *   /snacket, /stories,  a section's own view (desktop; on a phone the same
- *   /lyssna              address shows the view in the phone's surroundings)
+ *   /                    Home: Hem's overview, on every screen size
+ *   /snacket, /stories,  a section's own page, on every screen size (Issue #16)
+ *   /lyssna
  *   /laktaren/<handle>   a supporter's place on the stands
  */
 const VIEWS = ['snacket', 'stories', 'lyssna'] as const

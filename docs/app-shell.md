@@ -10,15 +10,17 @@ routes in [`modules/app-shell.ts`](../modules/app-shell.ts)).
   next match, the newest episodes and, below them, what's playing. Where
   there's no rail, the mini-player floats bottom right instead. Desktop has
   no sport switch, so its sport filter is always "Allt".
-- **Phones and tablets:** the long front page, header, bottom nav and pilot
-  banner.
+- **Phones and tablets:** the same pages, with the header (and its sport
+  filter), the bottom nav (Hem, Stories, Snacket, Lyssna, Du) and the pilot
+  banner. Hem also shows the next match and the four newest episodes, which
+  desktop has in its rail (Issue #16).
 - **Every screen:** the footer, with its full disclaimers.
 
 | Address | Desktop | Phones and tablets |
 |---|---|---|
-| `/` | Hem's overview | the front page with every section |
+| `/` | Hem's overview | the same overview |
 | `/snacket`, `/stories`, `/lyssna` | the section's view | the same view |
-| `/#snacket`, `/#story-…`, `/#post-…` | sent to the view (`/snacket`, `/stories#story-…`, `/snacket#post-…`) | in-page sections |
+| `/#snacket`, `/#stories`, `/#lyssna`, `/#hem`, `/#story-…`, `/#post-…` (old one-page addresses) | sent to the page (`/snacket`, `/stories#story-…`, `/snacket#post-…`, …) | the same |
 | `/laktaren/<handle>` | a supporter's place on the stands | the same |
 
 `/`, the three views and supporters' pages are cached by Netlify for
@@ -33,8 +35,7 @@ so links to those addresses shared since then would 404 until the next deploy.
 
 The server can't know the screen size, and `/` is cached once for everyone,
 so the server HTML contains both the desktop part (sidebar, rail, Hem
-overview) and the phone part (header, long front page, bottom nav); CSS shows
-one. Only the visible one is *hydrated*
+overview) and the phone part (header, bottom nav); CSS shows one. Only the visible one is *hydrated*
 (`defineLazyHydrationComponent('mediaQuery', …)`, see `useScreenParts` in
 `composables/useViewport.ts`): the other stays inert HTML, with no component
 setup, listeners, observers or requests, until the window crosses 1024 px.
@@ -51,9 +52,19 @@ Measured on `/` (local production builds), before and after the shell:
 | Snacket requests per load | 2–3 | 2 |
 | Hydration mismatches, duplicate ids | none | none |
 
-Links in shared components stay the classic hash links (`lib/sectionLinks.ts`),
-which work on every screen size; on desktop the router turns them into the
-views (`plugins/app-shell.client.ts`), including addresses opened directly.
+Links in shared components lead to the pages on every screen size
+(`lib/sectionLinks.ts`). Until Issue #16 phones had one long front page with
+in-page sections (`/#snacket`); those addresses (shared links, bookmarks,
+installed apps' shortcuts) are sent on to the pages by the router
+(`plugins/app-shell.client.ts`): as a redirect when followed in the app, and
+by replacing the address once the page has hydrated when opened directly
+(Hem shows briefly first, since the server never sees the hash).
 
 Moving between views is client-side under one parent route, so the single
 `<audio>` element in `app.vue` keeps playing.
+
+Each page has its own title ("Snacket på stan – Djurgår’n tills jag dör").
+After a page change, focus moves to the new page's heading when it would
+otherwise be lost or was on the phone's navigation (`data-nav-focus`: the
+bottom nav, the header's logo, the mini-player's way to Lyssna), never away
+from something still in use, such as the player (see `AppShell.vue`).

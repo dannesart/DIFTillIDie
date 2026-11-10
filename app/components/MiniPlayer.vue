@@ -22,7 +22,7 @@ const small = useMedia('(max-width: 639px)')
 const visible = computed(() => !!current.value && !playerInView.value && (props.docked || !(typing.value && small.value)))
 
 // Back to the playing show's own player — switching the picker to it if needed.
-// (On desktop "Lyssna" is a view of its own: go there.)
+// ("Lyssna" is a page of its own: from elsewhere, go there.)
 const links = useSectionLinks()
 // Where the rail (and so the docked player) appears: xl, or 2xl on Snacket and Stories.
 const railLate = useRailLate()
@@ -55,7 +55,8 @@ function backToPlayer() {
     >
       <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-navy-900/90 shadow-[0_24px_60px_-24px_rgb(3_9_21/0.95)] backdrop-blur-xl">
         <div class="flex items-center gap-3 py-2 pl-2 pr-2.5">
-          <button class="group flex min-w-0 flex-1 items-center gap-3 text-left" :title="`Till spelaren: ${current.title}`" @click="backToPlayer">
+          <!-- Leads to Lyssna, where this player steps aside: focus follows to that page (data-nav-focus, see AppShell) -->
+          <button data-nav-focus class="group flex min-w-0 flex-1 items-center gap-3 text-left" :title="`Till spelaren: ${current.title}`" @click="backToPlayer">
             <!-- Tiny night-sky tile; the bars dance while it plays -->
             <span class="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-[radial-gradient(circle_at_70%_25%,#1b3c7c_0%,#0a1b3d_55%,#030915_100%)]">
               <span v-if="!playing" class="absolute right-1.5 top-1.5 size-3 rounded-full bg-guld">

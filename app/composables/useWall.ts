@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { DESKTOP_QUERY, sectionLinks } from '~/lib/sectionLinks'
+import { sectionLinks } from '~/lib/sectionLinks'
 import { createWall } from '~/lib/wall'
 
 /**
@@ -33,6 +33,5 @@ export function useRailLate() {
 /** Section and supporter addresses for the page you're on (see lib/sectionLinks). */
 export function useSectionLinks() {
   const route = useRoute()
-  const desktop = () => import.meta.client && window.matchMedia(DESKTOP_QUERY).matches
-  return computed(() => sectionLinks(route.path, { desktop }))
+  return computed(() => sectionLinks(route.path))
 }
