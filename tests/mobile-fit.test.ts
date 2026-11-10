@@ -88,9 +88,39 @@ describe('the next-match card', () => {
   })
 })
 
+describe('Snacket', () => {
+  const section = template('app/components/SnacketSection.vue')
+  const card = template('app/components/PostCard.vue')
+  const header = all(card).find(n => n.tag === 'header')!
+
+  it('has one column on phones that can never be wider than the screen', () => {
+    // Signed in, the "Du på läktaren" row has a wide min-content; an implicit column grew to it and took the feed along.
+    const grid = parentOf(section, all(section).find(n => n.tag === 'aside')!)
+    expect(classes(grid)).toEqual(expect.arrayContaining(['grid', 'grid-cols-1']))
+  })
+
+  it('lets a post\'s own actions wrap below the author instead of running out of the card', () => {
+    expect(classes(header)).toContain('flex-wrap')
+    // "Ja, ta bort för alla" / "Avbryt", shown while confirming
+    const confirm = all(header).find(n => n.props?.some(p => p.type === 7 && p.name === 'if' && p.exp?.content === 'confirming'))!
+    expect(classes(confirm)).toEqual(expect.arrayContaining(['flex-wrap', 'max-w-full', 'ml-auto']))
+    expect(classes(confirm)).not.toContain('shrink-0')
+    const [remove] = withText(header, 'Ta bort').filter(n => n.tag === 'button')
+    expect(classes(remove!)).toContain('ml-auto')
+  })
+
+  it('keeps the avatar and name together, at a width that grows with the text', () => {
+    // Wrapping breaks between the header's children: the author is one of them, so it never splits.
+    const author = header.children!.find(n => n.type === 1)!
+    expect(classes(author)).toEqual(expect.arrayContaining(['flex', 'min-w-0', 'flex-[1_1_12rem]']))
+    expect(all(author).some(n => n.tag === 'Avatar')).toBe(true)
+    expect(all(author).some(n => n.tag === 'TimeAgo')).toBe(true)
+  })
+})
+
 describe('no hiding', () => {
   it('fixes the layout instead of clipping the overflow', () => {
-    for (const f of ['app/components/HeroMatchday.vue', 'app/components/AppHeader.vue'])
+    for (const f of ['app/components/HeroMatchday.vue', 'app/components/AppHeader.vue', 'app/components/SnacketSection.vue', 'app/components/PostCard.vue'])
       expect(readFileSync(f, 'utf8')).not.toMatch(/overflow-x-(hidden|clip)/)
   })
 })

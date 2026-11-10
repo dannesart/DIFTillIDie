@@ -80,7 +80,9 @@ function mention(handle: string) {
         </button>
       </div>
 
-      <div class="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <!-- One column on phones that never grows past the screen (minmax(0,1fr)): an implicit column
+           would grow to the widest row in it, the signed-in "Du på läktaren" card's, and take the feed along (Issue #16) -->
+      <div class="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div class="min-w-0">
           <!-- Compact: the composer itself opens in a dialog, with the draft as it was left -->
           <button
