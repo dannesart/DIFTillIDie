@@ -62,29 +62,34 @@ async function remove() {
 
 <template>
   <article class="card p-5 transition duration-300 hover:border-white/15" :class="post.own && 'border-himmel/30'">
-    <header class="flex items-start gap-3">
-      <Avatar v-if="onWall" :name="post.author.name" :design="post.author.avatar" />
-      <NuxtLink v-else :to="authorPath" class="shrink-0 rounded-full transition hover:scale-105" :aria-label="`${post.author.name} på läktaren`" tabindex="-1">
-        <Avatar :name="post.author.name" :design="post.author.avatar" />
-      </NuxtLink>
-      <div class="min-w-0 flex-1">
-        <p class="flex flex-wrap items-baseline gap-x-2">
-          <span v-if="onWall" class="font-semibold">{{ post.author.name }}</span>
-          <NuxtLink v-else :to="authorPath" class="font-semibold underline-offset-2 hover:text-himmel hover:underline" :title="`${post.author.name} på läktaren`">{{ post.author.name }}</NuxtLink>
-          <span v-if="onWall || noMentions" class="text-sm text-krita-dim">@{{ post.author.handle }}</span>
-          <button v-else class="text-sm text-krita-dim hover:text-himmel" :title="`Nämn @${post.author.handle}`" @click="emit('mention', post.author.handle)">@{{ post.author.handle }}</button>
-        </p>
-        <p class="text-xs text-krita-dim">
-          <TimeAgo :at="post.createdAt" />
-          <span v-if="post.sport" class="capitalize"> · {{ post.sport }}</span>
-        </p>
+    <!-- Wraps: on a narrow screen or with larger text, "Ta bort" (or "Ja, ta bort för alla") goes to its own line
+         instead of out of the card, or of squeezing the name to a word per line. The author (avatar and name) stays
+         together and wants 12rem, so it grows with the text (Issue #16). -->
+    <header class="flex flex-wrap items-start gap-3">
+      <div class="flex min-w-0 flex-[1_1_12rem] items-start gap-3">
+        <Avatar v-if="onWall" :name="post.author.name" :design="post.author.avatar" />
+        <NuxtLink v-else :to="authorPath" class="shrink-0 rounded-full transition hover:scale-105" :aria-label="`${post.author.name} på läktaren`" tabindex="-1">
+          <Avatar :name="post.author.name" :design="post.author.avatar" />
+        </NuxtLink>
+        <div class="min-w-0 flex-1">
+          <p class="flex flex-wrap items-baseline gap-x-2">
+            <span v-if="onWall" class="font-semibold">{{ post.author.name }}</span>
+            <NuxtLink v-else :to="authorPath" class="font-semibold underline-offset-2 hover:text-himmel hover:underline" :title="`${post.author.name} på läktaren`">{{ post.author.name }}</NuxtLink>
+            <span v-if="onWall || noMentions" class="text-sm text-krita-dim">@{{ post.author.handle }}</span>
+            <button v-else class="text-sm text-krita-dim hover:text-himmel" :title="`Nämn @${post.author.handle}`" @click="emit('mention', post.author.handle)">@{{ post.author.handle }}</button>
+          </p>
+          <p class="text-xs text-krita-dim">
+            <TimeAgo :at="post.createdAt" />
+            <span v-if="post.sport" class="capitalize"> · {{ post.sport }}</span>
+          </p>
+        </div>
       </div>
       <template v-if="post.own">
-        <div v-if="confirming" class="flex shrink-0 items-center gap-2 text-xs">
+        <div v-if="confirming" class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs">
           <button class="font-bold text-rod hover:underline disabled:opacity-50" :disabled="removing" @click="remove">{{ removing ? 'Tar bort…' : 'Ja, ta bort för alla' }}</button>
           <button class="text-krita-dim hover:text-krita" :disabled="removing" @click="confirming = false; removeError = null">Avbryt</button>
         </div>
-        <button v-else class="text-xs text-krita-dim hover:text-rod" @click="confirming = true">Ta bort</button>
+        <button v-else class="ml-auto text-xs text-krita-dim hover:text-rod" @click="confirming = true">Ta bort</button>
       </template>
     </header>
     <p v-if="removeError" class="mt-2 text-right text-xs font-semibold text-rod" role="alert">{{ removeError }}</p>
