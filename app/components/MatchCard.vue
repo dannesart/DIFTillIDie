@@ -75,11 +75,12 @@ function downloadIcs() {
 
     <Transition mode="out-in" enter-from-class="opacity-0 motion-safe:translate-y-2" leave-to-class="opacity-0 motion-safe:-translate-y-2" enter-active-class="transition duration-300" leave-active-class="transition duration-200">
       <div v-if="fixture" :key="fixture.id">
-        <div class="flex items-center justify-between gap-3">
-          <p class="kicker truncate text-krita-dim">Nästa match<span class="hidden sm:inline"> · {{ sportLabel[fixture.sport] }}</span></p>
+        <!-- Phones: the badge wraps below rather than cutting "Nästa match" short (larger text, Issue #16); the desktop rail keeps one line -->
+        <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 lg:flex-nowrap">
+          <p class="kicker min-w-0 text-krita-dim lg:truncate">Nästa match<span class="hidden sm:inline"> · {{ sportLabel[fixture.sport] }}</span></p>
           <!-- Source stays visible; the badge opens the details -->
           <button
-            class="kicker flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 transition"
+            class="kicker flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-left transition lg:shrink-0"
             :class="fixture.source === 'manual' ? 'border-guld/40 text-guld hover:bg-guld/10' : 'border-himmel/40 text-himmel hover:bg-himmel/10'"
             :aria-expanded="infoOpen"
             aria-controls="match-info"
@@ -93,7 +94,8 @@ function downloadIcs() {
         </div>
 
         <p class="kicker mt-5 text-krita-dim">{{ fixture.competition }} · {{ teamLabel(fixture) }}</p>
-        <p class="mt-1.5 font-display text-3xl font-bold leading-tight sm:text-4xl">
+        <!-- A team name too long for a line of its own (large text on a small phone) breaks instead of running out of the card -->
+        <p class="mt-1.5 break-words font-display text-3xl font-bold leading-tight sm:text-4xl">
           <span :class="isDif(fixture.home) && 'text-himmel-300'">{{ fixture.home }}</span>
           <span class="font-normal italic text-krita-dim"> – </span>
           <span :class="isDif(fixture.away) && 'text-himmel-300'">{{ fixture.away }}</span>
@@ -114,10 +116,13 @@ function downloadIcs() {
           <span v-if="fixture.preliminary" class="rounded-full border border-rod/50 px-2 py-0.5 text-xs font-semibold text-rod">Preliminär tid</span>
         </div>
 
-        <div class="mt-6 grid grid-cols-4 gap-2" aria-live="off">
-          <div v-for="u in units" :key="u.label" class="rounded-2xl bg-navy-950/70 px-2 py-3 text-center">
-            <span class="block font-display text-3xl font-bold tabular-nums sm:text-4xl">{{ u.value === null ? '··' : String(u.value).padStart(2, '0') }}</span>
-            <span class="kicker text-krita-dim">{{ u.label }}</span>
+        <!-- Four in a row when they fit (about 14rem, so it grows with larger text); two by two when they don't, rather than overlapping (Issue #16) -->
+        <div class="@container mt-6">
+          <div class="grid grid-cols-2 gap-2 @[14rem]:grid-cols-4" aria-live="off">
+            <div v-for="u in units" :key="u.label" class="rounded-2xl bg-navy-950/70 px-2 py-3 text-center">
+              <span class="block font-display text-3xl font-bold tabular-nums sm:text-4xl">{{ u.value === null ? '··' : String(u.value).padStart(2, '0') }}</span>
+              <span class="kicker text-krita-dim">{{ u.label }}</span>
+            </div>
           </div>
         </div>
 

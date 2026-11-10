@@ -45,7 +45,8 @@ const NuxtLink = resolveComponent('NuxtLink')
     class="sticky top-[env(safe-area-inset-top)] z-40 transition-[background-color,border-color,backdrop-filter] duration-300"
     :class="scrolled ? 'border-b border-white/8 bg-navy-950/85 backdrop-blur-xl' : 'border-b border-transparent'"
   >
-    <div class="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
+    <!-- Wraps when the logo and the sport filter don't fit side by side (a small screen, larger text): the filter takes its own row instead of being pushed off the edge (Issue #16) -->
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
       <!-- On the front page plain in-page anchors, as always; elsewhere links back to it -->
       <component :is="onHome ? 'a' : NuxtLink" v-bind="onHome ? { href: '#' } : { to: '/' }" class="group flex items-center gap-2.5" :aria-label="onHome ? 'Djurgår’n tills jag dör – till toppen' : 'Djurgår’n tills jag dör – till startsidan'">
         <span class="stripes block h-8 w-6 rounded-[5px] [--stripe:4px] transition-transform duration-500 ease-spring group-hover:-rotate-6 group-hover:scale-110" />

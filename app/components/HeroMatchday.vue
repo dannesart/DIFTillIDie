@@ -31,14 +31,16 @@ const days = computed(() => daysSinceFounding(now.value ?? demoNow.value).toLoca
       <div class="absolute inset-0 bg-gradient-to-l from-transparent via-navy-950/30 to-navy-950" />
     </div>
 
-    <div class="mx-auto grid max-w-7xl gap-10 px-4 pb-14 pt-10 sm:px-6 sm:pt-16 lg:grid-cols-[1.25fr_1fr] lg:gap-16 lg:pb-24 lg:pt-20">
-      <div class="animate-rise">
+    <!-- One column on phones that never grows past the screen (minmax(0,1fr)), whatever is in it (Issue #16) -->
+    <div class="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 pb-14 pt-10 sm:px-6 sm:pt-16 lg:grid-cols-[1.25fr_1fr] lg:gap-16 lg:pb-24 lg:pt-20">
+      <div class="@container animate-rise">
         <p class="kicker flex items-center gap-2 text-himmel">
           <span class="inline-block size-1.5 rounded-full bg-guld" />
           {{ greeting }}
         </p>
         <h1 class="mt-5 font-display font-black leading-[0.82] tracking-[-0.035em]">
-          <span class="stripe-text block text-[clamp(4rem,15vw,9.5rem)]">Djurgår’n</span>
+          <!-- One unbreakable word, about 5em wide: as large as before, but never wider than its column (19cqi), so a small screen or larger text can't push it off the edge -->
+          <span class="stripe-text block text-[min(clamp(4rem,15vw,9.5rem),19cqi)]">Djurgår’n</span>
           <span class="mt-2 block text-[clamp(2.4rem,8vw,5.2rem)] font-semibold italic text-krita">
             tills jag dör<span class="text-rod">.</span>
           </span>
