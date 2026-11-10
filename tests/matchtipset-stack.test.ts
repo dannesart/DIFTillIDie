@@ -100,8 +100,8 @@ describe.skipIf(!enabled)('Matchtipset on a local Supabase stack', () => {
     // Refusals are only "locked".
     expect(new Set(settled.filter(r => r.error).map(r => r.error!.code))).toEqual(new Set(settled.some(r => r.error) ? ['55000'] : []))
 
-    const [deadline] = await sql`select locks_at from matchtips.matches where id = ${match}`
-    const valid = await sql`select revision, home_goals, away_goals from matchtips.prediction_submissions where match_id = ${match} and submitted_at < ${deadline!.locks_at} order by revision desc limit 1`
+    // Compared in SQL: a JS Date has only milliseconds, the deadline has microseconds.
+    const valid = await sql`select s.revision, s.home_goals, s.away_goals from matchtips.prediction_submissions s join matchtips.matches m on m.id = s.match_id where s.match_id = ${match} and s.submitted_at < m.locks_at order by s.revision desc limit 1`
     const cia = await supporter('cia', false)
     const shown = await cia.client.rpc('matchtips_picks', { p_match: match })
     expect(shown.error).toBeNull()
