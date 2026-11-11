@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { parse } from 'vue/compiler-sfc'
 
 /*
- * Phones (Issue #16, P1): on a small screen or with larger text, the
- * next-match card, the sport filter and Snacket must stay on the screen,
+ * Phones (Issue #16): on a small screen or with larger text, the
+ * next-match card, the sport filter, Snacket and the Stories must stay on the screen,
  * by layout rather than by hiding what doesn't fit. These are the
  * constraints that make that true; the real check (every word and control
  * visible and tappable at 320/390/430 px, 100/125/150% text) is in the PR.
@@ -115,9 +115,49 @@ describe('Snacket', () => {
   })
 })
 
+describe('a Story card', () => {
+  const card = template('app/components/StoryCard.vue')
+  // The "Fler källor om samma händelse" list
+  const [othersLabel] = withText(card, 'Fler källor om samma händelse')
+  const others = parentOf(card, othersLabel!)
+  const sourceRow = all(others).find(n => n.tag === 'a')!
+
+  it('breaks a word too long for the card rather than letting the card cut it off', () => {
+    // The card clips (overflow-hidden, for the lead's stripe field), so a long Swedish compound must break inside it.
+    const headline = all(card).find(n => n.tag === 'h3')!
+    expect(classes(headline)).toContain('break-words')
+    const excerpt = all(card).find(n => n.tag === 'p' && n.props?.some(p => p.type === 7 && p.name === 'if' && p.exp?.content === 'leadSource.excerpt'))!
+    expect(classes(excerpt)).toContain('break-words')
+    const otherHeadline = all(sourceRow).find(n => n.tag === 'span' && classes(n).includes('font-display'))!
+    expect(classes(otherHeadline)).toContain('break-words')
+  })
+
+  it('puts another source\'s headline beside its outlet only when the card itself has room', () => {
+    // A card is a third of the page on desktop and the outlet column grows with the text: the screen's width says nothing about that.
+    expect(classes(others)).toContain('@container')
+    expect(classes(sourceRow)).toEqual(expect.arrayContaining(['flex-col', 'sm:@[15rem]:flex-row']))
+    const outlet = sourceRow.children!.find(n => n.type === 1)!
+    expect(classes(outlet)).toContain('sm:@[15rem]:w-28')
+    for (const n of [sourceRow, outlet]) expect(classes(n).filter(c => /^sm:(flex-row|w-28|items-baseline|gap-4)$/.test(c))).toEqual([])
+  })
+
+  it('wraps the label line on phones instead of cutting sport, outlet or "sammanställning" short', () => {
+    const [label] = all(card).filter(n => n.tag === 'span' && classes(n).includes('kicker') && text(n).includes('sammanställning'))
+    expect(classes(label!)).not.toContain('truncate')
+    expect(classes(label!)).toEqual(expect.arrayContaining(['lg:truncate', 'break-words']))
+    // The dot and label stay together, with room for the label's longest word beside the time
+    const group = parentOf(card, label!)
+    expect(classes(group)).toEqual(expect.arrayContaining(['min-w-0', 'flex-[1_1_10rem]', 'lg:flex-initial']))
+    const row = parentOf(card, group)
+    expect(classes(row)).toEqual(expect.arrayContaining(['flex-wrap', 'lg:flex-nowrap']))
+    // The time, at the row's end
+    expect(all(row).some(n => n.tag === 'TimeAgo')).toBe(true)
+  })
+})
+
 describe('no hiding', () => {
   it('fixes the layout instead of clipping the overflow', () => {
-    for (const f of ['app/shell/views/Hem.vue', 'app/components/AppHeader.vue', 'app/components/SnacketSection.vue', 'app/components/PostCard.vue'])
+    for (const f of ['app/shell/views/Hem.vue', 'app/components/AppHeader.vue', 'app/components/SnacketSection.vue', 'app/components/PostCard.vue', 'app/components/StoryCard.vue'])
       expect(readFileSync(f, 'utf8')).not.toMatch(/overflow-x-(hidden|clip)/)
   })
 })

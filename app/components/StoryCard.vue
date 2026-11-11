@@ -52,31 +52,39 @@ watch(talk, (n, old) => {
     <!-- Lead story gets a quiet stripe field behind the title -->
     <div v-if="lead" aria-hidden="true" class="stripes pointer-events-none absolute -right-10 -top-10 h-56 w-56 rotate-12 rounded-[2.5rem] opacity-[0.08] [--stripe:18px] transition duration-700 group-hover:rotate-6 group-hover:opacity-15" />
 
-    <div class="relative flex items-center gap-2 text-krita-dim">
-      <span class="size-2 shrink-0 rounded-full" :class="sportDot[story.sport]" />
-      <span class="kicker truncate">{{ sportLabel[story.sport] }} · {{ leadSource.outlet }}<template v-if="leadSource.reporting === 'compiled'"> · sammanställning</template></span>
+    <!--
+      Below lg the label wraps rather than losing sport, outlet or "sammanställning" to an ellipsis.
+      It has room for its longest word (10rem, so it grows with the text) beside the time, which takes
+      its own line only when even that doesn't fit; the dot and the time stay on the label's first line
+      (0.26rem centres the dot on a kicker line, 1.02rem tall).
+    -->
+    <div class="relative flex flex-wrap items-start gap-x-2 gap-y-1 text-krita-dim lg:flex-nowrap lg:items-center">
+      <span class="flex min-w-0 flex-[1_1_10rem] items-start gap-2 lg:flex-initial lg:items-center">
+        <span class="mt-[0.26rem] size-2 shrink-0 rounded-full lg:mt-0" :class="sportDot[story.sport]" />
+        <span class="kicker min-w-0 break-words lg:truncate">{{ sportLabel[story.sport] }} · {{ leadSource.outlet }}<template v-if="leadSource.reporting === 'compiled'"> · sammanställning</template></span>
+      </span>
       <span class="kicker ml-auto shrink-0"><TimeAgo :at="leadSource.publishedAt" /></span>
     </div>
 
-    <!-- The headline is always the lead source's own, linking to its article -->
-    <h3 class="relative mt-4 font-display font-semibold leading-[1.05] tracking-tight" :class="lead ? 'text-3xl sm:text-5xl' : 'text-xl sm:text-2xl'">
+    <!-- The headline is always the lead source's own, linking to its article; a word too long for the card breaks rather than running out of it -->
+    <h3 class="relative mt-4 break-words font-display font-semibold leading-[1.05] tracking-tight" :class="lead ? 'text-3xl sm:text-5xl' : 'text-xl sm:text-2xl'">
       <a :href="leadSource.url" target="_blank" rel="noopener" class="decoration-himmel/60 decoration-2 underline-offset-[6px] hover:underline">
         {{ leadSource.headline }}
       </a>
     </h3>
-    <p v-if="leadSource.excerpt" class="relative mt-3 leading-relaxed text-krita-dim" :class="lead ? 'max-w-xl text-lg' : 'line-clamp-3 text-sm'">
+    <p v-if="leadSource.excerpt" class="relative mt-3 break-words leading-relaxed text-krita-dim" :class="lead ? 'max-w-xl text-lg' : 'line-clamp-3 text-sm'">
       {{ leadSource.excerpt }}
     </p>
 
-    <!-- Other sources on the same event, each with its own headline -->
-    <div v-if="others.length" class="relative mt-6">
+    <!-- Other sources on the same event, each with its own headline: beside its outlet only when the card itself has room (a card is a third of the page on desktop, and the outlet column grows with the text) -->
+    <div v-if="others.length" class="relative mt-6 @container">
       <p class="kicker text-krita-dim">Fler källor om samma händelse</p>
       <ul class="mt-2 divide-y divide-white/8 border-y border-white/8">
         <li v-for="src in (lead ? others : others.slice(0, 2))" :key="src.id">
-          <a :href="src.url" target="_blank" rel="noopener" class="group/src flex flex-col gap-1 py-3 transition hover:bg-white/[0.03] sm:flex-row sm:items-baseline sm:gap-4">
-            <span class="shrink-0 text-sm font-bold text-himmel sm:w-28">{{ src.outlet }}</span>
+          <a :href="src.url" target="_blank" rel="noopener" class="group/src flex flex-col gap-1 py-3 transition hover:bg-white/[0.03] sm:@[15rem]:flex-row sm:@[15rem]:items-baseline sm:@[15rem]:gap-4">
+            <span class="shrink-0 text-sm font-bold text-himmel sm:@[15rem]:w-28">{{ src.outlet }}</span>
             <span class="min-w-0 flex-1">
-              <span class="block font-display leading-snug decoration-himmel/60 underline-offset-4 group-hover/src:underline" :class="lead ? 'text-xl' : 'text-base'">{{ src.headline }}</span>
+              <span class="block break-words font-display leading-snug decoration-himmel/60 underline-offset-4 group-hover/src:underline" :class="lead ? 'text-xl' : 'text-base'">{{ src.headline }}</span>
               <span class="kicker mt-1 block text-krita-dim"><TimeAgo :at="src.publishedAt" /><template v-if="src.reporting === 'compiled'"> · sammanställer andra medier</template> · läs hos {{ src.outlet }} ↗</span>
             </span>
           </a>
