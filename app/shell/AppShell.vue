@@ -9,7 +9,7 @@ import { DESKTOP_QUERY, MOBILE_QUERY } from '~/lib/sectionLinks'
  * time in the middle (/, /snacket, …), and from xl a contextual rail (next
  * match, newest episodes). Every view is a real address, and moving between
  * them is client-side, so the one <audio> element in app.vue keeps playing.
- * Below lg the site's own header, front page and bottom nav are kept.
+ * Below lg the site's own header and bottom nav, with the same pages.
  *
  * The server renders the desktop and phone parts both; each hydrates only on
  * its own screen size (see useScreenParts), so a phone never runs the
@@ -81,6 +81,31 @@ useHead({ htmlAttrs: { class: 'app-shell' } })
 function skipToContent() {
   document.getElementById('innehall')?.focus()
 }
+
+/*
+ * After moving to another page: keyboard and screen-reader users start at
+ * its heading (Issue #16), or at the content while the page is still
+ * loading it (a supporter's page), when focus would otherwise be lost (the
+ * link followed went with the old page) or left on the phone's navigation
+ * (`data-nav-focus`: the bottom nav, the header's logo, the mini-player's
+ * way to Lyssna). Never away from
+ * something still there and in use: the podcast player, a dialog, desktop's
+ * sidebar.
+ */
+// The router's route: the shell's own (useRoute) stays the same while its pages change.
+const { currentRoute } = useRouter()
+let shownPath = currentRoute.value.path
+useNuxtApp().hook('page:finish', async () => {
+  if (currentRoute.value.path === shownPath) return
+  shownPath = currentRoute.value.path
+  await nextTick()
+  const focused = document.activeElement
+  if (focused && focused !== document.body && focused.isConnected && !focused.closest('[data-nav-focus]')) return
+  const heading = document.querySelector<HTMLElement>('#innehall h1, #innehall h2')
+  if (heading && !heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1')
+  const target = heading ?? document.getElementById('innehall')
+  target?.focus({ preventScroll: true })
+})
 </script>
 
 <template>

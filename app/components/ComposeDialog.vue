@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { keepsPostDraft } from '~/lib/postDraft'
-import { postAnchor, revealPost } from '~/lib/reveal'
+import { revealPost } from '~/lib/reveal'
 
 /*
  * The compose dialog: one shared, native <dialog> for writing, two ways
@@ -139,9 +139,8 @@ function toSnacket() {
   const postId = mode.value === 'post' ? published.value?.id : undefined
   close()
   if (storyId) filter.value = { storyId }
-  // A jump the reader asked for — never one that happens on its own. (A
-  // post's classic address is its place in Snacket on every screen.)
-  if (!links.value.shows('snacket')) return void navigateTo(postId ? `/#${postAnchor(postId)}` : links.value.section('snacket'))
+  // A jump the reader asked for — never one that happens on its own.
+  if (!links.value.shows('snacket')) return void navigateTo(postId ? links.value.post(postId) : links.value.section('snacket'))
   requestAnimationFrame(() => {
     if (postId) void revealPost(postId)
     else document.getElementById('snacket')?.scrollIntoView({ behavior: 'smooth' })

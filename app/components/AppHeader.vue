@@ -28,15 +28,14 @@ onBeforeUnmount(() => {
   resize?.disconnect()
 })
 
-const nav = [
-  { href: '#stories', label: 'Stories' },
-  { href: '#snacket', label: 'Snacket' },
-  { href: '#lyssna', label: 'Lyssna & titta' },
-]
-// Elsewhere (a supporter's page) the same links lead back to the front page's sections.
+// The pages are in the bottom nav. The logo leads to Hem; on Hem, back to its top.
 const route = useRoute()
 const onHome = computed(() => route.path === '/')
-const NuxtLink = resolveComponent('NuxtLink')
+function home(e: MouseEvent) {
+  if (!onHome.value || route.hash) return
+  e.preventDefault()
+  window.scrollTo({ top: 0 })
+}
 </script>
 
 <template>
@@ -47,18 +46,13 @@ const NuxtLink = resolveComponent('NuxtLink')
   >
     <!-- Wraps when the logo and the sport filter don't fit side by side (a small screen, larger text): the filter takes its own row instead of being pushed off the edge (Issue #16) -->
     <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
-      <!-- On the front page plain in-page anchors, as always; elsewhere links back to it -->
-      <component :is="onHome ? 'a' : NuxtLink" v-bind="onHome ? { href: '#' } : { to: '/' }" class="group flex items-center gap-2.5" :aria-label="onHome ? 'Djurgår’n tills jag dör – till toppen' : 'Djurgår’n tills jag dör – till startsidan'">
+      <NuxtLink to="/" data-nav-focus class="group flex items-center gap-2.5" :aria-label="onHome ? 'Djurgår’n tills jag dör – till toppen' : 'Djurgår’n tills jag dör – till startsidan'" @click="home">
         <span class="stripes block h-8 w-6 rounded-[5px] [--stripe:4px] transition-transform duration-500 ease-spring group-hover:-rotate-6 group-hover:scale-110" />
         <span class="leading-none">
           <span class="block font-display text-xl font-bold tracking-tight">Djurgår’n</span>
           <span class="block font-display text-[0.8rem] italic text-himmel">tills jag dör</span>
         </span>
-      </component>
-
-      <nav class="ml-6 hidden items-center gap-6 text-sm font-medium text-krita-dim lg:flex" aria-label="Sektioner">
-        <component :is="onHome ? 'a' : NuxtLink" v-for="n in nav" :key="n.href" v-bind="onHome ? { href: n.href } : { to: `/${n.href}` }" class="transition hover:text-krita">{{ n.label }}</component>
-      </nav>
+      </NuxtLink>
 
       <div class="ml-auto flex rounded-full border border-white/10 bg-navy-900/80 p-1 text-xs font-semibold" role="radiogroup" aria-label="Välj sport">
         <button

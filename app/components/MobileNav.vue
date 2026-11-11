@@ -1,24 +1,22 @@
 <script setup lang="ts">
+import type { SectionId } from '~/lib/sectionLinks'
 import { accountEntry } from '~/lib/accountEntry'
 
 /*
- * Bottom navigation for phones and tablets (the header's links only show
- * from lg up). On the front page, plain in-page anchors with a scroll-spy
- * for the active section; elsewhere (a supporter's page) the same items lead
- * back to those sections. The podcast player lives in app.vue, so it keeps
- * playing either way.
+ * Bottom navigation for phones and tablets: the site's pages, the same
+ * addresses as desktop's sidebar (Issue #16). The active tab is the page
+ * you're on, by its address. The podcast player lives in app.vue, outside
+ * the pages, so it keeps playing from page to page; where focus goes after
+ * a tap is the shell's (AppShell).
  */
-type Section = 'hem' | 'stories' | 'snacket' | 'lyssna'
-const items: { id: Section, label: string }[] = [
+const items: { id: SectionId, label: string }[] = [
   { id: 'hem', label: 'Hem' },
   { id: 'stories', label: 'Stories' },
   { id: 'snacket', label: 'Snacket' },
   { id: 'lyssna', label: 'Lyssna' },
 ]
 
-const active = ref<Section>('hem')
 const route = useRoute()
-const onHome = computed(() => route.path === '/')
 const { status: authStatus, profile, profileStatus } = useAuth()
 const accountOpen = useAccountDialog()
 const links = useSectionLinks()
@@ -31,57 +29,11 @@ const desktop = useMedia('(min-width: 1024px)')
 // The keyboard needs the space while typing on a phone or tablet.
 const hidden = computed(() => typing.value && !desktop.value)
 
-// Scroll-spy: the active section is the last one whose top has passed a line
-// a third of the way down the screen. Paused briefly after a tap so a smooth
-// scroll past other sections doesn't make the highlight flicker.
-let lockedUntil = 0
-let frame = 0
-function spy() {
-  frame = 0
-  if (Date.now() < lockedUntil) return
-  const line = window.innerHeight * 0.33
-  let current: Section = 'hem'
-  for (const { id } of items.slice(1)) {
-    const el = document.getElementById(id)
-    if (el && el.getBoundingClientRect().top <= line) current = id
-  }
-  active.value = current
-}
-const onScroll = () => (frame ||= requestAnimationFrame(spy))
-const unlock = () => {
-  lockedUntil = 0
-  spy()
-}
-
-onMounted(() => {
-  spy()
-  window.addEventListener('scroll', onScroll, { passive: true })
-  window.addEventListener('scrollend', unlock)
-})
-onBeforeUnmount(() => {
-  window.removeEventListener('scroll', onScroll)
-  window.removeEventListener('scrollend', unlock)
-  cancelAnimationFrame(frame)
-})
-
-function go(id: Section) {
-  if (!onHome.value) {
-    void navigateTo(id === 'hem' ? '/' : `/#${id}`)
-    return
-  }
-  active.value = id
-  lockedUntil = Date.now() + 1200
-  const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const el = document.getElementById(id)
-  if (id === 'hem') window.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' })
-  else el?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' })
-  // Keep the address shareable without stacking history entries.
-  history.replaceState(history.state, '', id === 'hem' ? location.pathname + location.search : `#${id}`)
-  // Move keyboard/screen-reader focus to the section, without a second jump.
-  if (el) {
-    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1')
-    el.focus({ preventScroll: true })
-  }
+// The page you're already on: a tap takes you back to its top (html scrolls smoothly, or not under reduced motion).
+function tap(e: MouseEvent, id: SectionId) {
+  if (!links.value.here(id) || route.hash) return
+  e.preventDefault()
+  window.scrollTo({ top: 0 })
 }
 </script>
 
@@ -91,24 +43,25 @@ function go(id: Section) {
 
   <nav
     aria-label="Huvudmeny"
+    data-nav-focus
     class="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-navy-950/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl transition-transform duration-300 lg:hidden"
     :class="hidden && 'translate-y-full'"
     :inert="hidden || undefined"
   >
     <ul class="mx-auto grid h-16 max-w-xl" :class="hasAccount ? 'grid-cols-5' : 'grid-cols-4'">
       <li v-for="item in items" :key="item.id">
-        <a
-          :href="(onHome ? '' : '/') + (item.id === 'hem' ? '#' : `#${item.id}`)"
-          :aria-current="onHome && active === item.id ? 'location' : undefined"
+        <NuxtLink
+          :to="links.view(item.id)"
+          :aria-current="links.here(item.id) ? 'page' : undefined"
           class="relative flex h-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold transition-colors motion-safe:active:scale-95"
-          :class="onHome && active === item.id ? 'text-himmel' : 'text-krita-dim hover:text-krita'"
-          @click.prevent="go(item.id)"
+          :class="links.here(item.id) ? 'text-himmel' : 'text-krita-dim hover:text-krita'"
+          @click="tap($event, item.id)"
         >
           <!-- Active marker: a short stripe, like the club's -->
           <span
             aria-hidden="true"
             class="stripes absolute top-0 h-[3px] w-8 rounded-b-full [--stripe:4px] transition-opacity duration-300"
-            :class="onHome && active === item.id ? 'opacity-100' : 'opacity-0'"
+            :class="links.here(item.id) ? 'opacity-100' : 'opacity-0'"
           />
 
           <span class="relative grid size-6 place-items-center" aria-hidden="true">
@@ -135,7 +88,7 @@ function go(id: Section) {
           </span>
           {{ item.label }}
           <span v-if="item.id === 'lyssna' && playing" class="sr-only">(spelar nu)</span>
-        </a>
+        </NuxtLink>
       </li>
       <!-- You: your läktarplats once you have a profile (the account dialog is on it), until then the account dialog -->
       <li v-if="hasAccount">

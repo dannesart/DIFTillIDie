@@ -20,7 +20,7 @@ const { show } = useStorySpotlight()
 const links = useSectionLinks()
 const authorPath = computed(() => links.value.supporter(props.post.author.handle))
 
-// Tags and Stories live on the front page (or their own view): from elsewhere, go there first.
+// Tags and Stories live on their own pages: from elsewhere, go there first.
 async function showTag(tag: string) {
   filter.value = { tag: tag.toLowerCase() }
   if (!links.value.shows('snacket')) await navigateTo(links.value.section('snacket'))

@@ -1,23 +1,23 @@
-import { DESKTOP_QUERY, desktopTarget } from '~/lib/sectionLinks'
+import { legacyTarget } from '~/lib/sectionLinks'
 
 /*
- * On desktop, the front page's sections are views of their own. Links to them stay the classic ones everywhere (/#snacket),
- * since phones keep the long front page; on desktop they are sent to the
- * view instead (see desktopTarget): links followed in the app, and an
- * address opened directly or shared, once the page has hydrated (so the
- * server's HTML is hydrated as it was rendered).
+ * The one-page front page's old addresses (/#snacket, /#post-…), still in
+ * shared links, bookmarks and installed apps' shortcuts, go to the pages
+ * that have them now (see legacyTarget), on every screen size: links
+ * followed in the app as a redirect (no extra history entry), and an address
+ * opened directly by replacing it once the page has hydrated (so the
+ * server's HTML is hydrated as it was rendered, and Hem shows briefly).
  */
 export default defineNuxtPlugin((nuxtApp) => {
   const router = useRouter()
-  const desktop = () => window.matchMedia(DESKTOP_QUERY).matches
 
   router.beforeEach((to) => {
-    if (nuxtApp.isHydrating || !desktop()) return
-    return desktopTarget(to.path, to.hash) ?? undefined
+    if (nuxtApp.isHydrating) return
+    return legacyTarget(to.path, to.hash) ?? undefined
   })
   onNuxtReady(() => {
     const { path, hash } = router.currentRoute.value
-    const target = desktop() && desktopTarget(path, hash)
+    const target = legacyTarget(path, hash)
     if (target) void router.replace(target)
   })
 })
