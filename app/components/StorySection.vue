@@ -30,7 +30,13 @@ const sourcesDown = computed(() => {
 </script>
 
 <template>
-  <section id="stories" class="mx-auto max-w-7xl scroll-mt-20 px-4 py-16 sm:px-6 lg:py-24">
+  <section id="stories" class="@container mx-auto max-w-7xl scroll-mt-20 px-4 py-16 sm:px-6 lg:py-24">
+    <!--
+      A query container: the grid has as many columns as it has room for, not as the screen is wide. Beside
+      the sidebar (17rem) and rail (24rem), and with larger text, a third of the page can be too narrow for a
+      card. 27rem and 42rem are two and three cards of about 13rem (the narrowest desktop shows at 100% text)
+      with their gaps; md and lg keep phones in one column and tablets in two.
+    -->
     <div class="flex flex-wrap items-end justify-between gap-6">
       <div>
         <p class="kicker flex items-center gap-2 text-himmel">
@@ -47,7 +53,7 @@ const sourcesDown = computed(() => {
 
     <SourceStatus :sources="news.sources" :generated-at="news.generatedAt" class="mt-6" />
 
-    <div v-if="status === 'pending' && !stories.length" class="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+    <div v-if="status === 'pending' && !stories.length" class="mt-10 grid gap-5 md:@[27rem]:grid-cols-2 lg:@[42rem]:grid-cols-3" aria-busy="true">
       <div v-for="i in 3" :key="i" class="card h-56 animate-pulse" />
     </div>
 
@@ -61,8 +67,8 @@ const sourcesDown = computed(() => {
     </div>
 
     <template v-else>
-      <TransitionGroup tag="div" move-class="transition duration-500" enter-from-class="opacity-0 scale-95" leave-to-class="opacity-0 scale-95" enter-active-class="transition duration-500" leave-active-class="transition duration-200 absolute" class="relative mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        <StoryCard v-if="lead" :key="lead.id" :story="lead" lead class="md:col-span-2 lg:row-span-2" />
+      <TransitionGroup tag="div" move-class="transition duration-500" enter-from-class="opacity-0 scale-95" leave-to-class="opacity-0 scale-95" enter-active-class="transition duration-500" leave-active-class="transition duration-200 absolute" class="relative mt-10 grid gap-5 md:@[27rem]:grid-cols-2 lg:@[42rem]:grid-cols-3">
+        <StoryCard v-if="lead" :key="lead.id" :story="lead" lead class="md:@[27rem]:col-span-2 lg:@[42rem]:row-span-2" />
         <StoryCard v-for="s in shown" :key="s.id" :story="s" />
       </TransitionGroup>
 

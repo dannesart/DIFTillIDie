@@ -155,9 +155,35 @@ describe('a Story card', () => {
   })
 })
 
+describe('the Stories grid', () => {
+  const section = template('app/components/StorySection.vue')
+  const root = all(section).find(n => n.tag === 'section')!
+  const skeleton = all(section).find(n => n.props?.some(p => p.type === 6 && p.name === 'aria-busy'))!
+  const grid = all(section).find(n => n.tag === 'TransitionGroup')!
+  const lead = all(grid).find(n => n.tag === 'StoryCard' && n.props?.some(p => p.type === 6 && p.name === 'lead'))!
+  const COLUMNS = ['grid', 'md:@[27rem]:grid-cols-2', 'lg:@[42rem]:grid-cols-3']
+
+  it('has as many columns as it has room for, not as the screen is wide', () => {
+    // Beside the sidebar and rail, and with larger text, a third of the page is too narrow for a card.
+    expect(classes(root)).toContain('@container')
+    for (const g of [grid, skeleton]) {
+      expect(classes(g)).toEqual(expect.arrayContaining(COLUMNS))
+      // No column count that holds whatever the room, and no auto-fill/auto-fit (more than three columns, and a lead that can't follow)
+      expect(classes(g).filter(c => /(^|:)grid-cols-/.test(c) && !COLUMNS.includes(c))).toEqual([])
+      expect(classes(g).join(' ')).not.toMatch(/auto-(fill|fit)/)
+    }
+  })
+
+  it('lets the lead span only the columns there are', () => {
+    // A span of two in a one-column grid would add a column and run out of the page.
+    expect(classes(lead)).toEqual(expect.arrayContaining(['md:@[27rem]:col-span-2', 'lg:@[42rem]:row-span-2']))
+    expect(classes(lead).filter(c => /^(md|lg):(col|row)-span-/.test(c))).toEqual([])
+  })
+})
+
 describe('no hiding', () => {
   it('fixes the layout instead of clipping the overflow', () => {
-    for (const f of ['app/shell/views/Hem.vue', 'app/components/AppHeader.vue', 'app/components/SnacketSection.vue', 'app/components/PostCard.vue', 'app/components/StoryCard.vue'])
+    for (const f of ['app/shell/views/Hem.vue', 'app/components/AppHeader.vue', 'app/components/SnacketSection.vue', 'app/components/PostCard.vue', 'app/components/StoryCard.vue', 'app/components/StorySection.vue'])
       expect(readFileSync(f, 'utf8')).not.toMatch(/overflow-x-(hidden|clip)/)
   })
 })
