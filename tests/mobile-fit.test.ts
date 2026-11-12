@@ -141,17 +141,21 @@ describe('a Story card', () => {
     for (const n of [sourceRow, outlet]) expect(classes(n).filter(c => /^sm:(flex-row|w-28|items-baseline|gap-4)$/.test(c))).toEqual([])
   })
 
-  it('wraps the label line on phones instead of cutting sport, outlet or "sammanställning" short', () => {
+  it('wraps the label line on every screen instead of cutting sport, outlet or "sammanställning" short', () => {
     const [label] = all(card).filter(n => n.tag === 'span' && classes(n).includes('kicker') && text(n).includes('sammanställning'))
-    expect(classes(label!)).not.toContain('truncate')
-    expect(classes(label!)).toEqual(expect.arrayContaining(['lg:truncate', 'break-words']))
+    expect(classes(label!)).toContain('break-words')
     // The dot and label stay together, with room for the label's longest word beside the time
     const group = parentOf(card, label!)
-    expect(classes(group)).toEqual(expect.arrayContaining(['min-w-0', 'flex-[1_1_10rem]', 'lg:flex-initial']))
+    expect(classes(group)).toEqual(expect.arrayContaining(['min-w-0', 'flex-[1_1_10rem]']))
     const row = parentOf(card, group)
-    expect(classes(row)).toEqual(expect.arrayContaining(['flex-wrap', 'lg:flex-nowrap']))
+    expect(classes(row)).toContain('flex-wrap')
+    // Even the widest desktop card is too narrow for a compiled source's label on one line: no breakpoint may cut it short
+    for (const n of all(row).filter(n => n.type === 1))
+      expect(classes(n).filter(c => /(^|:)(truncate|text-ellipsis|line-clamp-\d+|whitespace-nowrap|flex-nowrap|overflow-hidden)$/.test(c))).toEqual([])
     // The time, at the row's end
-    expect(all(row).some(n => n.tag === 'TimeAgo')).toBe(true)
+    const time = row.children!.filter(n => n.type === 1).at(-1)!
+    expect(all(time).some(n => n.tag === 'TimeAgo')).toBe(true)
+    expect(classes(time)).toEqual(expect.arrayContaining(['ml-auto', 'shrink-0']))
   })
 })
 
