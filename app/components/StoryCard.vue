@@ -53,15 +53,16 @@ watch(talk, (n, old) => {
     <div v-if="lead" aria-hidden="true" class="stripes pointer-events-none absolute -right-10 -top-10 h-56 w-56 rotate-12 rounded-[2.5rem] opacity-[0.08] [--stripe:18px] transition duration-700 group-hover:rotate-6 group-hover:opacity-15" />
 
     <!--
-      Below lg the label wraps rather than losing sport, outlet or "sammanställning" to an ellipsis.
+      On every screen the label wraps rather than losing sport, outlet or "sammanställning" to an ellipsis:
+      even the widest desktop card is too narrow for a compiled source's label on one line.
       It has room for its longest word (10rem, so it grows with the text) beside the time, which takes
       its own line only when even that doesn't fit; the dot and the time stay on the label's first line
       (0.26rem centres the dot on a kicker line, 1.02rem tall).
     -->
-    <div class="relative flex flex-wrap items-start gap-x-2 gap-y-1 text-krita-dim lg:flex-nowrap lg:items-center">
-      <span class="flex min-w-0 flex-[1_1_10rem] items-start gap-2 lg:flex-initial lg:items-center">
-        <span class="mt-[0.26rem] size-2 shrink-0 rounded-full lg:mt-0" :class="sportDot[story.sport]" />
-        <span class="kicker min-w-0 break-words lg:truncate">{{ sportLabel[story.sport] }} · {{ leadSource.outlet }}<template v-if="leadSource.reporting === 'compiled'"> · sammanställning</template></span>
+    <div class="relative flex flex-wrap items-start gap-x-2 gap-y-1 text-krita-dim">
+      <span class="flex min-w-0 flex-[1_1_10rem] items-start gap-2">
+        <span class="mt-[0.26rem] size-2 shrink-0 rounded-full" :class="sportDot[story.sport]" />
+        <span class="kicker min-w-0 break-words">{{ sportLabel[story.sport] }} · {{ leadSource.outlet }}<template v-if="leadSource.reporting === 'compiled'"> · sammanställning</template></span>
       </span>
       <span class="kicker ml-auto shrink-0"><TimeAgo :at="leadSource.publishedAt" /></span>
     </div>
