@@ -4,6 +4,8 @@ import type { FrozenStory, Sport, Story } from '#shared/types/domain'
 import type { AuthorRow, PublicAuthor } from '#shared/utils/profile'
 import { authorOf, toAuthor } from '#shared/utils/profile'
 import type { AuthStore } from './auth'
+import type { DraftAttachment, NewsLoad } from './postDraft'
+import { attachmentRefusal, resolveAttachment } from './postDraft'
 
 /*
  * Real Snacket posts, read from and published to Supabase through its Data
@@ -155,8 +157,14 @@ export function createCommunity(client: SupabaseClient | null, auth: AuthStore |
    * capture, and the database freezes it into the post in the same
    * transaction: both, or neither. A Story without a capture can't be
    * attached, and the post isn't published without it behind your back.
+   *
+   * `attach`: what the draft says the post is about, checked here against the
+   * Stories as they are now (resolveAttachment), right before sending. Only a
+   * Story that's there is attached; anything else (gone, news loading or
+   * unavailable, an old draft's Story not yet confirmed) refuses the post
+   * rather than publishing it as an ordinary one. No attachment: a normal post.
    */
-  async function publish(input: { body: string, sport?: Sport, story?: Story }): Promise<PublishResult> {
+  async function publish(input: { body: string, sport?: Sport, story?: Story, attach?: { attachment?: DraftAttachment, stories: Story[], news: NewsLoad } }): Promise<PublishResult> {
     if (!client || !auth) return { ok: false, message: 'Publicering är inte påslagen här.' }
     if (auth.status.value !== 'signed-in') return { ok: false, message: 'Logga in för att publicera.' }
     if (auth.profileStatus.value !== 'ready') return { ok: false, message: 'Välj ditt läktarnamn innan du publicerar.' }
@@ -164,11 +172,18 @@ export function createCommunity(client: SupabaseClient | null, auth: AuthStore |
     const body = normalizePostBody(input.body)
     const invalid = validatePostBody(body)
     if (invalid) return { ok: false, message: invalid }
-    if (input.story && !input.story.capture) return { ok: false, message: STORY_UNVERIFIED }
+    let story = input.story
+    if (input.attach) {
+      const state = resolveAttachment(input.attach.attachment, input.attach.stories, input.attach.news)
+      const refused = attachmentRefusal(state)
+      if (refused) return { ok: false, message: refused }
+      story = state.kind === 'attached' ? state.story : undefined
+    }
+    if (story && !story.capture) return { ok: false, message: STORY_UNVERIFIED }
     publishing.value = true
     try {
       // No author: the database takes it from the session.
-      const args = { p_body: body, p_sport: input.sport ?? null, p_story: input.story?.capture?.data ?? null, p_story_sig: input.story?.capture?.sig ?? null }
+      const args = { p_body: body, p_sport: input.sport ?? null, p_story: story?.capture?.data ?? null, p_story_sig: story?.capture?.sig ?? null }
       const call = (cols: string) => client.rpc('publish_post', args).select(cols).single()
       let { data, error: e } = await call(COLUMNS)
       // A database without the avatar column yet. publish_post() and the

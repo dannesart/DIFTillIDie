@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { keepsPostDraft } from '~/lib/postDraft'
+import { attachmentPatch, draftAttachment, keepsPostDraft } from '~/lib/postDraft'
 import { revealPost } from '~/lib/reveal'
 
 /*
@@ -197,11 +197,11 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
             ref="composer"
             :body="post.body"
             :sport="post.sport"
-            :story-id="post.storyId"
+            :attachment="draftAttachment(post)"
             class="mt-3"
             @update:body="setPost({ body: $event })"
             @update:sport="setPost({ sport: $event })"
-            @update:story-id="setPost({ storyId: $event })"
+            @update:attachment="setPost(attachmentPatch($event))"
             @published="onPublished"
           />
           <div class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-krita-dim">

@@ -4,7 +4,8 @@ import type { SnacketIdentity } from '~/lib/localScope'
 import { resolveIdentity } from '~/lib/localScope'
 import type { FeedSort } from '~/lib/feedSort'
 import type { CommunityPost, PublishResult } from '~/lib/posts'
-import { STORY_UNVERIFIED } from '~/lib/posts'
+import type { DraftAttachment, NewsLoad } from '~/lib/postDraft'
+import { attachmentFrom } from '~/lib/postDraft'
 
 /*
  * Snacket på stan: real posts by signed-in supporters, from Supabase,
@@ -100,13 +101,20 @@ export function useSnacket() {
    * counts. By default the filters are cleared and the feed goes back to
    * Nyast, so the new post is in view (at the top);
    * `keepView` leaves them, for posting from a Story.
+   *
+   * What the post is about: `story` (writing about that Story) or the draft's
+   * `attachment`. Either way it's checked against the Stories as they are now,
+   * right before sending (community.publish); an attachment that can't be
+   * confirmed refuses the post, never publishes it without its Story.
+   * `news`: how the news stands where the post was written, to say why.
    */
-  async function publish(body: string, opts: { sport?: Sport, storyId?: string, keepView?: boolean } = {}): Promise<PublishResult> {
+  async function publish(body: string, opts: { sport?: Sport, story?: Story, attachment?: DraftAttachment, news?: NewsLoad, keepView?: boolean } = {}): Promise<PublishResult> {
     if (identity.value.kind !== 'member') return { ok: false, message: 'Logga in och välj ditt läktarnamn för att publicera.' }
     // The Story goes along as the server's signed capture; see app/lib/posts.ts.
-    const story = opts.storyId ? findStory(news.value?.stories ?? [], opts.storyId) : undefined
-    if (opts.storyId && !story) return { ok: false, message: STORY_UNVERIFIED }
-    const r = await community.publish({ body, sport: opts.sport, story })
+    const attachment = opts.story ? attachmentFrom(opts.story) : opts.attachment
+    const stories = news.value?.stories ?? []
+    const loaded: NewsLoad = news.value?.generatedAt ? 'ready' : 'loading'
+    const r = await community.publish({ body, sport: opts.sport, attach: { attachment, stories, news: opts.news ?? loaded } })
     const keepView = opts.keepView
     if (r.ok && !keepView) {
       filter.value = {}

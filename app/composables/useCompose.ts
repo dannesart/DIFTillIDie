@@ -1,4 +1,4 @@
-import type { Sport } from '#shared/types/domain'
+import type { Sport, Story } from '#shared/types/domain'
 import type { LocalOwner } from '~/lib/localScope'
 import { readScoped, scopedKey } from '~/lib/localScope'
 import type { PostDraft } from '~/lib/postDraft'
@@ -68,7 +68,7 @@ export function useCompose() {
   }
 
   /** Write a Snacket post: the draft in progress, or a fresh one from what you're browsing. */
-  function openPost(browsing: { sport?: Sport, storyId?: string } = {}, mentioning?: string) {
+  function openPost(browsing: { sport?: Sport, story?: Story } = {}, mentioning?: string) {
     activeId.value = null
     // Said in the dialog: text written earlier is still there (not just a mention added now).
     postResumed.value = !!post.value.body.trim()
@@ -78,7 +78,7 @@ export function useCompose() {
   }
 
   /** Reply to someone: their @handle in the Snacket draft, ready to write after. */
-  const mention = (handle: string, browsing: { sport?: Sport, storyId?: string } = {}) => openPost(browsing, handle)
+  const mention = (handle: string, browsing: { sport?: Sport, story?: Story } = {}) => openPost(browsing, handle)
 
   /**
    * Throw the Snacket draft away (text and Story; the sport stays), here and

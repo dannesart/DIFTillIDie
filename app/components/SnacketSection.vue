@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FeedSort } from '~/lib/feedSort'
 import { createFeedSort, engagement } from '~/lib/feedSort'
-import { postDraftPreview } from '~/lib/postDraft'
+import { draftAttachment, newsLoad, postDraftPreview, resolveAttachment } from '~/lib/postDraft'
 import { postAnchor } from '~/lib/reveal'
 
 /*
@@ -14,7 +14,7 @@ import { postAnchor } from '~/lib/reveal'
 const { feed, all, community, filter, sort, sport, me, identity } = useSnacket()
 const { stats, statsStatus, statsLoadedAt } = useInteractions()
 const { status: feedStatus, stale, refreshing } = community
-const { stories } = useNews()
+const { stories, status: newsStatus } = useNews()
 const { status } = useAuth()
 const accountOpen = useAccountDialog()
 const canSignIn = computed(() => status.value !== 'unavailable')
@@ -45,13 +45,14 @@ const tags = computed(() => {
 
 const compose = useCompose()
 // A post started here begins from what you're browsing: the sport, the Story whose posts these are.
-const browsing = () => ({ sport: sport.value === 'alla' ? undefined : sport.value, storyId: filterStory.value ? filter.value.storyId : undefined })
+const browsing = () => ({ sport: sport.value === 'alla' ? undefined : sport.value, story: filterStory.value })
 /** The draft in progress (text, or only an attached Story), shown in the entry so it's clear nothing was lost. */
 const draftText = computed(() => {
   if (identity.value.kind === 'guest') return null
   const d = compose.post.value
-  const story = findStory(stories.value, d.storyId)
-  return postDraftPreview(d, story && leadOf(story).headline)
+  // The Story's headline now, or, when it can't be confirmed, the one the supporter chose
+  const s = resolveAttachment(draftAttachment(d), stories.value, newsLoad(newsStatus.value))
+  return postDraftPreview(d, s.kind === 'attached' || s.kind === 'confirm' ? leadOf(s.story).headline : d.headline)
 })
 
 function mention(handle: string) {
