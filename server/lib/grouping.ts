@@ -61,7 +61,7 @@ export function namesIn(text: string): Set<string> {
   return out
 }
 
-interface Profile {
+export interface Profile {
   article: SourceArticle
   time: number
   headlineTokens: Set<string>
@@ -71,7 +71,7 @@ interface Profile {
 
 const tokenize = (text: string) => [...text.matchAll(WORD)].flatMap(m => m[0].split(/[-–]/)).map(stem).filter(Boolean)
 
-function profile(a: SourceArticle): Profile {
+export function profile(a: SourceArticle): Profile {
   return {
     article: a,
     time: Date.parse(a.publishedAt),
@@ -133,10 +133,11 @@ function joinFullNames(names: string[], articles: SourceArticle[]): string[] {
   return out
 }
 
+/** Same article from two feeds (e.g. both Sportbladet sections) counts once. */
+export const uniqueArticles = (articles: SourceArticle[]) => [...new Map(articles.map(a => [canonicalUrl(a.url), a])).values()]
+
 export function groupIntoStories(articles: SourceArticle[]): Story[] {
-  // Same article from two feeds (e.g. both Sportbladet sections) counts once.
-  const unique = [...new Map(articles.map(a => [canonicalUrl(a.url), a])).values()]
-  const profiles = unique.map(profile)
+  const profiles = uniqueArticles(articles).map(profile)
 
   // Union–find over linked pairs.
   const parent = profiles.map((_, i) => i)
@@ -153,8 +154,12 @@ export function groupIntoStories(articles: SourceArticle[]): Story[] {
 
   const clusters = new Map<number, number[]>()
   profiles.forEach((_, i) => clusters.set(find(i), [...(clusters.get(find(i)) ?? []), i]))
+  return toStories(profiles, [...clusters.values()], edges)
+}
 
-  const stories: Story[] = [...clusters.values()].map((members) => {
+/** Stories from clusters of profiles; `edges` holds the names that linked each member. */
+export function toStories(profiles: Profile[], clusters: number[][], edges: Map<number, Set<string>>): Story[] {
+  const stories: Story[] = clusters.map((members) => {
     const sources = members.map(i => profiles[i]!.article).sort((a, b) => a.publishedAt.localeCompare(b.publishedAt) || a.id.localeCompare(b.id))
     const earliest = sources[0]!
     const lead = sources.find(s => s.reporting === 'original') ?? earliest
