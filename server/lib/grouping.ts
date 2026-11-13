@@ -107,13 +107,23 @@ function displayName(stemmed: string, articles: SourceArticle[]): string {
   return spellings[0] ?? stemmed
 }
 
-/** "Patrik", "Werner" → "Patrik Werner" when a source writes them side by side. */
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * "Patrik", "Werner" → "Patrik Werner" when a source writes them side by side, as whole words in one
+ * headline or one teaser: a headline's last word and its teaser's first word, or two articles' texts,
+ * are never side by side ("…entlediga Honkavaara" + "Maximilian Hahn…" is not "Honkavaara Maximilian").
+ */
 function joinFullNames(names: string[], articles: SourceArticle[]): string[] {
-  const text = articles.map(a => `${a.headline} ${a.excerpt ?? ''}`).join(' ')
+  const fields = articles.flatMap(a => [a.headline, a.excerpt ?? ''])
+  const sideBySide = (first: string, last: string) => {
+    const pair = new RegExp(`(?<![\\p{L}\\p{M}'’-])${escape(first)} ${escape(last)}(?![\\p{L}\\p{M}'’-])`, 'u')
+    return fields.some(f => pair.test(f))
+  }
   const out = [...names]
   for (const first of names) {
     for (const last of names) {
-      if (first === last || !text.includes(`${first} ${last}`)) continue
+      if (first === last || !sideBySide(first, last)) continue
       const i = out.indexOf(last)
       if (i === -1 || !out.includes(first)) continue
       out[i] = `${first} ${last}`
