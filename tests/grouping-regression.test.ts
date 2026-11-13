@@ -82,19 +82,33 @@ describe('grouping guarantees', () => {
   })
 
   it('still finds a Story by any of its articles when a group splits', () => {
-    // Today the chain is one Story; a stricter algorithm would split it. References made either way must resolve.
-    const merged = groupIntoStories(chain)
-    const split = [...groupIntoStories(chain.slice(0, 2)), ...groupIntoStories(chain.slice(2))]
-    expect(merged).toHaveLength(1)
-    expect(split).toHaveLength(2)
-    for (const a of chain) {
-      const ref = `story-${a.id}`
+    // Explicit Stories, not grouping's output: whichever partition a grouping rule makes, references must resolve.
+    // Ids as grouping makes them: story-<earliest article>. One article also carries an older (legacy) id.
+    const story = (sources: SourceArticle[]): Story => ({
+      id: `story-${sources[0]!.id}`, sport: sources[0]!.sport, sources, leadId: sources[0]!.id, sharedNames: [], updatedAt: sources.at(-1)!.publishedAt,
+    })
+    const [first, second, third] = [chain[0]!, { ...chain[1]!, legacyId: 'legacy-1' }, chain[2]!]
+    const other = story(single)
+    const merged = [story([first, second, third]), other]
+    const split = [story([first, second]), story([third]), other]
+    const refs = [first, second, third].map(a => `story-${a.id}`)
+
+    // Before: the merged Story answers to each of its articles, its own id and the legacy id
+    for (const ref of [...refs, merged[0]!.id, 'story-legacy-1']) {
       expect(findStory(merged, ref)).toBe(merged[0])
-      expect(findStory(split, ref)).toBe(storyOf(split, a))
-      expect(split.filter(s => storyAnswersTo(s, ref))).toHaveLength(1)
+      expect(merged.filter(s => storyAnswersTo(s, ref))).toEqual([merged[0]])
+    }
+    // After: each reference lands on exactly the part that kept its article, never on another Story
+    const [early, late] = split
+    for (const [ref, part] of [[refs[0], early], [refs[1], early], ['story-legacy-1', early], [refs[2], late]] as const) {
+      expect(findStory(split, ref)).toBe(part)
+      expect(split.filter(s => storyAnswersTo(s, ref))).toEqual([part])
     }
     // A reference to the merged Story (its earliest article) lands on the part that kept that article
-    expect(findStory(split, merged[0]!.id)!.sources).toContain(chain[0])
+    expect(findStory(split, merged[0]!.id)).toBe(early)
+    expect(late!.id).toBe(`story-${third.id}`)
+    // Nothing answers for a Story that isn't there
+    expect(findStory(split, 'story-unknown')).toBeUndefined()
   })
 })
 
