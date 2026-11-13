@@ -34,6 +34,7 @@ export interface FeedPost {
   sport?: Sport
   storyId?: string
   storyRef?: CommunityPost['storyRef']
+  storyRefInvalid?: CommunityPost['storyRefInvalid']
   /** Written by whoever is signed in here. */
   own: boolean
 }
@@ -46,6 +47,7 @@ const toFeedPost = (p: CommunityPost, me: string | null): FeedPost => ({
   sport: p.sport,
   storyId: p.storyId,
   storyRef: p.storyRef,
+  storyRefInvalid: p.storyRefInvalid,
   own: !!me && p.author.id === me,
 })
 
@@ -77,18 +79,20 @@ export function useSnacket() {
   /** Real posts through the sport, #tag and Story filters, newest first. (Hetast is applied on top, where the feed is shown.) */
   const feed = computed(() => {
     const { tag, storyId } = filter.value
-    const story = storyId ? findStory(news.value?.stories ?? [], storyId) : undefined
+    const about = storyId ? new Set(postsForStoryFilter(news.value?.stories ?? [], all.value, storyId)) : undefined
     return all.value.filter(p =>
       matches(p.sport)
-      && (!storyId || (story ? aboutStory(p, story) : p.storyId === storyId))
+      && (!about || about.has(p))
       && (!tag || p.body.toLowerCase().includes(`#${tag.toLowerCase()}`)),
     )
   })
 
-  /** Real posts about a Story, newest first. */
-  /** A post is about the one Story its reference resolves to (never both sides of an ambiguous legacy id). */
-  const aboutStory = (p: FeedPost, story: Story) => findStory(news.value?.stories ?? [], p.storyId) === story
-  const postsForStory = (story: Story) => all.value.filter(p => aboutStory(p, story))
+  /**
+   * Real posts about a Story, newest first: the posts storyOfPost resolves to it (by a frozen Story's lead
+   * article; never both sides of an ambiguous legacy id). The Story filter, counts, the dialog's earlier
+   * posts and PostCard's link all use storyOfPost, so they agree.
+   */
+  const postsForStory = (story: Story) => postsAboutStory(news.value?.stories ?? [], all.value, story)
   const countForStory = (story: Story) => postsForStory(story).length
 
   /**

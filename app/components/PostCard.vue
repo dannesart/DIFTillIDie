@@ -35,13 +35,20 @@ const { stories, status: newsStatus } = useNews()
  * The Story a post is about:
  *  - frozen: kept with the post when it was published (exactly the sources
  *    attached then, as read from the feeds), shown for good;
- *  - live: a post from before frozen Stories, while its Story is in the feeds;
- *  - gone: such a post after that. Said plainly; nothing is guessed.
+ *  - live: the Story in the feeds now (storyOfPost: for a frozen Story, the one
+ *    holding its lead article; never another event's by the old id), linked
+ *    while there is one;
+ *  - unlinked: a frozen Story with no live one, or one that couldn't be read;
+ *  - gone: a post from before frozen Stories once its Story left the feeds.
+ * Said plainly once the news has loaded; nothing is guessed.
  */
-const live = computed(() => findStory(stories.value, props.post.storyId))
+const live = computed(() => storyOfPost(stories.value, props.post))
 const frozen = computed(() => props.post.storyRef)
 const lead = computed(() => frozen.value && frozenLead(frozen.value))
-const gone = computed(() => !!props.post.storyId && !frozen.value && !live.value && newsStatus.value !== 'pending' && newsStatus.value !== 'idle')
+const newsLoaded = computed(() => newsStatus.value !== 'pending' && newsStatus.value !== 'idle')
+const unlinked = computed(() => newsLoaded.value && !live.value && (!!frozen.value || !!props.post.storyRefInvalid))
+const gone = computed(() => newsLoaded.value && !!props.post.storyId && !frozen.value && !props.post.storyRefInvalid && !live.value)
+const NO_LIVE_STORY = 'Ingen aktuell Story kan kopplas säkert till det här inlägget.'
 const sourcesLabel = (n: number) => `${n} ${n === 1 ? 'källa' : 'källor'}`
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 const tokens = computed(() => tokenize(props.post.body))
@@ -121,6 +128,7 @@ async function remove() {
         Ur flödet från {{ lead.outlet }}<template v-if="lead.publisher && lead.publisher !== lead.outlet"> ({{ lead.publisher }})</template><template v-if="lead.capturedAt">, {{ day(lead.capturedAt) }}</template>.
         <a :href="lead.url" target="_blank" rel="noopener noreferrer" class="font-semibold text-krita underline-offset-2 hover:text-himmel hover:underline">Läs hos {{ lead.outlet }} ↗</a>
       </p>
+      <p v-if="unlinked" class="mt-1 text-xs text-krita-dim">{{ NO_LIVE_STORY }}</p>
       <details v-if="frozen.sources.length > 1" class="mt-1 text-xs text-krita-dim">
         <summary class="cursor-pointer hover:text-krita">Alla {{ sourcesLabel(frozen.sources.length) }}</summary>
         <ul class="mt-1.5 space-y-1.5">
@@ -140,6 +148,11 @@ async function remove() {
       </span>
       <span class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel">→</span>
     </button>
+
+    <!-- Kept with the post, but unreadable here: not a post from before frozen Stories, so never found by its id -->
+    <p v-else-if="post.storyRefInvalid && unlinked" class="mt-4 rounded-2xl border border-dashed border-white/12 px-3 py-2.5 text-xs text-krita-dim">
+      {{ NO_LIVE_STORY }}
+    </p>
 
     <!-- …and after it has left them: we never kept a copy, so we don't guess -->
     <p v-else-if="gone" class="mt-4 rounded-2xl border border-dashed border-white/12 px-3 py-2.5 text-xs text-krita-dim">

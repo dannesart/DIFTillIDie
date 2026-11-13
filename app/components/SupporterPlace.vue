@@ -47,7 +47,7 @@ useSeoMeta({
 })
 
 const feedPosts = computed<FeedPost[]>(() => posts.value.map((p: CommunityPost) => ({
-  id: p.id, author: p.author, body: p.body, createdAt: p.createdAt, sport: p.sport, storyId: p.storyId, storyRef: p.storyRef, own: own.value,
+  id: p.id, author: p.author, body: p.body, createdAt: p.createdAt, sport: p.sport, storyId: p.storyId, storyRef: p.storyRef, storyRefInvalid: p.storyRefInvalid, own: own.value,
 })))
 
 onMounted(() => void wall.load())
