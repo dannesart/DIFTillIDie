@@ -22,6 +22,8 @@ export interface CommunityPost {
   storyId?: string
   /** The Story frozen when it was published. Absent for posts from before 2026-11-05. */
   storyRef?: FrozenStory
+  /** A frozen Story was stored but can't be read: not a post from before frozen Stories, so never resolved by its id. */
+  storyRefInvalid?: true
   createdAt: string
 }
 
@@ -46,13 +48,15 @@ export function toCommunityPost(r: PostRow): CommunityPost | null {
   const a = Array.isArray(r.author) ? r.author[0] : r.author
   // Without a visible author there's nothing honest to show.
   if (!a) return null
+  const storyRef = toFrozenStory(r.story_ref)
   return {
     id: r.id,
     author: toAuthor(a),
     body: r.body,
     sport: r.sport === 'fotboll' || r.sport === 'hockey' ? r.sport : undefined,
     storyId: r.story_id ?? undefined,
-    storyRef: toFrozenStory(r.story_ref),
+    storyRef,
+    ...(r.story_ref != null && !storyRef ? { storyRefInvalid: true as const } : {}),
     createdAt: r.created_at,
   }
 }

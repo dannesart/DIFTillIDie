@@ -31,10 +31,10 @@ const latest = computed(() => all.value.filter(p => matches(p.sport)).slice(0, P
 const loading = computed(() => feedStatus.value === 'idle' || feedStatus.value === 'loading')
 const topStories = computed(() => stories.value.filter(s => matches(s.sport)).slice(0, PREVIEWS))
 
-// The Story a post is about, by its own headline: as kept with the post, or as it is in the feeds.
+// The Story a post is about, by its own headline: as kept with the post, or as it is in the feeds (storyOfPost, as everywhere).
 function aboutStory(post: FeedPost) {
   if (post.storyRef) return frozenLead(post.storyRef)?.headline
-  const live = findStory(stories.value, post.storyId)
+  const live = storyOfPost(stories.value, post)
   return live && leadOf(live).headline
 }
 
