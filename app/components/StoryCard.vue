@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Story } from '#shared/types/domain'
+import { draftsAbout, newStoryDraft } from '~/lib/storyDrafts'
 
 const props = defineProps<{ story: Story, lead?: boolean }>()
 
@@ -25,7 +26,13 @@ const sportDot = { fotboll: 'bg-himmel', hockey: 'bg-himmel-200' } as const
 
 // Writing and reading are two intents: the button writes (in a dialog),
 // the count reads (in Snacket på stan). Neither changes this card's size.
-const hasDraft = computed(() => !!compose.draftFor(props.story.id))
+// Drafts about this Story now, by the article each chose (Issue #25). Several: choose one, never a guess.
+const { stories } = useNews()
+const mine = computed(() => draftsAbout(compose.storyDrafts.value, props.story, stories.value))
+function writeAbout() {
+  if (mine.value.length > 1) compose.openDrafts(props.story.id)
+  else compose.openDraft(mine.value[0] ?? newStoryDraft(props.story))
+}
 const links = useSectionLinks()
 function readTalk() {
   filter.value = { storyId: props.story.id }
@@ -120,7 +127,7 @@ watch(talk, (n, old) => {
       <button
         class="talk-button inline-flex items-center gap-2 rounded-full border border-guld/40 px-4 py-2 text-sm font-bold text-guld transition duration-300 hover:border-guld hover:bg-guld/10"
         aria-haspopup="dialog"
-        @click="compose.open(story.id)"
+        @click="writeAbout"
       >
         <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 5h16v11H9l-5 4z" />
@@ -128,7 +135,7 @@ watch(talk, (n, old) => {
           <circle class="dot" cx="12" cy="10.5" r="1" fill="currentColor" stroke="none" />
           <circle class="dot" cx="15" cy="10.5" r="1" fill="currentColor" stroke="none" />
         </svg>
-        {{ hasDraft ? 'Fortsätt ditt utkast' : 'Snacka om detta' }}
+        {{ mine.length > 1 ? `Fortsätt ett av dina ${mine.length} utkast` : mine.length ? 'Fortsätt ditt utkast' : 'Snacka om detta' }}
       </button>
       <button
         v-if="talk"

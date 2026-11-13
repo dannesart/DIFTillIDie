@@ -1,43 +1,60 @@
 <script setup lang="ts">
-import { attachmentPatch, draftAttachment, keepsPostDraft } from '~/lib/postDraft'
+import { attachmentPatch, draftAttachment, keepsPostDraft, newsLoad, resolveAttachment } from '~/lib/postDraft'
 import { revealPost } from '~/lib/reveal'
+import { draftsAbout } from '~/lib/storyDrafts'
 
 /*
  * The compose dialog: one shared, native <dialog> for writing, two ways
  * (see useCompose), each with its own draft:
- *  - "Snacka om detta": about a Story, which it shows in miniature;
+ *  - "Snacka om detta": a Story draft, about the Story that holds the article
+ *    it chose, shown in miniature; one whose Story can't be confirmed is
+ *    recovered in the composer (confirmed, chosen again, or removed);
  *  - a Snacket post, opened from "Vad snackas det om på stan?" or an
  *    @mention, with sport and an optional Story chosen in the composer.
+ * And a list of Story drafts to choose from ("Sparade utkast").
  * showModal() gives us a real modal for free — inert background, focus kept
  * inside, Escape to close. Desktop: a centred card. Mobile: a bottom sheet.
  * Drafts are saved as you type, so closing (Escape, ✕, a tap outside) never
  * loses one. While a post is on its way it can't be closed, so its result
  * (published, or an error with the text kept) always lands here.
  */
-const { activeId, postOpen, post, postResumed, draftFor, setDraft, setPost, discardPost, close } = useCompose()
-const { stories } = useNews()
+const { storyDrafts, active, listing, listedFrom, postOpen, post, postResumed, setStoryDraft, removeActive, setPost, discardPost, openDraft, openDrafts, close } = useCompose()
+const { stories, status: newsStatus } = useNews()
 const { postsForStory, filter, identity } = useSnacket()
 const { publishing } = useCommunity()
 const links = useSectionLinks()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const composer = useTemplateRef<{ focus: () => void }>('composer')
+const list = useTemplateRef<{ focus: () => void }>('list')
 
-const story = computed(() => (activeId.value ? findStory(stories.value, activeId.value!) : undefined))
+const news = computed(() => newsLoad(newsStatus.value))
+/** The open Story draft's Story: the one holding the article it chose (never found by its old id). */
+const state = computed(() => (active.value ? resolveAttachment(draftAttachment(active.value), stories.value, news.value) : undefined))
+const story = computed(() => (state.value?.kind === 'attached' ? state.value.story : undefined))
 const lead = computed(() => (story.value ? leadOf(story.value) : undefined))
 const earlier = computed(() => (story.value ? postsForStory(story.value) : []))
-/** What it's open for: a Story, a Snacket post, or nothing. */
-const mode = computed(() => (story.value && lead.value ? 'story' : postOpen.value ? 'post' : null))
+/** What it's open for: a Story draft, the list of them, a Snacket post, or nothing. */
+const mode = computed(() => (active.value ? 'story' : listing.value ? 'drafts' : postOpen.value ? 'post' : null))
+
+/** The drafts listed: those about one Story (while it's there), or all, the ones to see to first. */
+const listedStory = computed(() => findStory(stories.value, listing.value?.storyId))
+const listed = computed(() => {
+  if (listedStory.value) return draftsAbout(storyDrafts.value, listedStory.value, stories.value)
+  const attachedFirst = (d: typeof storyDrafts.value[number]) => (resolveAttachment(draftAttachment(d), stories.value, news.value).kind === 'attached' ? 1 : 0)
+  return [...storyDrafts.value].sort((a, b) => attachedFirst(a) - attachedFirst(b))
+})
 
 const draft = computed({
-  get: () => (activeId.value ? draftFor(activeId.value) : ''),
-  set: v => activeId.value && setDraft(activeId.value, v),
+  get: () => active.value?.body ?? '',
+  set: v => setStoryDraft({ body: v }),
 })
 
 /*
- * "Släng utkast": the one way to lose a Snacket draft on purpose (closing
- * always keeps it). Asked first, with "Behåll" focused; Escape there just
- * keeps it. Never while a post is on its way.
+ * "Släng utkast": the one way to lose a draft on purpose (closing always
+ * keeps it): the Snacket draft, or the one Story draft that's open. Asked
+ * first, with "Behåll" focused; Escape there just keeps it. Never while a
+ * post is on its way.
  */
 const discarding = ref(false)
 /** What screen readers last heard about the draft. */
@@ -59,6 +76,12 @@ function keepDraft() {
 
 function confirmDiscard() {
   if (publishing.value) return
+  if (mode.value === 'story') {
+    // This draft only; nothing is left of it to write in, so back to where it was chosen from.
+    removeActive()
+    discarding.value = false
+    return back()
+  }
   discardPost()
   discarding.value = false
   restored.value = false
@@ -84,7 +107,8 @@ watch(mode, async (now, before) => {
     if (!el.open) el.showModal()
     document.documentElement.classList.add('dialog-open')
     await nextTick()
-    composer.value?.focus()
+    if (composer.value) composer.value.focus()
+    else list.value?.focus()
   }
   else if (el.open) {
     el.close()
@@ -129,8 +153,16 @@ function onPublished(id: string, text: string) {
   discarding.value = false
   published.value = { id, text }
   // The composer already emptied the Snacket draft (text and Story); the sport stays for next time.
-  if (activeId.value) setDraft(activeId.value, '')
+  // A Story draft goes, that one only; any other about the same Story stays.
+  if (mode.value === 'story') removeActive()
   nextTick(() => document.getElementById('compose-done')?.focus())
+}
+
+/** Back to the list a Story draft was chosen from, or closed. */
+function back() {
+  const from = listedFrom.value
+  if (from && storyDrafts.value.length) openDrafts(from.storyId)
+  else close()
 }
 
 /** To Snacket: about this Story, or the post just published (at the top, on Nyast). */
@@ -169,12 +201,16 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
       <div class="dialog-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-3 sm:px-7 sm:pb-7 sm:pt-5">
         <div class="flex items-center justify-between gap-3">
           <h2 id="compose-title" class="kicker text-guld">
-            {{ published ? 'Publicerat' : mode === 'story' ? 'Snacka om detta' : 'Snacka om det' }}
+            {{ published ? 'Publicerat' : mode === 'drafts' ? (listedStory ? 'Dina utkast om detta' : 'Sparade utkast') : mode === 'story' ? 'Snacka om detta' : 'Snacka om det' }}
           </h2>
           <button class="grid size-9 place-items-center rounded-full text-krita-dim transition enabled:hover:bg-white/10 enabled:hover:text-krita disabled:opacity-40" aria-label="Stäng (ditt utkast sparas)" :disabled="publishing" @click="dismiss">
             <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
         </div>
+
+        <button v-if="mode === 'story' && listedFrom && !published" type="button" class="mt-1 text-xs font-semibold text-krita-dim hover:text-krita" :disabled="publishing" @click="openDrafts(listedFrom.storyId)">
+          <span aria-hidden="true">←</span> {{ listedFrom.storyId ? 'Dina utkast om detta' : 'Sparade utkast' }}
+        </button>
 
         <!-- The Story, in miniature -->
         <div v-if="story && lead && mode === 'story'" class="mt-3 rounded-2xl border border-white/10 bg-navy-950/60 p-4">
@@ -187,11 +223,38 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
             {{ story.sources.length }} {{ story.sources.length === 1 ? 'källa' : 'källor' }} ·
             <a :href="lead.url" target="_blank" rel="noopener" class="underline decoration-white/30 underline-offset-2 hover:text-krita">läs hos {{ lead.outlet }} ↗</a>
           </p>
+          <!-- What the supporter chose is kept as chosen; the Story just shows another headline now -->
+          <p v-if="state?.kind === 'attached' && state.changed && !published" class="mt-2 border-t border-white/8 pt-2 text-xs text-krita-dim">
+            Storyn har ändrats sedan du började skriva.
+            <template v-if="active?.headline">Du skrev om ”{{ active.headline }}”{{ active.outlet ? ` (${active.outlet})` : '' }}, som finns kvar i Storyn.</template>
+          </p>
         </div>
 
-        <template v-if="!published">
+        <!-- Story drafts to choose from: each its own, never merged -->
+        <template v-if="mode === 'drafts'">
+          <p id="compose-note" class="mt-2 text-sm text-krita-dim">
+            <template v-if="listedStory">Du har {{ listed.length }} utkast om den här Storyn. Välj vilket du vill fortsätta – de hålls isär.</template>
+            <template v-else>Dina utkast om Stories. Nyheterna ändras, så en del kan behöva en ny Story eller din bekräftelse innan de publiceras.</template>
+          </p>
+          <StoryDraftList v-if="listed.length" ref="list" class="mt-4" :drafts="listed" :stories="stories" :news="news" @open="openDraft" />
+          <p v-else class="mt-4 text-sm text-krita-dim">Inga sparade utkast just nu.</p>
+        </template>
+
+        <template v-else-if="!published">
           <p v-if="restored && identity.kind !== 'guest' && (mode === 'story' ? draft : post.body.trim())" class="mt-3 text-xs font-semibold text-guld">Ditt utkast finns kvar.</p>
-          <PostComposer v-if="mode === 'story'" ref="composer" v-model:body="draft" :story="story" class="mt-3" @published="onPublished" />
+          <PostComposer
+            v-if="mode === 'story' && active"
+            ref="composer"
+            about
+            :body="active.body"
+            :sport="active.sport"
+            :attachment="draftAttachment(active)"
+            class="mt-3"
+            @update:body="setStoryDraft({ body: $event })"
+            @update:sport="setStoryDraft({ sport: $event })"
+            @update:attachment="setStoryDraft(attachmentPatch($event))"
+            @published="onPublished"
+          />
           <PostComposer
             v-else
             ref="composer"
@@ -206,8 +269,8 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
           />
           <div class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-krita-dim">
             <p id="compose-note">Ditt utkast sparas medan du skriver. Publicerade inlägg syns för alla i Snacket på stan.</p>
-            <!-- Throwing the Snacket draft away, on purpose: asked first, never while it's being published -->
-            <template v-if="mode === 'post' && identity.kind !== 'guest' && (discarding || keepsPostDraft(post))">
+            <!-- Throwing this draft away, on purpose: asked first, never while it's being published -->
+            <template v-if="identity.kind !== 'guest' && (discarding || (mode === 'post' ? keepsPostDraft(post) : !!active?.body.trim()))">
               <span v-if="discarding" role="group" aria-labelledby="discard-question" class="flex flex-wrap items-center gap-x-3 gap-y-1" @keydown.esc.prevent.stop="keepDraft">
                 <span id="discard-question" class="font-semibold text-krita">Släng utkastet för gott?</span>
                 <button ref="discardYes" type="button" class="font-bold text-rod hover:underline disabled:opacity-40" :disabled="publishing" @click="confirmDiscard">Släng utkast</button>
