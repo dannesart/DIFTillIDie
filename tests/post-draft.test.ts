@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Story } from '../shared/types/domain'
 import { discardPostDraft, emptyPostDraft, keepsPostDraft, POST_DRAFT_KEY, postDraftPreview, readPostDraft, startPostDraft, withMention, writePostDraft } from '../app/lib/postDraft'
 
 /*
@@ -93,16 +94,26 @@ describe('reading what storage holds', () => {
   })
 })
 
+// The Story you're browsing: a fresh draft starts attached to it, with the article its headline is from
+const BROWSED: Story = {
+  id: 'story-t-1', sport: 'hockey', leadId: 'sportbladet-2', sharedNames: [], updatedAt: '2026-11-13T10:00:00Z',
+  sources: [
+    { id: 'bollsvenskan-1', sourceId: 'b', outlet: 'Bollsvenskan', publisher: 'Bollsvenskan', headline: 'Först ut', url: 'https://e.se/1', publishedAt: '2026-11-13T08:00:00Z', sport: 'hockey', reporting: 'compiled' },
+    { id: 'sportbladet-2', sourceId: 's', outlet: 'Sportbladet', publisher: 'Aftonbladet', headline: 'Rubriken som visas', url: 'https://e.se/2', publishedAt: '2026-11-13T10:00:00Z', sport: 'hockey', reporting: 'original' },
+  ],
+}
+const BROWSED_ATTACHMENT = { storyId: 'story-t-1', leadId: 'sportbladet-2', headline: 'Rubriken som visas', outlet: 'Sportbladet' }
+
 describe('opening the composer', () => {
   it('leaves a draft in progress exactly as it was', () => {
     const d = { body: 'Halvskrivet', sport: 'hockey' as const, storyId: 'story-1' }
-    expect(startPostDraft(d, { sport: 'fotboll', storyId: 'story-2' })).toBe(d)
+    expect(startPostDraft(d, { sport: 'fotboll', story: BROWSED })).toBe(d)
     const storyOnly = { body: '', storyId: 'story-1' }
-    expect(startPostDraft(storyOnly, { storyId: 'story-2' })).toBe(storyOnly)
+    expect(startPostDraft(storyOnly, { story: BROWSED })).toBe(storyOnly)
   })
 
-  it('starts a fresh one from what you’re browsing', () => {
-    expect(startPostDraft(emptyPostDraft(), { sport: 'hockey', storyId: 'story-2' })).toEqual({ body: '', sport: 'hockey', storyId: 'story-2' })
+  it('starts a fresh one from what you’re browsing, with that Story’s lead article and headline', () => {
+    expect(startPostDraft(emptyPostDraft(), { sport: 'hockey', story: BROWSED })).toEqual({ body: '', sport: 'hockey', ...BROWSED_ATTACHMENT })
     expect(startPostDraft(emptyPostDraft(), {})).toEqual({ body: '', sport: undefined, storyId: undefined })
   })
 
@@ -168,7 +179,7 @@ describe('throwing a draft away (Släng utkast)', () => {
 
   it('the next post starts fresh from what you’re browsing, with the sport kept', () => {
     const after = discardPostDraft({ body: 'Slängt', sport: 'hockey', storyId: 'story-1' })
-    expect(startPostDraft(after, { sport: 'fotboll', storyId: 'story-2' })).toEqual({ body: '', sport: 'hockey', storyId: 'story-2' })
+    expect(startPostDraft(after, { sport: 'fotboll', story: BROWSED })).toEqual({ body: '', sport: 'hockey', ...BROWSED_ATTACHMENT })
   })
 })
 

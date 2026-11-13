@@ -3,13 +3,15 @@ import type { Sport, Story } from '#shared/types/domain'
 import type { PublicAuthor } from '#shared/utils/profile'
 import { focusDestination } from '~/lib/composerState'
 import { insertMention, matchSupporters } from '~/lib/mentions'
+import type { DraftAttachment } from '~/lib/postDraft'
+import { attachmentFrom, newsLoad, resolveAttachment } from '~/lib/postDraft'
 import { POST_MAX, postLength } from '~/lib/posts'
 import { createCaretLookup, createInlineLookup } from '~/lib/storyLookup'
 
 /*
  * The one post composer, in the compose dialog (ComposeDialog), two ways:
  *  - a Snacket post: text, sport and attached Story are the dialog's draft
- *    (v-model:body, v-model:sport, v-model:story-id), so closing keeps them;
+ *    (v-model:body, v-model:sport, v-model:attachment), so closing keeps them;
  *  - about a Story ("Snacka om detta"): `story` locks the attachment and
  *    the text is bound to that Story's draft via v-model:body.
  *
@@ -20,13 +22,13 @@ import { createCaretLookup, createInlineLookup } from '~/lib/storyLookup'
 const props = defineProps<{ story?: Story }>()
 const body = defineModel<string>('body', { default: '' })
 const sport = defineModel<Sport | undefined>('sport')
-const storyId = defineModel<string | undefined>('storyId')
+const attachment = defineModel<DraftAttachment | undefined>('attachment')
 const emit = defineEmits<{ published: [postId: string, text: string] }>()
 
 const { me, identity, publish } = useSnacket()
 const { status: authStatus } = useAuth()
 const { publishing } = useCommunity()
-const { stories } = useNews()
+const { stories, status: newsStatus } = useNews()
 const accountOpen = useAccountDialog()
 
 const error = ref<string | null>(null)
@@ -35,7 +37,28 @@ const textarea = useTemplateRef<HTMLTextAreaElement>('textarea')
 const hintId = useId()
 
 const aboutStory = computed(() => !!props.story)
-const attached = computed(() => props.story ?? findStory(stories.value, storyId.value))
+/*
+ * The draft's Story (Issue #25): the article the supporter chose, in whichever live Story holds it now.
+ * One that can't be confirmed (gone, news loading or unavailable, an old draft's not yet confirmed) stays
+ * shown with its choices and is never dropped: publishing refuses it (useSnacket.publish).
+ */
+const state = computed(() => (props.story
+  ? { kind: 'attached' as const, story: props.story, changed: false }
+  : resolveAttachment(attachment.value, stories.value, newsLoad(newsStatus.value))))
+const attached = computed(() => (state.value.kind === 'attached' ? state.value.story : undefined))
+const unconfirmed = computed(() => !aboutStory.value && state.value.kind !== 'none' && state.value.kind !== 'attached')
+const unconfirmedLabel = computed(() => {
+  const s = state.value
+  if (s.kind === 'confirm') return `Om: ”${leadOf(s.story).headline}”?`
+  const a = attachment.value
+  return a?.headline ? `Om: ”${a.headline}”${a.outlet ? ` (${a.outlet})` : ''}` : 'En tidigare vald Story'
+})
+const unconfirmedNote = computed(() => ({
+  confirm: 'Utkastet är äldre än den här kontrollen. Bekräfta att inlägget gäller den här Storyn innan du publicerar.',
+  missing: 'Storyn finns inte längre i nyhetsflödet.',
+  loading: 'Nyheterna laddas…',
+  unavailable: 'Nyheterna kunde inte hämtas just nu.',
+} as Record<string, string>)[state.value.kind] ?? '')
 /** Guests can't publish, so they aren't handed a text box that would only pretend to. */
 const canWrite = computed(() => identity.value.kind !== 'guest')
 
@@ -56,6 +79,8 @@ function onFocusOut(e: FocusEvent) {
   picking.value = false
 }
 watch(body, () => (error.value = null))
+// Choosing, confirming or removing the Story answers a refusal about it
+watch(attachment, () => (error.value = null), { deep: true })
 
 /*
  * Attaching a Story (one per post), from the Stories already loaded:
@@ -67,7 +92,7 @@ watch(body, () => (error.value = null))
  * Not in a Story's own dialog (that Story is the attachment), and quiet
  * while a Story is attached, so hashtags are just hashtags.
  */
-const lookup = createInlineLookup({ stories: () => stories.value, enabled: () => !aboutStory.value && !attached.value })
+const lookup = createInlineLookup({ stories: () => stories.value, enabled: () => !aboutStory.value && state.value.kind === 'none' })
 const lookupId = `${hintId}-stories`
 const lookupList = useTemplateRef<{ optionId: (i: number) => string }>('lookupList')
 const picking = ref(false)
@@ -106,7 +131,7 @@ function choosePerson(p: PublicAuthor) {
 }
 
 function attach(story: Story) {
-  storyId.value = story.id
+  attachment.value = attachmentFrom(story)
   picking.value = false
   attachNews.value = `Bifogad: ${leadOf(story).headline}`
 }
@@ -147,10 +172,17 @@ function choosePicked(story: Story) {
 }
 
 function detach() {
-  storyId.value = undefined
+  attachment.value = undefined
   attachNews.value = 'Storyn är inte längre bifogad.'
   // The ✕ is gone; keep focus in the composer, on the way to attach another.
   nextTick(() => bifoga.value?.focus())
+}
+
+/** An old draft's Story, confirmed: from now on it's the article it shows. */
+function confirmOld() {
+  if (state.value.kind !== 'confirm') return
+  attach(state.value.story)
+  nextTick(() => textarea.value?.focus())
 }
 
 function closePicker() {
@@ -178,8 +210,10 @@ async function submit() {
   error.value = null
   const r = await publish(body.value, {
     sport: props.story?.sport ?? sport.value,
-    // Only a Story still among the loaded ones (an old draft's may have gone).
-    storyId: props.story?.id ?? (attached.value ? storyId.value : undefined),
+    // What the post is about, checked again right before sending: never dropped if it can't be confirmed.
+    story: props.story,
+    attachment: props.story ? undefined : attachment.value,
+    news: newsLoad(newsStatus.value),
     keepView: aboutStory.value,
   })
   if (!r.ok) {
@@ -189,7 +223,7 @@ async function submit() {
   }
   body.value = ''
   if (!aboutStory.value) {
-    storyId.value = undefined
+    attachment.value = undefined
     lookup.close()
     picking.value = false
     attachNews.value = ''
@@ -311,8 +345,21 @@ defineExpose({ focus })
           <span class="truncate">Om: {{ leadOf(attached).headline }}</span>
           <button type="button" class="ml-0.5 shrink-0 opacity-70 hover:opacity-100" aria-label="Ta bort kopplingen till Storyn" @click="detach">✕</button>
         </span>
+        <p v-if="state.kind === 'attached' && state.changed" class="w-full text-xs text-krita-dim">
+          Storyn har ändrats: artikeln du valde finns kvar, men Storyn visar nu en annan rubrik.
+        </p>
+        <!-- A chosen Story that can't be confirmed now: shown as it was chosen, never dropped -->
+        <div v-if="unconfirmed" class="w-full rounded-2xl border border-dashed border-white/15 px-3 py-2.5 text-xs text-krita-dim">
+          <p class="break-words font-semibold text-krita"><span aria-hidden="true">📎</span> {{ unconfirmedLabel }}</p>
+          <p class="mt-0.5" role="status">{{ unconfirmedNote }}</p>
+          <div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+            <button v-if="state.kind === 'confirm'" type="button" class="font-bold text-himmel hover:underline" @click="confirmOld">Ja, den här Storyn</button>
+            <button ref="bifoga" type="button" class="font-semibold hover:text-krita" :aria-expanded="picking" @click="picking = !picking">Välj Story igen</button>
+            <button type="button" class="font-semibold hover:text-rod" @click="detach">Ta bort kopplingen</button>
+          </div>
+        </div>
         <button
-          v-else
+          v-else-if="!attached"
           ref="bifoga"
           type="button"
           class="chip border-white/12 text-krita-dim outline-none hover:text-krita focus-visible:border-himmel"
