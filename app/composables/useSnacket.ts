@@ -5,7 +5,6 @@ import { resolveIdentity } from '~/lib/localScope'
 import type { FeedSort } from '~/lib/feedSort'
 import type { CommunityPost, PublishResult } from '~/lib/posts'
 import type { DraftAttachment, NewsLoad } from '~/lib/postDraft'
-import { attachmentFrom } from '~/lib/postDraft'
 
 /*
  * Snacket på stan: real posts by signed-in supporters, from Supabase,
@@ -102,19 +101,18 @@ export function useSnacket() {
    * Nyast, so the new post is in view (at the top);
    * `keepView` leaves them, for posting from a Story.
    *
-   * What the post is about: `story` (writing about that Story) or the draft's
-   * `attachment`. Either way it's checked against the Stories as they are now,
+   * What the post is about: its draft's `attachment` (a Snacket draft's or a
+   * Story draft's). It's checked against the Stories as they are now,
    * right before sending (community.publish); an attachment that can't be
    * confirmed refuses the post, never publishes it without its Story.
    * `news`: how the news stands where the post was written, to say why.
    */
-  async function publish(body: string, opts: { sport?: Sport, story?: Story, attachment?: DraftAttachment, news?: NewsLoad, keepView?: boolean } = {}): Promise<PublishResult> {
+  async function publish(body: string, opts: { sport?: Sport, attachment?: DraftAttachment, news?: NewsLoad, keepView?: boolean } = {}): Promise<PublishResult> {
     if (identity.value.kind !== 'member') return { ok: false, message: 'Logga in och välj ditt läktarnamn för att publicera.' }
     // The Story goes along as the server's signed capture; see app/lib/posts.ts.
-    const attachment = opts.story ? attachmentFrom(opts.story) : opts.attachment
     const stories = news.value?.stories ?? []
     const loaded: NewsLoad = news.value?.generatedAt ? 'ready' : 'loading'
-    const r = await community.publish({ body, sport: opts.sport, attach: { attachment, stories, news: opts.news ?? loaded } })
+    const r = await community.publish({ body, sport: opts.sport, attach: { attachment: opts.attachment, stories, news: opts.news ?? loaded } })
     const keepView = opts.keepView
     if (r.ok && !keepView) {
       filter.value = {}

@@ -38,7 +38,11 @@ const text = (v: unknown, max: number) => (typeof v === 'string' && v ? v.slice(
 
 /** One owner's draft; only what a draft can hold survives, anything else starts fresh. */
 export function readPostDraft(storage: Pick<Storage, 'getItem'> | undefined, owner: LocalOwner): PostDraft {
-  const raw = readScoped<Record<string, unknown>>(storage, scopedKey(POST_DRAFT_KEY, owner), () => ({}))
+  return cleanPostDraft(readScoped<Record<string, unknown>>(storage, scopedKey(POST_DRAFT_KEY, owner), () => ({})))
+}
+
+/** What a stored draft can hold, from whatever was stored: text where text belongs, at sane lengths. */
+export function cleanPostDraft(raw: Record<string, unknown>): PostDraft {
   return {
     body: typeof raw.body === 'string' ? raw.body : '',
     sport: SPORTS.includes(raw.sport as string) ? raw.sport as Sport : undefined,
@@ -55,7 +59,8 @@ export function draftAttachment(d: DraftAttachment): DraftAttachment | undefined
   return { storyId: d.storyId, leadId: d.leadId, headline: d.headline, outlet: d.outlet }
 }
 
-const leadArticle = (s: Story) => s.sources.find(a => a.id === s.leadId) ?? s.sources[0]!
+/** The article whose headline a Story shows. */
+export const leadArticle = (s: Story) => s.sources.find(a => a.id === s.leadId) ?? s.sources[0]!
 
 /** Choosing a Story: its id, the article whose headline it shows now, and that headline and outlet. */
 export function attachmentFrom(story: Story): DraftAttachment {

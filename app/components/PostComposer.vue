@@ -12,14 +12,16 @@ import { createCaretLookup, createInlineLookup } from '~/lib/storyLookup'
  * The one post composer, in the compose dialog (ComposeDialog), two ways:
  *  - a Snacket post: text, sport and attached Story are the dialog's draft
  *    (v-model:body, v-model:sport, v-model:attachment), so closing keeps them;
- *  - about a Story ("Snacka om detta"): `story` locks the attachment and
- *    the text is bound to that Story's draft via v-model:body.
+ *  - about a Story ("Snacka om detta", `about`): a Story draft, bound the
+ *    same way. While its Story is there it's written about that Story, which
+ *    the dialog shows; when it can't be confirmed, it's recovered here like
+ *    any attachment: confirmed, chosen again or removed.
  *
  * Writing here means publishing for real, so it's only offered to someone
  * who can publish: signed-out visitors get a way to sign in instead. A post
  * is only "out" once Supabase has confirmed it; on failure the text stays.
  */
-const props = defineProps<{ story?: Story }>()
+const props = defineProps<{ about?: boolean }>()
 const body = defineModel<string>('body', { default: '' })
 const sport = defineModel<Sport | undefined>('sport')
 const attachment = defineModel<DraftAttachment | undefined>('attachment')
@@ -36,17 +38,16 @@ const form = useTemplateRef<HTMLFormElement>('form')
 const textarea = useTemplateRef<HTMLTextAreaElement>('textarea')
 const hintId = useId()
 
-const aboutStory = computed(() => !!props.story)
 /*
  * The draft's Story (Issue #25): the article the supporter chose, in whichever live Story holds it now.
  * One that can't be confirmed (gone, news loading or unavailable, an old draft's not yet confirmed) stays
  * shown with its choices and is never dropped: publishing refuses it (useSnacket.publish).
  */
-const state = computed(() => (props.story
-  ? { kind: 'attached' as const, story: props.story, changed: false }
-  : resolveAttachment(attachment.value, stories.value, newsLoad(newsStatus.value))))
+const state = computed(() => resolveAttachment(attachment.value, stories.value, newsLoad(newsStatus.value)))
 const attached = computed(() => (state.value.kind === 'attached' ? state.value.story : undefined))
-const unconfirmed = computed(() => !aboutStory.value && state.value.kind !== 'none' && state.value.kind !== 'attached')
+/** Writing about the Story the dialog shows: a Story draft whose Story is there. */
+const aboutStory = computed(() => !!props.about && !!attached.value)
+const unconfirmed = computed(() => state.value.kind !== 'none' && state.value.kind !== 'attached')
 const unconfirmedLabel = computed(() => {
   const s = state.value
   if (s.kind === 'confirm') return `Om: ”${leadOf(s.story).headline}”?`
@@ -209,12 +210,11 @@ async function submit() {
   if (!me.value || publishing.value || !body.value.trim() || left.value < 0) return
   error.value = null
   const r = await publish(body.value, {
-    sport: props.story?.sport ?? sport.value,
+    sport: aboutStory.value ? attached.value!.sport : sport.value,
     // What the post is about, checked again right before sending: never dropped if it can't be confirmed.
-    story: props.story,
-    attachment: props.story ? undefined : attachment.value,
+    attachment: attachment.value,
     news: newsLoad(newsStatus.value),
-    keepView: aboutStory.value,
+    keepView: props.about,
   })
   if (!r.ok) {
     // The text, sport and Story stay exactly as they were.
@@ -222,12 +222,11 @@ async function submit() {
     return
   }
   body.value = ''
-  if (!aboutStory.value) {
-    attachment.value = undefined
-    lookup.close()
-    picking.value = false
-    attachNews.value = ''
-  }
+  // A published Story draft is removed as a whole; the dialog still shows what it was about.
+  if (!props.about) attachment.value = undefined
+  lookup.close()
+  picking.value = false
+  attachNews.value = ''
   emit('published', r.post.id, r.post.body)
 }
 

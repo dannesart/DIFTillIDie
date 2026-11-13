@@ -3,6 +3,7 @@ import type { FeedSort } from '~/lib/feedSort'
 import { createFeedSort, engagement } from '~/lib/feedSort'
 import { draftAttachment, newsLoad, postDraftPreview, resolveAttachment } from '~/lib/postDraft'
 import { postAnchor } from '~/lib/reveal'
+import { draftsToRecover } from '~/lib/storyDrafts'
 
 /*
  * Snacket på stan: posts, reactions and comments by signed-in supporters,
@@ -55,6 +56,9 @@ const draftText = computed(() => {
   return postDraftPreview(d, s.kind === 'attached' || s.kind === 'confirm' ? leadOf(s.story).headline : d.headline)
 })
 
+/** Story drafts no Story leads to any more (Issue #25): found here, so none is ever out of reach. */
+const toRecover = computed(() => (identity.value.kind === 'guest' ? [] : draftsToRecover(compose.storyDrafts.value, stories.value, newsLoad(newsStatus.value))))
+
 function mention(handle: string) {
   // Guests are invited to sign in, as before; there's nothing to write with yet.
   if (identity.value.kind === 'guest') accountOpen.value = true
@@ -99,6 +103,18 @@ function mention(handle: string) {
               <span v-else class="block text-base text-krita-dim">Vad snackas det om på stan?</span>
             </span>
             <span aria-hidden="true" class="shrink-0 rounded-full bg-himmel px-4 py-2 text-sm font-bold text-navy-950">{{ draftText ? 'Fortsätt' : 'Skriv' }}</span>
+          </button>
+          <!-- Story drafts whose Story is gone, changed or unconfirmed: a separate list, never the draft above -->
+          <button
+            v-if="toRecover.length"
+            type="button"
+            class="mt-2 flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl border border-dashed border-white/15 px-4 py-2.5 text-left text-sm transition hover:border-guld/50"
+            aria-haspopup="dialog"
+            @click="compose.openDrafts()"
+          >
+            <span class="font-semibold text-guld">Sparade utkast</span>
+            <span class="min-w-0 flex-1 text-krita-dim">{{ toRecover.length }} {{ toRecover.length === 1 ? 'utkast om en Story att se över' : 'utkast om Stories att se över' }}</span>
+            <span class="text-xs font-bold text-krita">Visa <span aria-hidden="true">→</span></span>
           </button>
 
           <div v-if="hasFilter || all.length" class="mt-6 flex flex-wrap items-center justify-between gap-3">

@@ -62,7 +62,7 @@ Everything in Snacket på stan is real and stored in Supabase (see [snacket-post
 | Auth still restoring | A moment's wait; no local content shown. |
 
 - **Still local and per owner:**
-  - **Story drafts.** The guest keeps `djurgarn:drafts:v1`, and each account has `djurgarn:drafts:v1:account:<user id>`. Switching account clears a half-typed comment and closes an open compose dialog.
+  - **Story drafts** ("Snacka om detta"; Issue #25). Each draft has its own id and keeps the article it chose, under `djurgarn:story-drafts:v2` for the guest and `djurgarn:story-drafts:v2:account:<user id>` for each account. Older drafts, one text per Story id under `djurgarn:drafts:v1` (and `:account:<user id>`), are still read from there and never written or deleted. The v2 store records which ones it has taken over, in the same write (see `app/lib/storyDrafts.ts`). Switching account clears a half-typed comment and closes an open compose dialog.
   - **The Snacket draft** (text, sport, attached Story; see [snacket-posts.md](snacket-posts.md)) works the same way: `djurgarn:post-draft:v1` for the guest, `djurgarn:post-draft:v1:account:<user id>` for each account.
   - **Posts written before Snacket became real**, under `djurgarn:snacket:v1` (guest) or `djurgarn:snacket:v1:account:<user id>`, are **dormant**: the app no longer reads them, and never publishes, migrates or deletes them.
 
