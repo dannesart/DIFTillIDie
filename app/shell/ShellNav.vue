@@ -48,7 +48,8 @@ const accountLabel = computed(() => {
           <NuxtLink
             :to="links.view(s.id)"
             :aria-current="links.here(s.id) ? 'page' : undefined"
-            class="group relative flex items-center gap-3.5 rounded-2xl px-3 py-2.5 text-[0.95rem] font-semibold transition-colors"
+            v-ripple="'himmel'"
+            class="group relative flex items-center gap-3.5 rounded-2xl px-3 py-2.5 [--press:0.98] text-[0.95rem] font-semibold transition-colors"
             :class="links.here(s.id) ? 'bg-white/[0.07] text-krita' : 'text-krita-dim hover:bg-white/[0.04] hover:text-krita'"
           >
             <!-- The active marker: a short club stripe -->

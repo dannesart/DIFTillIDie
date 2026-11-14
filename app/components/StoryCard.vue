@@ -125,7 +125,8 @@ watch(talk, (n, old) => {
     <!-- Every Story invites a conversation -->
     <div class="relative mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
       <button
-        class="talk-button inline-flex items-center gap-2 rounded-full border border-guld/40 px-4 py-2 text-sm font-bold text-guld transition duration-300 hover:border-guld hover:bg-guld/10"
+        v-ripple
+        class="talk-button relative inline-flex items-center gap-2 rounded-full border border-guld/40 px-4 py-2 text-sm font-bold text-guld transition duration-300 hover:border-guld hover:bg-guld/10"
         aria-haspopup="dialog"
         @click="writeAbout"
       >

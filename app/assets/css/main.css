@@ -241,6 +241,39 @@
 .animate-pop { animation: pop 0.45s var(--ease-spring); }
 .animate-rise { animation: rise 0.8s var(--ease-out-expo) both; }
 
+/*
+ * v-ripple (app/plugins/ripple.ts): pressing answers at once with a slight
+ * press-in, and a soft glow spreads from where you pressed. Both off with
+ * reduced motion; focus rings are untouched (outline/box-shadow aren't clipped).
+ */
+.ripple-host { -webkit-tap-highlight-color: transparent; }
+.ripple-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ripple-dot {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(circle closest-side, color-mix(in srgb, var(--ripple, currentColor) 32%, transparent), transparent);
+  animation: ripple 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+/* Spreads fast, stays a beat, then fades. */
+@keyframes ripple {
+  0% { transform: scale(0.2); opacity: 1; }
+  45% { opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ripple-host {
+    transition-property: color, background-color, border-color, opacity, scale, translate;
+    transition-duration: 150ms;
+  }
+  .ripple-host:active { scale: var(--press, 0.96); transition-duration: 60ms; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
