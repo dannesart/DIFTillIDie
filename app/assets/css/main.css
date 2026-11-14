@@ -185,7 +185,7 @@
   }
 
   .card {
-    @apply rounded-3xl border border-white/8 bg-navy-900/70 backdrop-blur-sm;
+    @apply rounded-3xl border border-transparent bg-navy-900/70 backdrop-blur-sm;
   }
 
   .chip {

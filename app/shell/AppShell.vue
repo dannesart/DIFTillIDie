@@ -123,7 +123,7 @@ useNuxtApp().hook('page:finish', async () => {
     </div>
 
     <!-- Fits any ordinary window; scrolls on its own only when it can't (a short window, with a podcast playing) -->
-    <aside v-if="screen.desktop.value" class="shell-scroll sticky top-0 hidden h-dvh overflow-y-auto border-r border-white/8 bg-natt/70 lg:block">
+    <aside v-if="screen.desktop.value" class="shell-scroll sticky top-0 hidden h-dvh overflow-y-auto border-r border-transparent bg-natt/70 lg:block">
       <ShellNav :hydrate-on-media-query="DESKTOP_QUERY" />
     </aside>
 
@@ -137,7 +137,7 @@ useNuxtApp().hook('page:finish', async () => {
 
     <aside
       v-if="screen.desktop.value"
-      class="hidden border-l border-white/8 bg-natt/40"
+      class="hidden border-l border-transparent bg-natt/40"
       :class="roomy ? '2xl:block' : 'xl:block'"
       aria-label="På gång"
     >
