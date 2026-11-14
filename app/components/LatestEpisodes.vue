@@ -28,7 +28,7 @@ const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('sv-SE', {
       <h2 :id="props.headingId" class="kicker text-krita-dim">Senaste avsnitten</h2>
       <NuxtLink :to="links.view('lyssna')" class="text-xs font-semibold text-himmel hover:underline">Alla poddar</NuxtLink>
     </div>
-    <ul class="mt-3 divide-y divide-white/6 rounded-3xl border border-white/8 bg-navy-900/50">
+    <ul class="mt-3 divide-y divide-white/6 rounded-3xl border border-transparent bg-navy-900/50">
       <li v-for="{ ep, show } in latest" :key="ep.id" class="flex items-center gap-3 p-3">
         <button
           class="grid size-9 shrink-0 place-items-center rounded-full transition hover:scale-105 active:scale-95 disabled:opacity-40"

@@ -53,7 +53,7 @@ watch(talk, (n, old) => {
 <template>
   <article
     :id="story.id"
-    class="card group relative flex scroll-mt-28 flex-col overflow-hidden transition duration-500 hover:border-himmel/30"
+    class="card group relative flex scroll-mt-28 flex-col overflow-hidden transition duration-500"
     :class="[lead ? 'p-6 sm:p-9' : 'p-6', spotlight === story.id && 'animate-spotlight']"
   >
     <!-- Lead story gets a quiet stripe field behind the title -->

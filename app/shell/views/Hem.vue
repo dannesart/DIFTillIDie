@@ -54,7 +54,7 @@ const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
   <div class="mx-auto max-w-4xl px-4 pb-24 sm:px-6 lg:max-w-7xl lg:pt-8">
     <div class="@container">
       <!-- A smaller hero: who we are, in one band -->
-      <section class="relative isolate mt-4 overflow-hidden rounded-[2rem] border border-white/8 bg-navy-900/60 px-6 py-7 sm:px-8 lg:mt-0">
+      <section class="relative isolate mt-4 overflow-hidden rounded-[2rem] border border-transparent bg-navy-900/60 px-6 py-7 sm:px-8 lg:mt-0">
         <div aria-hidden="true" class="grain absolute -right-10 -top-8 -z-10 h-56 w-56 rotate-[8deg] overflow-hidden rounded-[2rem] opacity-70">
           <div class="stripes absolute inset-0 [--stripe:22px]" />
           <div class="absolute inset-0 bg-gradient-to-l from-transparent via-navy-900/40 to-navy-900" />
