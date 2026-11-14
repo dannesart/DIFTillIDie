@@ -166,6 +166,8 @@ describe('every Story association goes through storyOfPost', () => {
   it('PostCard links the Story storyOfPost finds, and says so calmly when there is none', () => {
     const card = src('app/components/PostCard.vue')
     expect(card).toMatch(/const live = computed\(\(\) => storyOfPost\(stories\.value, props\.post\)\)/)
+    // A kept reference without a live Story is the original article, labelled so; an unreadable one says so in words.
+    expect(card).toContain("unlinked ? 'Artikel'")
     expect(card).toContain('Ingen aktuell Story kan kopplas säkert till det här inlägget.')
     expect(card).not.toMatch(/findStory\([^)]*post\.storyId/)
   })
