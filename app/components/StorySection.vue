@@ -73,7 +73,7 @@ const sourcesDown = computed(() => {
       </TransitionGroup>
 
       <div v-if="rest.length > INITIAL - 1" class="mt-8 text-center">
-        <button class="rounded-full border border-white/15 px-5 py-3 text-sm font-bold transition hover:-translate-y-0.5 hover:border-himmel hover:text-himmel" @click="expanded = !expanded">
+        <button v-ripple="'himmel'" class="relative rounded-full border border-white/15 px-5 py-3 text-sm font-bold transition hover:-translate-y-0.5 hover:border-himmel hover:text-himmel" @click="expanded = !expanded">
           {{ expanded ? 'Visa färre' : `Visa alla ${visible.length} stories` }}
         </button>
       </div>

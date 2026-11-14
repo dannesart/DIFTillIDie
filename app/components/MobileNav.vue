@@ -53,7 +53,7 @@ function tap(e: MouseEvent, id: SectionId) {
         <NuxtLink
           :to="links.view(item.id)"
           :aria-current="links.here(item.id) ? 'page' : undefined"
-          class="relative flex h-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold transition-colors motion-safe:active:scale-95"
+          v-ripple="'himmel'" class="relative flex h-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold transition-colors"
           :class="links.here(item.id) ? 'text-himmel' : 'text-krita-dim hover:text-krita'"
           @click="tap($event, item.id)"
         >
@@ -96,7 +96,7 @@ function tap(e: MouseEvent, id: SectionId) {
           v-if="entry.kind === 'profile'"
           :to="entry.to"
           :aria-current="onMine ? 'page' : undefined"
-          class="relative flex h-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold transition-colors motion-safe:active:scale-95"
+          v-ripple="'himmel'" class="relative flex h-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold transition-colors"
           :class="onMine ? 'text-himmel' : 'text-krita-dim hover:text-krita'"
         >
           <span
@@ -109,7 +109,7 @@ function tap(e: MouseEvent, id: SectionId) {
         </NuxtLink>
         <button
           v-else
-          class="relative flex h-full w-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold text-krita-dim transition-colors hover:text-krita motion-safe:active:scale-95"
+          v-ripple="'himmel'" class="relative flex h-full w-full flex-col items-center justify-center gap-1 text-[0.7rem] font-semibold text-krita-dim transition-colors hover:text-krita"
           aria-haspopup="dialog"
           @click="accountOpen = true"
         >
