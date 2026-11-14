@@ -26,8 +26,10 @@ describe('compiled reporting (Bollsvenskan)', () => {
     expect(new Set(match.sources.filter(s => s.outlet === 'Sportbladet').map(s => s.reporting))).toEqual(new Set(['original']))
   })
 
+  // The Degerfors match is two Stories of two (accepted trade-off, see grouping.test.ts): this one holds
+  // Sportbladet's report and Bollsvenskan's compilation of it.
   it('does not count compilations as independent reporting', () => {
-    expect(reportingCounts(match)).toEqual({ original: 2, compiled: 2, originalOutlets: ['Sportbladet'] })
+    expect(reportingCounts(match)).toEqual({ original: 1, compiled: 1, originalOutlets: ['Sportbladet'] })
   })
 
   it('leads with original reporting even when a compilation came first', () => {
@@ -68,12 +70,20 @@ describe('story id stability', () => {
     expect(after.id).toBe(before.id)
   })
 
+  // A newer article can no longer bridge two Stories (no chains), so the bridge here
+  // is an OLDER article that shows up late and links directly to both — it anchors the merged Story.
+  const bridge = { ...b, publishedAt: '2026-11-01T10:00:00.000Z' }
+
   it('still finds both earlier Stories after a bridging article merges them', () => {
     const separate = groupIntoStories([a, c])
     expect(separate).toHaveLength(2)
-    const merged = groupIntoStories([a, b, c])
+    const merged = groupIntoStories([a, bridge, c])
     expect(merged).toHaveLength(1)
     for (const old of separate) expect(storyAnswersTo(merged[0]!, old.id)).toBe(true)
+  })
+
+  it('does not let a newer article chain two Stories together', () => {
+    expect(groupIntoStories([a, b, c]).map(s => s.sources.map(x => x.id)).sort()).toEqual([[a.id, b.id], [c.id]].sort())
   })
 
   it('loses a reference once its article has left every feed (known limitation)', () => {
@@ -86,9 +96,10 @@ describe('story id stability', () => {
   })
 
   it('splits again when the bridging article leaves, and each part keeps its own id', () => {
-    const merged = groupIntoStories([a, b, c])[0]!
+    const merged = groupIntoStories([a, bridge, c])[0]!
+    expect(storyAnswersTo(merged, `story-${a.id}`)).toBe(true)
     const split = groupIntoStories([a, c])
-    expect(split.find(s => storyAnswersTo(s, merged.id))!.sources.map(s => s.id)).toEqual([a.id])
+    expect(split.find(s => storyAnswersTo(s, `story-${a.id}`))!.sources.map(s => s.id)).toEqual([a.id])
     expect(split.find(s => storyAnswersTo(s, `story-${c.id}`))!.sources.map(s => s.id)).toEqual([c.id])
   })
 })

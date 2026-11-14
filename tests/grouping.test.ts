@@ -7,16 +7,27 @@ describe('groupIntoStories on real feed data', () => {
   const stories = groupIntoStories(fixtureArticles())
   const storyWith = (headlineStart: string) => stories.find(s => s.sources.some(a => a.headline.startsWith(headlineStart)))!
 
-  it('groups the four reports of the Djurgården–Degerfors match from two outlets', () => {
-    const match = storyWith('Rosenqvist första mål')
-    expect(match.sources.map(a => a.headline)).toEqual([
+  // PRODUCT TRADE-OFF (#25): an article joins a Story only by linking directly to its oldest article, so
+  // the four Degerfors match reports become two Stories of two (only one report links to the oldest).
+  // We accept a duplicate-looking Story over chains that merge unrelated events.
+  it('shows the four reports of the Djurgården–Degerfors match as two Stories of two (accepted trade-off)', () => {
+    const goal = storyWith('Rosenqvist första mål')
+    expect(goal.sources.map(a => a.headline)).toEqual([
       'Rosenqvist första mål räddade Djurgården',
-      'Patrik Werner fick rött kort efter Degerfors förlust',
       'Djurgården höll undan och vann mot Degerfors: Rosenqvists första mål – rött kort på Werner efter frisparksbråk',
+    ])
+    expect(goal.sharedNames).toEqual(expect.arrayContaining(['Degerfors', 'Rosenqvist']))
+
+    const redCard = storyWith('Patrik Werner fick rött kort')
+    expect(redCard.sources.map(a => a.headline)).toEqual([
+      'Patrik Werner fick rött kort efter Degerfors förlust',
       'VAR-krav efter Djurgården–Degerfors – sportchef Werner utvisad efter nekad frispark',
     ])
-    expect(new Set(match.sources.map(a => a.outlet))).toEqual(new Set(['Sportbladet', 'Bollsvenskan']))
-    expect(match.sharedNames).toEqual(expect.arrayContaining(['Degerfors', 'Rosenqvist', 'Patrik Werner']))
+    expect(redCard.sharedNames).toEqual(expect.arrayContaining(['Degerfors', 'Patrik Werner']))
+
+    // Both outlets still appear, and no report is lost or doubled.
+    expect(new Set([...goal.sources, ...redCard.sources].map(a => a.outlet))).toEqual(new Set(['Sportbladet', 'Bollsvenskan']))
+    expect(goal.id).not.toBe(redCard.id)
   })
 
   it('leads with the earliest source\'s own headline, unchanged', () => {
