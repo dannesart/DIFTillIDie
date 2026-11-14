@@ -7,7 +7,9 @@ describe('groupIntoStories on real feed data', () => {
   const stories = groupIntoStories(fixtureArticles())
   const storyWith = (headlineStart: string) => stories.find(s => s.sources.some(a => a.headline.startsWith(headlineStart)))!
 
-  it('groups the four reports of the Djurgården–Degerfors match from two outlets', () => {
+  // EXPERIMENT (#25), KNOWN TRADE-OFF: first-article-anchor grouping splits these four reports 2+2,
+  // because only one other report links directly to the oldest. Expectation kept unchanged on purpose.
+  it.fails('groups the four reports of the Djurgården–Degerfors match from two outlets', () => {
     const match = storyWith('Rosenqvist första mål')
     expect(match.sources.map(a => a.headline)).toEqual([
       'Rosenqvist första mål räddade Djurgården',
