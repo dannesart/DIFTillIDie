@@ -11,8 +11,9 @@ import { canonicalUrl, fold, slugWords } from './news'
  *      places — capitalised words from headlines/teasers, minus generic ones),
  *   4. at least one of those shared names is in BOTH headlines.
  *
- * Linked articles form a Story (single-linkage). Anything we can't link
- * stays its own Story — a Story with one source is perfectly valid.
+ * EXPERIMENT (#25): a Story is its oldest article (the anchor) plus the
+ * articles linked DIRECTLY to it — no transitive chains. Anything we can't
+ * link stays its own Story — a Story with one source is perfectly valid.
  * We never write a headline: a source's own headline leads, preferring
  * original reporting over outlets that compile others' reporting.
  *
@@ -138,21 +139,22 @@ export function groupIntoStories(articles: SourceArticle[]): Story[] {
   const unique = [...new Map(articles.map(a => [canonicalUrl(a.url), a])).values()]
   const profiles = unique.map(profile)
 
-  // Union–find over linked pairs.
-  const parent = profiles.map((_, i) => i)
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)))
-  const edges = new Map<number, Set<string>>()
-  for (let i = 0; i < profiles.length; i++) {
-    for (let j = i + 1; j < profiles.length; j++) {
-      const shared = linked(profiles[i]!, profiles[j]!)
-      if (!shared) continue
-      parent[find(i)] = find(j)
-      for (const k of [i, j]) edges.set(k, new Set([...(edges.get(k) ?? []), ...shared]))
-    }
-  }
-
+  // EXPERIMENT (#25): oldest first, an article joins the Story of the first anchor it links to DIRECTLY;
+  // otherwise it anchors a new Story. No chains: A–B and B–C no longer put A and C together.
+  const order = profiles.map((_, i) => i)
+    .sort((x, y) => profiles[x]!.time - profiles[y]!.time || profiles[x]!.article.id.localeCompare(profiles[y]!.article.id))
   const clusters = new Map<number, number[]>()
-  profiles.forEach((_, i) => clusters.set(find(i), [...(clusters.get(find(i)) ?? []), i]))
+  const edges = new Map<number, Set<string>>()
+  for (const i of order) {
+    const anchor = [...clusters.keys()].find(k => linked(profiles[k]!, profiles[i]!))
+    if (anchor === undefined) {
+      clusters.set(i, [i])
+      continue
+    }
+    clusters.get(anchor)!.push(i)
+    const shared = linked(profiles[anchor]!, profiles[i]!)!
+    for (const k of [anchor, i]) edges.set(k, new Set([...(edges.get(k) ?? []), ...shared]))
+  }
 
   const stories: Story[] = [...clusters.values()].map((members) => {
     const sources = members.map(i => profiles[i]!.article).sort((a, b) => a.publishedAt.localeCompare(b.publishedAt) || a.id.localeCompare(b.id))

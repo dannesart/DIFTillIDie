@@ -156,7 +156,8 @@ describe('known gaps (#25): what a Story should do, and grouping does not yet', 
     expect(together(groupIntoStories(twoEvents), twoEvents[0]!, twoEvents[1]!)).toBe(false)
   })
 
-  it.fails('never puts the two ends of a chain, 40 hours and two events apart, in one Story', () => {
+  // EXPERIMENT (#25): passes with first-article-anchor grouping (no transitive chains).
+  it('never puts the two ends of a chain, 40 hours and two events apart, in one Story', () => {
     expect(together(groupIntoStories(chain), chain[0]!, chain[2]!)).toBe(false)
   })
 
