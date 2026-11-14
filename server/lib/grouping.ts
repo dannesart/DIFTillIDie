@@ -112,7 +112,7 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /**
  * "Patrik", "Werner" → "Patrik Werner" when a source writes them side by side, as whole words in one
  * headline or one teaser: a headline's last word and its teaser's first word, or two articles' texts,
- * are never side by side ("…entlediga Honkavaara" + "Maximilian Hahn…" is not "Honkavaara Maximilian").
+ * are never side by side ("…släppa Ekström" + "Tobias Lind…" is not "Ekström Tobias").
  */
 function joinFullNames(names: string[], articles: SourceArticle[]): string[] {
   const fields = articles.flatMap(a => [a.headline, a.excerpt ?? ''])
