@@ -1,5 +1,5 @@
 import type { SourceArticle, Story } from '../../shared/types/domain'
-import { canonicalUrl, fold } from './news'
+import { NEWS_SOURCES, canonicalUrl, fold } from './news'
 import type { Profile } from './grouping'
 import { MIN_SHARED, WINDOW_HOURS, namesIn, profile, sharedNames, toStories } from './grouping'
 
@@ -27,6 +27,52 @@ export interface Candidate {
   spanHours?: number
   /** Where event kinds are read: the headline only (default), or headline and teaser. */
   kindsFrom?: 'headline' | 'text'
+  /**
+   * Where the event-kind veto applies: between two linked articles only ('pair', default), or across a whole
+   * Story ('cluster': no Story ever holds two articles reporting different kinds of event, however they are
+   * connected). Only with link 'veto' or 'event'.
+   */
+  scope?: 'pair' | 'cluster'
+  /**
+   * 'isolate': an article that links, through articles of unknown kind, to two articles reporting different
+   * kinds of event (see ambiguousBridges) joins neither and stays its own Story. Requires scope 'cluster'.
+   */
+  bridges?: 'join' | 'isolate'
+}
+
+/** Two articles report different kinds of event: both have a known kind, and they share none. */
+const conflicts = (p: { kinds: Set<string> }, q: { kinds: Set<string> }) =>
+  p.kinds.size > 0 && q.kinds.size > 0 && ![...p.kinds].some(k => q.kinds.has(k))
+
+/**
+ * Articles that would have to choose between two incompatible events, whatever the time or order:
+ *  - an article of unknown kind is ambiguous when the articles of known kind it reaches conflict with each
+ *    other ("reaches": linked directly, or through a path of articles of unknown kind);
+ *  - an article of known kind is ambiguous when two articles it reaches that are compatible with it conflict
+ *    with each other (e.g. "sacked coach wanted by Finland" between a sacking and a national-team report).
+ * Reaching stops at articles of known kind: an article reporting its own event is evidence for that event,
+ * not a path through it. Depends only on the links, so it is the same for any input order.
+ */
+export function ambiguousBridges(ps: { kinds: Set<string> }[], link: (i: number, j: number) => boolean): Set<number> {
+  const n = ps.length
+  const out = new Set<number>()
+  for (let v = 0; v < n; v++) {
+    const reached: number[] = []
+    const seen = new Set([v])
+    const queue = [v]
+    while (queue.length) {
+      const x = queue.shift()!
+      for (let y = 0; y < n; y++) {
+        if (seen.has(y) || !link(x, y)) continue
+        seen.add(y)
+        if (ps[y]!.kinds.size) reached.push(y)
+        else queue.push(y)
+      }
+    }
+    const relevant = ps[v]!.kinds.size ? reached.filter(y => !conflicts(ps[v]!, ps[y]!)) : reached
+    if (relevant.some(x => relevant.some(y => conflicts(ps[x]!, ps[y]!)))) out.add(v)
+  }
+  return out
 }
 
 const WORD = /[\p{L}][\p{L}\p{M}'’-]*/gu
@@ -109,14 +155,36 @@ export function candidateLink(p: CProfile, q: CProfile, c: Candidate): string[] 
   return shared.length >= MIN_SHARED ? shared : null
 }
 
-/** Same article from two feeds counts once; which copy is kept doesn't depend on input order. */
+/**
+ * Which copy of one article (one canonical URL) is kept when feeds carry it more than once, possibly with a
+ * different headline, teaser, time or section. The policy, in order:
+ *  1. The earliest publication time: when the article first appeared. A later copy is usually a re-stamp by
+ *     another section feed, and keeping the first time stops a re-stamp from moving the article in time.
+ *  2. The feed configured first in NEWS_SOURCES (the configured priority), then any unconfigured feed by id.
+ *  3. The whole record, compared field by field, as a last resort: two copies that agree on all of the above
+ *     but differ in text are kept in a fixed, if arbitrary, order instead of whichever arrived first.
+ * A copy is always kept whole, never merged with another, so every source shown is one the feed published.
+ */
+const SOURCE_RANK = new Map(NEWS_SOURCES.map((s, i) => [s.id, i]))
+export function compareCopies(a: SourceArticle, b: SourceArticle): number {
+  const rank = (x: SourceArticle) => SOURCE_RANK.get(x.sourceId) ?? NEWS_SOURCES.length
+  const record = (x: SourceArticle) => [x.id, x.url, x.sport, x.headline, x.excerpt ?? '', x.outlet, x.publisher, x.reporting, x.legacyId ?? '']
+  const time = Date.parse(a.publishedAt) - Date.parse(b.publishedAt)
+  if (time) return time
+  if (rank(a) !== rank(b)) return rank(a) - rank(b)
+  if (a.sourceId !== b.sourceId) return a.sourceId < b.sourceId ? -1 : 1
+  const [ra, rb] = [record(a), record(b)]
+  for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i]! < rb[i]! ? -1 : 1
+  return 0
+}
+
+/** Same article from two feeds counts once; which copy is kept is decided by compareCopies, not input order. */
 export function canonicalArticles(articles: SourceArticle[]): SourceArticle[] {
   const byUrl = new Map<string, SourceArticle>()
-  const key = (a: SourceArticle) => `${a.id}\u0000${a.url}\u0000${a.sport}`
   for (const a of articles) {
     const u = canonicalUrl(a.url)
     const kept = byUrl.get(u)
-    if (!kept || key(a) < key(kept)) byUrl.set(u, a)
+    if (!kept || compareCopies(a, kept) < 0) byUrl.set(u, a)
   }
   return [...byUrl.values()].sort((a, b) => a.publishedAt.localeCompare(b.publishedAt) || a.id.localeCompare(b.id))
 }
@@ -125,6 +193,11 @@ export function groupWith(articles: SourceArticle[], c: Candidate): Story[] {
   const ps = canonicalArticles(articles).map(a => candidateProfile(a, c))
   const n = ps.length
   const links: (string[] | null)[][] = ps.map((p, i) => ps.map((q, j) => (i < j ? candidateLink(p, q, c) : null)))
+  if (c.bridges === 'isolate') {
+    // An ambiguous bridge keeps no links: it is its own Story, and it never connects anything else.
+    const ambiguous = ambiguousBridges(ps, (i, j) => i !== j && !!(i < j ? links[i]![j] : links[j]![i]))
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (ambiguous.has(i) || ambiguous.has(j)) links[i]![j] = null
+  }
   const link = (i: number, j: number) => (i < j ? links[i]![j] : links[j]![i])
   const cap = (c.spanHours ?? Infinity) * 3_600_000
 
@@ -143,6 +216,7 @@ export function groupWith(articles: SourceArticle[], c: Candidate): Story[] {
     hi[keep] = Math.max(hi[keep]!, hi[gone]!)
   }
   const fits = (a: number, b: number) => Math.max(hi[a]!, hi[b]!) - Math.min(lo[a]!, lo[b]!) <= cap
+    && (c.scope !== 'cluster' || !members.get(a)!.some(i => members.get(b)!.some(j => conflicts(ps[i]!, ps[j]!))))
 
   if (c.cluster === 'single') {
     // Closest links first (in time, then by position), so a span cap keeps the tightest Story.
@@ -202,5 +276,7 @@ export const CANDIDATES: Record<string, Candidate> = {
   'veto + single + 36h': { names: 'sentence', link: 'veto', cluster: 'single', spanHours: 36 },
   'event-only + single + 36h': { names: 'sentence', link: 'event-only', cluster: 'single', spanHours: 36 },
   'event + majority + 36h': { names: 'sentence', link: 'event', cluster: 'majority', spanHours: 36 },
+  'cluster veto + single + 36h': { names: 'sentence', link: 'veto', cluster: 'single', spanHours: 36, scope: 'cluster' },
+  'cluster veto + isolate + single + 36h': { names: 'sentence', link: 'veto', cluster: 'single', spanHours: 36, scope: 'cluster', bridges: 'isolate' },
 }
 
