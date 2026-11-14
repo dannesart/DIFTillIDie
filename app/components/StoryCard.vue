@@ -99,9 +99,6 @@ watch(talk, (n, old) => {
         </li>
       </ul>
       <p v-if="!lead && others.length > 2" class="mt-2 text-xs text-krita-dim">+ {{ others.length - 2 }} till</p>
-      <p v-if="story.sharedNames.length" class="mt-3 text-xs leading-relaxed text-krita-dim">
-        Samlade automatiskt för att de nämner samma namn inom ett dygn: <span class="text-krita">{{ story.sharedNames.join(', ') }}</span>.
-      </p>
     </div>
 
     <!-- Source pills: straight to each original article -->
