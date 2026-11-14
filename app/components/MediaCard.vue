@@ -9,7 +9,7 @@ const isSpotify = computed(() => props.item.embed?.includes('spotify.com'))
 </script>
 
 <template>
-  <article class="card group relative flex overflow-hidden transition duration-500 hover:-translate-y-1 hover:border-white/15" :class="large ? 'flex-col sm:flex-row' : 'flex-row items-stretch'">
+  <article class="card group relative flex overflow-hidden" :class="large ? 'flex-col sm:flex-row' : 'flex-row items-stretch'">
     <MediaCover :cover="item.cover" :title="item.title" :kind="item.kind" :class="large ? 'aspect-square sm:w-56 sm:shrink-0' : 'w-28 shrink-0 sm:w-36'" />
 
     <div class="flex min-w-0 flex-1 flex-col p-5 sm:p-6">

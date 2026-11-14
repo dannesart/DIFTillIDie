@@ -68,7 +68,7 @@ async function remove() {
 </script>
 
 <template>
-  <article class="card p-5 transition duration-300 hover:border-white/15" :class="post.own && 'border-himmel/30'">
+  <article class="card p-5">
     <!-- Wraps: on a narrow screen or with larger text, "Ta bort" (or "Ja, ta bort för alla") goes to its own line
          instead of out of the card, or of squeezing the name to a word per line. The author (avatar and name) stays
          together and wants 12rem, so it grows with the text (Issue #16). -->

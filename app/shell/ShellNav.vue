@@ -48,11 +48,10 @@ const accountLabel = computed(() => {
           <NuxtLink
             :to="links.view(s.id)"
             :aria-current="links.here(s.id) ? 'page' : undefined"
-            class="group relative flex items-center gap-3.5 rounded-2xl px-3 py-2.5 text-[0.95rem] font-semibold transition-colors"
+            v-ripple="'himmel'"
+            class="group relative flex items-center gap-3.5 rounded-2xl px-3 py-2.5 [--press:0.98] text-[0.95rem] font-semibold transition-colors"
             :class="links.here(s.id) ? 'bg-white/[0.07] text-krita' : 'text-krita-dim hover:bg-white/[0.04] hover:text-krita'"
           >
-            <!-- The active marker: a short club stripe -->
-            <span aria-hidden="true" class="stripes absolute inset-y-2 left-0 w-[3px] rounded-r-full [--stripe:4px] transition-opacity" :class="links.here(s.id) ? 'opacity-100' : 'opacity-0'" />
             <span :class="links.here(s.id) ? 'text-himmel' : ''"><NavIcon :id="s.id" /></span>
             {{ s.label }}
             <span v-if="s.id === 'lyssna' && playing" class="eq ml-auto flex h-3 items-end gap-px" aria-hidden="true">

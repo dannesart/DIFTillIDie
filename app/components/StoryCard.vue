@@ -53,7 +53,7 @@ watch(talk, (n, old) => {
 <template>
   <article
     :id="story.id"
-    class="card group relative flex scroll-mt-28 flex-col overflow-hidden transition duration-500 hover:border-himmel/30"
+    class="card group relative flex scroll-mt-28 flex-col overflow-hidden transition duration-500"
     :class="[lead ? 'p-6 sm:p-9' : 'p-6', spotlight === story.id && 'animate-spotlight']"
   >
     <!-- Lead story gets a quiet stripe field behind the title -->
@@ -75,7 +75,7 @@ watch(talk, (n, old) => {
     </div>
 
     <!-- The headline is always the lead source's own, linking to its article; a word too long for the card breaks rather than running out of it -->
-    <h3 class="relative mt-4 break-words font-display font-semibold leading-[1.05] tracking-tight" :class="lead ? 'text-3xl sm:text-5xl' : 'text-xl sm:text-2xl'">
+    <h3 class="relative mt-4 break-words font-display font-semibold tracking-tight" :class="lead ? 'max-w-4xl text-balance text-3xl leading-[1.05] sm:text-5xl' : 'text-pretty text-xl leading-[1.18] sm:text-[1.375rem]'">
       <a :href="leadSource.url" target="_blank" rel="noopener" class="decoration-himmel/60 decoration-2 underline-offset-[6px] hover:underline">
         {{ leadSource.headline }}
       </a>
@@ -125,7 +125,8 @@ watch(talk, (n, old) => {
     <!-- Every Story invites a conversation -->
     <div class="relative mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
       <button
-        class="talk-button inline-flex items-center gap-2 rounded-full border border-guld/40 px-4 py-2 text-sm font-bold text-guld transition duration-300 hover:border-guld hover:bg-guld/10"
+        v-ripple
+        class="talk-button relative inline-flex items-center gap-2 rounded-full border border-guld/40 px-4 py-2 text-sm font-bold text-guld transition duration-300 hover:border-guld hover:bg-guld/10"
         aria-haspopup="dialog"
         @click="writeAbout"
       >

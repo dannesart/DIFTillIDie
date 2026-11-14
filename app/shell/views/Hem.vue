@@ -54,7 +54,7 @@ const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
   <div class="mx-auto max-w-4xl px-4 pb-24 sm:px-6 lg:max-w-7xl lg:pt-8">
     <div class="@container">
       <!-- A smaller hero: who we are, in one band -->
-      <section class="relative isolate mt-4 overflow-hidden rounded-[2rem] border border-white/8 bg-navy-900/60 px-6 py-7 sm:px-8 lg:mt-0">
+      <section class="relative isolate mt-4 overflow-hidden rounded-[2rem] border border-transparent bg-navy-900/60 px-6 py-7 sm:px-8 lg:mt-0">
         <div aria-hidden="true" class="grain absolute -right-10 -top-8 -z-10 h-56 w-56 rotate-[8deg] overflow-hidden rounded-[2rem] opacity-70">
           <div class="stripes absolute inset-0 [--stripe:22px]" />
           <div class="absolute inset-0 bg-gradient-to-l from-transparent via-navy-900/40 to-navy-900" />
@@ -116,14 +116,14 @@ const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
           </ul>
           <p v-else-if="!topStories.length" class="mt-4 text-sm text-krita-dim">Inga nyheter om Djurgården i källorna just nu.</p>
           <ul v-else class="mt-3 divide-y divide-white/6">
-            <li v-for="s in topStories" :key="s.id" class="py-3 [&:nth-child(n+4)]:hidden @lg:[&:nth-child(n+4)]:block">
+            <li v-for="s in topStories" :key="s.id" class="py-4 [&:nth-child(n+4)]:hidden @lg:[&:nth-child(n+4)]:block">
               <p class="kicker flex items-center gap-2 text-krita-dim">
                 <span class="size-1.5 shrink-0 rounded-full bg-himmel" />
                 <span class="truncate">{{ sportLabel[s.sport] }} · {{ leadOf(s).outlet }}</span>
                 <span class="ml-auto shrink-0"><TimeAgo :at="leadOf(s).publishedAt" /></span>
               </p>
-              <NuxtLink :to="storyPath(s)" class="mt-1 line-clamp-2 font-display text-base font-semibold leading-snug hover:text-himmel" @click.prevent="openStory(s)">{{ leadOf(s).headline }}</NuxtLink>
-              <p class="mt-1 flex gap-3 text-xs text-krita-dim">
+              <NuxtLink :to="storyPath(s)" class="mt-2 line-clamp-3 text-pretty font-display text-[1.0625rem] font-semibold leading-[1.3] hover:text-himmel" @click.prevent="openStory(s)">{{ leadOf(s).headline }}</NuxtLink>
+              <p class="mt-1.5 flex gap-3 text-xs text-krita-dim">
                 <span>{{ s.sources.length }} {{ s.sources.length === 1 ? 'källa' : 'källor' }}</span>
                 <button v-if="countForStory(s)" class="font-semibold text-guld hover:underline" @click="readTalk(s)">{{ countForStory(s) }} i Snacket</button>
               </p>

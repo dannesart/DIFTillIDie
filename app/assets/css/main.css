@@ -103,6 +103,20 @@
 }
 
 @layer base {
+  /*
+   * Everything you can press shows the hand (Tailwind's reset gives buttons the arrow);
+   * a disabled control doesn't. Text fields keep their text cursor. In the base layer,
+   * so a component's own cursor class (cursor-wait while busy) still wins.
+   */
+  button, [role="button"], [role="tab"], [role="radio"], [role="option"], [role="switch"], [role="checkbox"], [role="menuitem"],
+  summary, select, label:has(> input[type="checkbox"], > input[type="radio"]),
+  input:is([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"], [type="reset"]) {
+    cursor: pointer;
+  }
+  :disabled, [aria-disabled="true"], label:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+
   html {
     scroll-behavior: smooth;
     /* Reserve the scrollbar's space, so locking scroll under a dialog never shifts the page. */
@@ -185,7 +199,7 @@
   }
 
   .card {
-    @apply rounded-3xl border border-white/8 bg-navy-900/70 backdrop-blur-sm;
+    @apply rounded-3xl border border-transparent bg-navy-900/70 backdrop-blur-sm;
   }
 
   .chip {
@@ -240,6 +254,39 @@
 .animate-spotlight { animation: spotlight 2.4s var(--ease-out-expo); }
 .animate-pop { animation: pop 0.45s var(--ease-spring); }
 .animate-rise { animation: rise 0.8s var(--ease-out-expo) both; }
+
+/*
+ * v-ripple (app/plugins/ripple.ts): pressing answers at once with a slight
+ * press-in, and a soft glow spreads from where you pressed. Both off with
+ * reduced motion; focus rings are untouched (outline/box-shadow aren't clipped).
+ */
+.ripple-host { -webkit-tap-highlight-color: transparent; }
+.ripple-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ripple-dot {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(circle closest-side, color-mix(in srgb, var(--ripple, currentColor) 32%, transparent), transparent);
+  animation: ripple 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+/* Spreads fast, stays a beat, then fades. */
+@keyframes ripple {
+  0% { transform: scale(0.2); opacity: 1; }
+  45% { opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ripple-host {
+    transition-property: color, background-color, border-color, opacity, scale, translate;
+    transition-duration: 150ms;
+  }
+  .ripple-host:active { scale: var(--press, 0.96); transition-duration: 60ms; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
