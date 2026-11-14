@@ -50,6 +50,8 @@ const unlinked = computed(() => newsLoaded.value && !live.value && (!!frozen.val
 const gone = computed(() => newsLoaded.value && !!props.post.storyId && !frozen.value && !props.post.storyRefInvalid && !live.value)
 const NO_LIVE_STORY = 'Ingen aktuell Story kan kopplas säkert till det här inlägget.'
 const sourcesLabel = (n: number) => `${n} ${n === 1 ? 'källa' : 'källor'}`
+// Only a real web address is a link; anything else is shown as text, and we say the link isn't there.
+const linkable = (url: string | undefined) => !!url && /^https?:\/\//i.test(url)
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 const tokens = computed(() => tokenize(props.post.body))
 
@@ -109,34 +111,45 @@ async function remove() {
       </template>
     </p>
 
-    <!-- Frozen at publication: the outlets' own headlines and links, as they stood in their feeds -->
-    <div v-if="frozen && lead" class="mt-4 rounded-2xl border border-white/10 bg-navy-950/60 p-3">
-      <component
-        :is="live ? 'button' : 'div'"
-        class="group flex w-full items-center gap-3 text-left"
-        v-bind="live ? { type: 'button', title: 'Visa Storyn' } : {}"
-        @click="live && showStory(live.id)"
-      >
-        <span class="h-10 w-1.5 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 5px, var(--color-navy-700) 5px 10px)" />
-        <span class="min-w-0 flex-1">
-          <span class="kicker block text-krita-dim">Story · {{ sourcesLabel(frozen.sources.length) }}</span>
-          <span class="block truncate font-display text-base font-semibold">{{ lead.headline }}</span>
-        </span>
-        <span v-if="live" class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel">→</span>
-      </component>
-      <p class="mt-2 text-xs text-krita-dim">
-        Ur flödet från {{ lead.outlet }}<template v-if="lead.publisher && lead.publisher !== lead.outlet"> ({{ lead.publisher }})</template><template v-if="lead.capturedAt">, {{ day(lead.capturedAt) }}</template>.
-        <a :href="lead.url" target="_blank" rel="noopener noreferrer" class="font-semibold text-krita underline-offset-2 hover:text-himmel hover:underline">Läs hos {{ lead.outlet }} ↗</a>
-      </p>
-      <p v-if="unlinked" class="mt-1 text-xs text-krita-dim">{{ NO_LIVE_STORY }}</p>
-      <details v-if="frozen.sources.length > 1" class="mt-1 text-xs text-krita-dim">
-        <summary class="cursor-pointer hover:text-krita">Alla {{ sourcesLabel(frozen.sources.length) }}</summary>
-        <ul class="mt-1.5 space-y-1.5">
-          <li v-for="s in frozen.sources" :key="s.key">
-            <a :href="s.url" target="_blank" rel="noopener noreferrer" class="hover:text-himmel"><span class="font-semibold text-krita">{{ s.outlet }}:</span> {{ s.headline }} ↗</a>
-          </li>
-        </ul>
-      </details>
+    <!--
+      Frozen at publication: the outlet's own headline and link, as they stood in its feed. Compact, so the
+      supporter's words lead. "Story" while that Story is still in the feeds (then it can be opened);
+      otherwise "Artikel": the original article, which is all we kept. Never another Story.
+    -->
+    <div v-if="frozen && lead" class="mt-3 flex gap-3 rounded-xl bg-white/[0.03] px-3 py-2.5">
+      <span aria-hidden="true" class="w-1 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 4px, var(--color-navy-700) 4px 8px)" />
+      <div class="min-w-0 flex-1">
+        <!-- Each "· item" stays together, so a wrapped line never starts with a dot -->
+        <p class="kicker flex flex-wrap items-baseline gap-x-1.5 text-krita-dim">
+          <span class="whitespace-nowrap">{{ unlinked ? 'Artikel' : `Story · ${sourcesLabel(frozen.sources.length)}` }}</span>
+          <span class="whitespace-nowrap">· {{ lead.outlet }}</span>
+          <span v-if="lead.capturedAt" class="whitespace-nowrap">· {{ day(lead.capturedAt) }}</span>
+        </p>
+        <!-- The headline is the link to the original article; long Swedish headlines wrap rather than being cut -->
+        <a
+          v-if="linkable(lead.url)"
+          :href="lead.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-1 block break-words text-pretty font-display text-[0.9rem] font-medium leading-snug text-krita/90 decoration-himmel/60 underline-offset-4 hover:text-himmel hover:underline"
+          :title="`Läs hos ${lead.publisher || lead.outlet}`"
+        >{{ lead.headline }}<span class="ml-1 text-krita-dim" aria-hidden="true">↗</span><span class="sr-only"> (läs hos {{ lead.outlet }})</span></a>
+        <p v-else class="mt-1 break-words font-display text-[0.9rem] font-medium leading-snug text-krita/90">
+          {{ lead.headline }} <span class="font-sans text-xs font-normal text-krita-dim">(länken finns inte kvar)</span>
+        </p>
+        <div v-if="live || frozen.sources.length > 1" class="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
+          <button v-if="live" type="button" class="font-semibold text-himmel hover:underline" @click="showStory(live.id)">Visa Storyn →</button>
+          <details v-if="frozen.sources.length > 1" class="text-krita-dim">
+            <summary class="hover:text-krita">Alla {{ sourcesLabel(frozen.sources.length) }}</summary>
+            <ul class="mt-1.5 space-y-1.5">
+              <li v-for="s in frozen.sources" :key="s.key">
+                <a v-if="linkable(s.url)" :href="s.url" target="_blank" rel="noopener noreferrer" class="break-words hover:text-himmel"><span class="font-semibold text-krita">{{ s.outlet }}:</span> {{ s.headline }} ↗</a>
+                <span v-else class="break-words"><span class="font-semibold text-krita">{{ s.outlet }}:</span> {{ s.headline }} (länken finns inte kvar)</span>
+              </li>
+            </ul>
+          </details>
+        </div>
+      </div>
     </div>
 
     <!-- From before frozen Stories, while its Story is still in the feeds -->
