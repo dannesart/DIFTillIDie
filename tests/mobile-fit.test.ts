@@ -117,8 +117,8 @@ describe('Snacket', () => {
 
 describe('a Story card', () => {
   const card = template('app/components/StoryCard.vue')
-  // The "Fler källor om samma händelse" list
-  const [othersLabel] = withText(card, 'Fler källor om samma händelse')
+  // The "Relaterade artiklar" list
+  const [othersLabel] = withText(card, 'Relaterade artiklar')
   const others = parentOf(card, othersLabel!)
   const sourceRow = all(others).find(n => n.tag === 'a')!
 

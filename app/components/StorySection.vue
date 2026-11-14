@@ -46,7 +46,7 @@ const sourcesDown = computed(() => {
         <h2 class="section-title mt-3">{{ heading }}</h2>
       </div>
       <p class="max-w-sm text-sm leading-relaxed text-krita-dim">
-        Hämtat från källornas egna flöden. När flera artiklar bevakar samma händelse samlas de i en Story –
+        Hämtat från källornas egna flöden. Artiklar som nämner samma namn inom ett dygn visas tillsammans i en Story –
         varje källa behåller sin rubrik och länk. Rubrikerna är källornas egna, aldrig våra.
       </p>
     </div>

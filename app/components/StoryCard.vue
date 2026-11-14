@@ -84,9 +84,9 @@ watch(talk, (n, old) => {
       {{ leadSource.excerpt }}
     </p>
 
-    <!-- Other sources on the same event, each with its own headline: beside its outlet only when the card itself has room (a card is a third of the page on desktop, and the outlet column grows with the text) -->
+    <!-- Related articles (they name the same people within a day; we don't claim they're about the same event), each with its own headline: beside its outlet only when the card itself has room (a card is a third of the page on desktop, and the outlet column grows with the text) -->
     <div v-if="others.length" class="relative mt-6 @container">
-      <p class="kicker text-krita-dim">Fler källor om samma händelse</p>
+      <p class="kicker text-krita-dim">Relaterade artiklar</p>
       <ul class="mt-2 divide-y divide-white/8 border-y border-white/8">
         <li v-for="src in (lead ? others : others.slice(0, 2))" :key="src.id">
           <a :href="src.url" target="_blank" rel="noopener" class="group/src flex flex-col gap-1 py-3 transition hover:bg-white/[0.03] sm:@[15rem]:flex-row sm:@[15rem]:items-baseline sm:@[15rem]:gap-4">
@@ -100,7 +100,7 @@ watch(talk, (n, old) => {
       </ul>
       <p v-if="!lead && others.length > 2" class="mt-2 text-xs text-krita-dim">+ {{ others.length - 2 }} till</p>
       <p v-if="story.sharedNames.length" class="mt-3 text-xs leading-relaxed text-krita-dim">
-        Samlade automatiskt: källorna nämner <span class="text-krita">{{ story.sharedNames.join(', ') }}</span> inom samma dygn.
+        Samlade automatiskt för att de nämner samma namn inom ett dygn: <span class="text-krita">{{ story.sharedNames.join(', ') }}</span>.
       </p>
     </div>
 

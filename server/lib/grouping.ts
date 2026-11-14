@@ -11,7 +11,7 @@ import { canonicalUrl, fold, slugWords } from './news'
  *      places — capitalised words from headlines/teasers, minus generic ones),
  *   4. at least one of those shared names is in BOTH headlines.
  *
- * EXPERIMENT (#25): a Story is its oldest article (the anchor) plus the
+ * A Story is its oldest article (the anchor) plus the
  * articles linked DIRECTLY to it — no transitive chains. Anything we can't
  * link stays its own Story — a Story with one source is perfectly valid.
  * We never write a headline: a source's own headline leads, preferring
@@ -139,7 +139,7 @@ export function groupIntoStories(articles: SourceArticle[]): Story[] {
   const unique = [...new Map(articles.map(a => [canonicalUrl(a.url), a])).values()]
   const profiles = unique.map(profile)
 
-  // EXPERIMENT (#25): oldest first, an article joins the Story of the first anchor it links to DIRECTLY;
+  // Oldest first (#25): an article joins the Story of the first anchor it links to DIRECTLY;
   // otherwise it anchors a new Story. No chains: A–B and B–C no longer put A and C together.
   const order = profiles.map((_, i) => i)
     .sort((x, y) => profiles[x]!.time - profiles[y]!.time || profiles[x]!.article.id.localeCompare(profiles[y]!.article.id))

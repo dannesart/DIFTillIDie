@@ -65,6 +65,11 @@ describe('grouping guarantees', () => {
     expect(groupIntoStories([chain[0]!, chain[2]!])).toHaveLength(2)
   })
 
+  it('never puts the two ends of a chain, 40 hours and two events apart, in one Story (#25)', () => {
+    // Each article must link directly to the Story's oldest article: no transitive chains.
+    expect(together(groupIntoStories(chain), chain[0]!, chain[2]!)).toBe(false)
+  })
+
   it('keeps a single article as its own valid Story', () => {
     const [story] = groupIntoStories(single)
     expect(story!.sources).toEqual(single)
@@ -154,11 +159,6 @@ describe('known gaps (#25): what a Story should do, and grouping does not yet', 
   it.fails('keeps the same person\'s two different events apart', () => {
     // Same evidence shape as the sacking above (a full name in both headlines), so name rules alone can't tell them apart
     expect(together(groupIntoStories(twoEvents), twoEvents[0]!, twoEvents[1]!)).toBe(false)
-  })
-
-  // EXPERIMENT (#25): passes with first-article-anchor grouping (no transitive chains).
-  it('never puts the two ends of a chain, 40 hours and two events apart, in one Story', () => {
-    expect(together(groupIntoStories(chain), chain[0]!, chain[2]!)).toBe(false)
   })
 
   it.fails('does not treat a sentence-initial ordinary word as a name', () => {

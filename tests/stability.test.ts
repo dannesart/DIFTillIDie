@@ -26,10 +26,10 @@ describe('compiled reporting (Bollsvenskan)', () => {
     expect(new Set(match.sources.filter(s => s.outlet === 'Sportbladet').map(s => s.reporting))).toEqual(new Set(['original']))
   })
 
-  // EXPERIMENT (#25), KNOWN TRADE-OFF: the Degerfors match splits 2+2 (see grouping.test.ts), so this
-  // Story no longer holds all four reports. Expectation kept unchanged on purpose.
-  it.fails('does not count compilations as independent reporting', () => {
-    expect(reportingCounts(match)).toEqual({ original: 2, compiled: 2, originalOutlets: ['Sportbladet'] })
+  // The Degerfors match is two Stories of two (accepted trade-off, see grouping.test.ts): this one holds
+  // Sportbladet's report and Bollsvenskan's compilation of it.
+  it('does not count compilations as independent reporting', () => {
+    expect(reportingCounts(match)).toEqual({ original: 1, compiled: 1, originalOutlets: ['Sportbladet'] })
   })
 
   it('leads with original reporting even when a compilation came first', () => {
@@ -70,7 +70,7 @@ describe('story id stability', () => {
     expect(after.id).toBe(before.id)
   })
 
-  // EXPERIMENT (#25): a newer article can no longer bridge two Stories (no chains), so the bridge here
+  // A newer article can no longer bridge two Stories (no chains), so the bridge here
   // is an OLDER article that shows up late and links directly to both — it anchors the merged Story.
   const bridge = { ...b, publishedAt: '2026-11-01T10:00:00.000Z' }
 
@@ -82,7 +82,7 @@ describe('story id stability', () => {
     for (const old of separate) expect(storyAnswersTo(merged[0]!, old.id)).toBe(true)
   })
 
-  it('EXPERIMENT (#25): a newer article does not chain two Stories together', () => {
+  it('does not let a newer article chain two Stories together', () => {
     expect(groupIntoStories([a, b, c]).map(s => s.sources.map(x => x.id)).sort()).toEqual([[a.id, b.id], [c.id]].sort())
   })
 
