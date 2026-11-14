@@ -2,8 +2,8 @@
 const { news, stories, status } = useNews()
 const { sport, matches } = useSport()
 
-// Lead (2×2) + 5 cards fills the desktop grid without an orphan.
-const INITIAL = 6
+// Lead (a full row, only as tall as its content) + 6 cards fills two- and three-column grids without an orphan.
+const INITIAL = 7
 const expanded = ref(false)
 
 const visible = computed(() => stories.value.filter(s => matches(s.sport)))
@@ -68,7 +68,7 @@ const sourcesDown = computed(() => {
 
     <template v-else>
       <TransitionGroup tag="div" move-class="transition duration-500" enter-from-class="opacity-0 scale-95" leave-to-class="opacity-0 scale-95" enter-active-class="transition duration-500" leave-active-class="transition duration-200 absolute" class="relative mt-10 grid gap-5 md:@[27rem]:grid-cols-2 lg:@[42rem]:grid-cols-3">
-        <StoryCard v-if="lead" :key="lead.id" :story="lead" lead class="md:@[27rem]:col-span-2 lg:@[42rem]:row-span-2" />
+        <StoryCard v-if="lead" :key="lead.id" :story="lead" lead class="md:@[27rem]:col-span-2 lg:@[42rem]:col-span-3" />
         <StoryCard v-for="s in shown" :key="s.id" :story="s" />
       </TransitionGroup>
 

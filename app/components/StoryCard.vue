@@ -75,7 +75,7 @@ watch(talk, (n, old) => {
     </div>
 
     <!-- The headline is always the lead source's own, linking to its article; a word too long for the card breaks rather than running out of it -->
-    <h3 class="relative mt-4 break-words font-display font-semibold leading-[1.05] tracking-tight" :class="lead ? 'text-3xl sm:text-5xl' : 'text-xl sm:text-2xl'">
+    <h3 class="relative mt-4 break-words font-display font-semibold tracking-tight" :class="lead ? 'max-w-4xl text-balance text-3xl leading-[1.05] sm:text-5xl' : 'text-pretty text-xl leading-[1.18] sm:text-[1.375rem]'">
       <a :href="leadSource.url" target="_blank" rel="noopener" class="decoration-himmel/60 decoration-2 underline-offset-[6px] hover:underline">
         {{ leadSource.headline }}
       </a>
