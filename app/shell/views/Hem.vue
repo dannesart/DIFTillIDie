@@ -116,14 +116,14 @@ const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
           </ul>
           <p v-else-if="!topStories.length" class="mt-4 text-sm text-krita-dim">Inga nyheter om Djurgården i källorna just nu.</p>
           <ul v-else class="mt-3 divide-y divide-white/6">
-            <li v-for="s in topStories" :key="s.id" class="py-3 [&:nth-child(n+4)]:hidden @lg:[&:nth-child(n+4)]:block">
+            <li v-for="s in topStories" :key="s.id" class="py-4 [&:nth-child(n+4)]:hidden @lg:[&:nth-child(n+4)]:block">
               <p class="kicker flex items-center gap-2 text-krita-dim">
                 <span class="size-1.5 shrink-0 rounded-full bg-himmel" />
                 <span class="truncate">{{ sportLabel[s.sport] }} · {{ leadOf(s).outlet }}</span>
                 <span class="ml-auto shrink-0"><TimeAgo :at="leadOf(s).publishedAt" /></span>
               </p>
-              <NuxtLink :to="storyPath(s)" class="mt-1 line-clamp-2 font-display text-base font-semibold leading-snug hover:text-himmel" @click.prevent="openStory(s)">{{ leadOf(s).headline }}</NuxtLink>
-              <p class="mt-1 flex gap-3 text-xs text-krita-dim">
+              <NuxtLink :to="storyPath(s)" class="mt-2 line-clamp-3 text-pretty font-display text-[1.0625rem] font-semibold leading-[1.3] hover:text-himmel" @click.prevent="openStory(s)">{{ leadOf(s).headline }}</NuxtLink>
+              <p class="mt-1.5 flex gap-3 text-xs text-krita-dim">
                 <span>{{ s.sources.length }} {{ s.sources.length === 1 ? 'källa' : 'källor' }}</span>
                 <button v-if="countForStory(s)" class="font-semibold text-guld hover:underline" @click="readTalk(s)">{{ countForStory(s) }} i Snacket</button>
               </p>

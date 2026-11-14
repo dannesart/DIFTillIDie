@@ -180,7 +180,7 @@ describe('the Stories grid', () => {
 
   it('lets the lead span only the columns there are', () => {
     // A span of two in a one-column grid would add a column and run out of the page.
-    expect(classes(lead)).toEqual(expect.arrayContaining(['md:@[27rem]:col-span-2', 'lg:@[42rem]:row-span-2']))
+    expect(classes(lead)).toEqual(expect.arrayContaining(['md:@[27rem]:col-span-2', 'lg:@[42rem]:col-span-3']))
     expect(classes(lead).filter(c => /^(md|lg):(col|row)-span-/.test(c))).toEqual([])
   })
 })
