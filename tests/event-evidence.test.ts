@@ -15,7 +15,7 @@ describe('EVH-1 is frozen', () => {
   it('changing server/lib/eventEvidence.ts needs a new hypothesis version, not an edit of EVH-1', () => {
     const source = readFileSync(new URL('../server/lib/eventEvidence.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
     expect(EVH_VERSION).toBe('EVH-1')
-    expect(createHash('sha256').update(source).digest('hex')).toBe('bcafa2144f7a48ce7de27d22e92efee1e889725ed24f6afae3d89ba270feeb5d')
+    expect(createHash('sha256').update(source).digest('hex')).toBe('f282063f65645f1b7f4bc18c9d918026320770a6964d3d6da2f35decb7130cf3')
   })
 })
 

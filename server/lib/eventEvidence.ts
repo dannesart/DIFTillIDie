@@ -112,12 +112,12 @@ function actionsIn(text: string, reported: Set<Action>, background: Set<Action>)
 
 function speakersIn(a: SourceArticle): Set<string> {
   const out = new Set<string>()
-  // Headline segments opening with up to three words and a colon: "Hahn:", "… – Simon Thern: …"
+  // Headline segments opening with up to three words and a colon: "Lund:", "… – Ola Lund: …"
   for (const seg of a.headline.split(/\s[–-]\s/)) {
     const m = seg.match(/^\s*([^:”"“]{1,40}?)(:| om )/u)
     if (m && m[1]!.trim().split(/\s+/).length <= 3) for (const n of namesInSentences(m[1]!)) out.add(n)
   }
-  // Teaser: up to three words before a speech verb: "Expressens Noa Bachner bedömer …"
+  // Teaser: up to three words before a speech verb: "Tidningens Ola Lund bedömer …"
   const text = a.excerpt ?? ''
   const ws = [...text.matchAll(WORD)]
   for (const verb of EVH1.speechVerbs) {

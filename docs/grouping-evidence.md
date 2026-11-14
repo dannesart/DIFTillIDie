@@ -4,7 +4,9 @@ Experimental. Nothing here is used by the app; `groupIntoStories()` is unchanged
 
 ## EVH-1: the frozen hypothesis
 
-Code: [`server/lib/eventEvidence.ts`](../server/lib/eventEvidence.ts). It judges one pair of articles at a time and is not a grouping algorithm. Frozen on 2026-11-14 at source sha256 `bcafa2144f7a48ce7de27d22e92efee1e889725ed24f6afae3d89ba270feeb5d`, and [`tests/event-evidence.test.ts`](../tests/event-evidence.test.ts) fails if the file changes.
+Code: [`server/lib/eventEvidence.ts`](../server/lib/eventEvidence.ts). It judges one pair of articles at a time and is not a grouping algorithm. Frozen on 2026-11-14 at source sha256 `f282063f65645f1b7f4bc18c9d918026320770a6964d3d6da2f35decb7130cf3`, and [`tests/event-evidence.test.ts`](../tests/event-evidence.test.ts) fails if the file changes.
+
+Freeze record: first frozen at `bcafa214…`. Two code comments there used real people's names as examples; they were replaced with fictional ones (comment-only, no behaviour change) before any snapshot other than the development set was evaluated. The development baseline was re-run under the new hash with identical results.
 
 In words:
 
