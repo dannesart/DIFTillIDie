@@ -4,5 +4,6 @@ useHead({ title: 'Lyssna & titta – Djurgår’n tills jag dör' })
 </script>
 
 <template>
-  <MediaSection class="lg:pt-10" />
+  <!-- Phones: less empty space above the title, so the latest episode starts sooner (#16) -->
+  <MediaSection class="pt-8 lg:pt-10" />
 </template>
