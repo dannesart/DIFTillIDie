@@ -103,6 +103,20 @@
 }
 
 @layer base {
+  /*
+   * Everything you can press shows the hand (Tailwind's reset gives buttons the arrow);
+   * a disabled control doesn't. Text fields keep their text cursor. In the base layer,
+   * so a component's own cursor class (cursor-wait while busy) still wins.
+   */
+  button, [role="button"], [role="tab"], [role="radio"], [role="option"], [role="switch"], [role="checkbox"], [role="menuitem"],
+  summary, select, label:has(> input[type="checkbox"], > input[type="radio"]),
+  input:is([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"], [type="reset"]) {
+    cursor: pointer;
+  }
+  :disabled, [aria-disabled="true"], label:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+
   html {
     scroll-behavior: smooth;
     /* Reserve the scrollbar's space, so locking scroll under a dialog never shifts the page. */
