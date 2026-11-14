@@ -125,11 +125,11 @@ describe('displayed linking names', () => {
 
   it('never joins a headline\'s last word to its teaser\'s first word', () => {
     const shown = names([
-      compiled({ headline: 'Hahn: tydligt beslut att entlediga Honkavaara', excerpt: 'Maximilian Hahn motiverar beslutet.' }),
-      compiled({ headline: 'Hahn om Honkavaara: ingen anledning att vänta', excerpt: 'Maximilian Hahn förklarar.', publishedAt: at(2) }),
+      compiled({ headline: 'Lind förklarar valet att släppa Ekström', excerpt: 'Tobias Lind tar ansvar för beskedet.' }),
+      compiled({ headline: 'Lind om Ekström: läget krävde ett beslut', excerpt: 'Tobias Lind svarar på kritiken.', publishedAt: at(2) }),
     ])
-    expect(shown).not.toContain('Honkavaara Maximilian')
-    expect(shown).toEqual(expect.arrayContaining(['Maximilian Hahn', 'Honkavaara']))
+    expect(shown).not.toContain('Ekström Tobias')
+    expect(shown).toEqual(expect.arrayContaining(['Tobias Lind', 'Ekström']))
   })
 
   it('never joins words from two different articles', () => {
