@@ -54,6 +54,29 @@ All third-party text and every label stay in the gitignored `.data/grouping-eval
    Every run is appended to `evaluations.json` with the hypothesis version and scorer hash; the summary goes to `results/`. Output names only article numbers, event ids and rules, so it can be shared.
 5. **No tuning before evaluating.** Record a version's failures on a snapshot first. A revised hypothesis gets a new version and is judged only on snapshots captured after it was frozen.
 
+## Daily capture (Windows)
+
+The capture runs unattended from Windows Task Scheduler, independent of any editor or Claude session. It **only captures evidence**: it never writes labels, pins, evaluates, or touches the event registry.
+
+- **Its own checkout.** The task runs the scripts from a dedicated, detached `git worktree` of this branch, with its own `npm ci --ignore-scripts`, so switching branches in your working copy never breaks it. Data goes to the main checkout's `.data/grouping-eval/` (via `GROUPING_EVAL_ROOT`). To update the code it runs, check out a newer commit in that worktree.
+- **What a run writes**:
+  - `snapshots/snapshot-<UTC>.json`, created exclusively (never overwritten; a clash gets `-2`) and carrying a `capture` block: `status`, `complete`, `trigger`, `startedAt`, `minutesLate`;
+  - one line in `capture-runs.jsonl` per run: start and finish times, status, exit code, snapshot name, article count, each source's health and error, notes;
+  - `logs/capture-<local time>.log`.
+- **Outcomes**:
+  - **success**: every source answered;
+  - **partial**: some source failed. The snapshot is kept but marked `complete: false`, and it is never counted as a success;
+  - **failure**: every source failed (no snapshot), or the capture could not start;
+  - **skipped-locked**: another capture held the lock. A lock older than 30 minutes is treated as left by a crash and cleared.
+
+  Exit codes, shown as Task Scheduler's *Last Run Result*: 0 success, 2 partial, 1 failure, 3 locked, 4 captured but a backup failed, 5 could not start. Any non-zero result also raises a Windows notification.
+- **Missed runs.** The task runs only while you are signed in and never wakes the computer. If the machine is asleep or off at the scheduled time, it runs **once** as soon as it can afterwards. That run is recorded as `catch-up` with its real time and `minutesLate`, never as the scheduled time. Days the machine stays off are simply missing.
+- **Backup.** After each run, the whole data folder is copied to each backup folder with `robocopy /E`: copy only, nothing is ever deleted from a backup. Backup folders must be outside the repository and private. Never use a public repository, a public CI artifact, or a public logging service.
+- **Scripts**:
+  - `install-capture-task.ps1 -DataRoot … -BackupRoot …` installs or updates the task. Machine paths live only in the task, never in git.
+  - `capture-status.ps1 -DataRoot …` shows the task, the last runs and the last complete capture, and warns after 36 hours without one.
+  - `capture-task.ps1` is what the task runs.
+
 ## Development baseline (in-sample, not evidence)
 
 EVH-1 on the 2026-11-14 development snapshot (labels v1, pinned before EVH-1 existed; the lexicon was written against it):
