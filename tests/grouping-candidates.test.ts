@@ -245,7 +245,7 @@ describe('event classifier under challenge (headline vocabulary)', () => {
     expect(kinds('Sparkade Mäkinen klar för Finland')).toEqual(['exit', 'transfer'])
   })
   it('leaves a reaction without event vocabulary unknown, rather than guessing', () => {
-    expect(kinds('Ståhl: ”En skam för oss”')).toEqual([])
+    expect(kinds('Mittfältaren Berglund: ”Det känns tomt i omklädningsrummet”')).toEqual([])
   })
   it('reads one event in different wordings as the same kind', () => {
     expect(kinds('Djurgården bryter med Mäkinen')).toEqual(['exit'])
@@ -259,13 +259,13 @@ describe('event classifier under challenge (headline vocabulary)', () => {
     expect(kinds('Mäkinen klar för spel igen')).not.toContain('transfer')
   })
   it.fails('ambiguous: a player dropped from the line-up is not an exit (real feed: hockey)', () => {
-    expect(kinds('Nyförvärvet petad: ”Behöver nollställa”')).not.toContain('exit')
+    expect(kinds('Backen Lövgren petad – ”Jag ska jobba mig in i laget igen”')).not.toContain('exit')
   })
   it.fails('ambiguous: "inför" as "introduces" is not a match preview (real feed)', () => {
-    expect(kinds('Externa firmor inför garanti för tränarval')).not.toContain('preview')
+    expect(kinds('Klubben inför nytt biljettsystem på läktaren')).not.toContain('preview')
   })
   it.fails('background in the headline: the defeat that led to a sacking is not a match result (real feed)', () => {
-    expect(kinds('Honkavaara ”dead man walking” – HBK-förlusten fällde avgörandet')).not.toContain('result')
+    expect(kinds('Norrvik sparkar tränaren Ek – helgens förlust blev droppen')).not.toContain('result')
   })
   it.fails('background in the headline: "after the sacking" is not a second sacking report', () => {
     expect(kinds('Efter sparken: Mäkinen aktuell för Finland')).toEqual(['search'])
