@@ -52,9 +52,12 @@ onBeforeUnmount(() => {
 
 <template>
   <article ref="root" class="card relative overflow-hidden" :class="highlight && 'border-guld/30'">
-    <!-- The cover never takes more than a third: the same 18rem on the front page (the card is ≥ 976px there), room for the episode in a narrower column -->
+    <!--
+      The cover never takes more than a third: the same 18rem on the front page (the card is ≥ 976px there), room for the episode in a narrower column.
+      On phones it's a slim strip of the artwork, without its overlaid name (the title follows right below), so the latest episode's play button comes sooner.
+    -->
     <div class="grid lg:grid-cols-[min(18rem,33%)_minmax(0,1fr)]">
-      <MediaCover :cover="podcast.cover" :title="title" kind="podd" class="aspect-[16/9] lg:aspect-auto" />
+      <MediaCover :cover="podcast.cover" :title="title" kind="podd" class="h-20 sm:h-auto sm:aspect-[16/9] lg:aspect-auto max-sm:[&_.kicker]:hidden max-sm:[&_span.block]:hidden" />
 
       <div class="min-w-0 p-5 sm:p-7">
         <div class="flex flex-wrap items-center gap-2">
