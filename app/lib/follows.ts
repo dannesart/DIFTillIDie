@@ -76,8 +76,13 @@ export function createFollows(client: SupabaseClient | null, auth: AuthStore | n
     }
     catch (e) {
       if (mine !== request) return
-      if (followsMissing(e)) missing()
-      else if (status.value !== 'ready') status.value = 'error'
+      if (followsMissing(e)) return missing()
+      // Couldn't tell: settle on "not followed", so "Följ" stays usable rather than
+      // disabled (or hidden) for good. Safe because following is idempotent: if you
+      // did follow them, tapping "Följ" changes nothing and then shows "Följer".
+      // Unfollowing is only offered once a follow has been confirmed.
+      set(following, profileId, false)
+      status.value = 'ready'
     }
   }
 

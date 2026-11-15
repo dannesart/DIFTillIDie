@@ -81,6 +81,33 @@ describe('following and unfollowing', () => {
     expect(calls).toEqual([{ op: 'row', args: JARN }])
   })
 
+  it('a failed lookup never leaves the button stuck: the supporter is known, as not followed, and can be followed', async () => {
+    let fail = false
+    const { client } = fakeClient({ row: { data: null } })
+    // After a first supporter worked (the store is 'ready'), the next lookup fails…
+    const f = createFollows(client, fakeAuth())
+    await f.check(JARN)
+    expect(f.status.value).toBe('ready')
+    ;(client as unknown as { from: (t: string) => unknown }).from = () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => (fail = true, { data: null, error: { code: 'XX000' } }) }) }) })
+    await f.check(LOTTA)
+    expect(fail).toBe(true)
+    // …and Lotta's state is still settled (not "unknown", which kept the button disabled)
+    expect(LOTTA in f.following.value).toBe(true)
+    expect(f.following.value[LOTTA]).toBe(false)
+    expect(f.status.value).toBe('ready')
+    // Tapping follows; following is idempotent, so this is safe even if she was followed already
+    expect(await f.toggle(LOTTA)).toEqual({ ok: true })
+    expect(f.following.value[LOTTA]).toBe(true)
+  })
+
+  it('a failed very first lookup keeps the button (not hidden by an error status)', async () => {
+    const { client } = fakeClient({ row: { error: { code: 'XX000' } } })
+    const f = createFollows(client, fakeAuth())
+    await f.check(JARN)
+    expect(f.status.value).toBe('ready')
+    expect(f.following.value[JARN]).toBe(false)
+  })
+
   it('"Följer" only once Supabase has confirmed it', async () => {
     let release!: (r: R) => void
     const { client, calls } = fakeClient({ follow: () => new Promise<R>(r => (release = r)) })
