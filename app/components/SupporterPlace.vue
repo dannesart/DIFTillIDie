@@ -35,6 +35,35 @@ useNews()
 
 const own = computed(() => !!userId.value && userId.value === wall.id.value)
 
+/*
+ * Following (#9), private: only you see whom you follow. "Följ" on someone
+ * else's place, a friendly way in when you can't follow yet, and on your own
+ * place a list of the public supporters you follow. Shown only once the
+ * database is known to support it.
+ */
+const follows = useFollows()
+/** 'signin' / 'profile': why you can't follow yet; any other text: what went wrong. */
+const followNote = ref<string | null>(null)
+const followingThem = computed(() => !!wall.id.value && !!follows.following.value[wall.id.value])
+const followBusy = computed(() => !!wall.id.value && (!!follows.pending.value[wall.id.value] || (!!userId.value && !(wall.id.value in follows.following.value))))
+const showFollow = computed(() => !own.value && !!wall.id.value && follows.status.value === 'ready')
+async function tapFollow() {
+  followNote.value = null
+  if (!userId.value) return void (followNote.value = 'signin')
+  if (profileStatus.value === 'missing') return void (followNote.value = 'profile')
+  const r = await follows.toggle(wall.id.value!)
+  if (!r.ok) followNote.value = r.message
+}
+// Someone else's place: do you follow them? (Signed out: is following here at all?)
+watch([() => wall.id.value, userId], ([id]) => {
+  followNote.value = null
+  if (id && !own.value) void follows.check(id)
+}, { immediate: true })
+// Your own place: the supporters you follow.
+watch(own, (mine) => {
+  if (mine) void follows.loadList()
+}, { immediate: true })
+
 // An id, a former handle, or your own handle just changed: show the current address.
 watch(wall.canonical, (handle) => {
   if (handle && handle !== address) void navigateTo({ path: links.value.supporter(handle), hash: route.hash }, { replace: true })
@@ -122,10 +151,39 @@ const postsLabel = computed(() => {
         <div class="-mt-12 flex items-end justify-between gap-3 sm:-mt-14">
           <Avatar :name="profile.displayName" :design="profile.avatar" size="xl" class="ring-4! ring-navy-900!" />
           <button v-if="own" class="mb-1 rounded-full border border-white/15 bg-navy-900/80 px-4 py-2 text-sm font-bold backdrop-blur transition hover:border-himmel hover:text-himmel" @click="editor.edit()">Ändra profil</button>
+          <!-- Follow (private): "Följ" until Supabase confirms, then "Följer"; tapping "Följer" stops following -->
+          <button
+            v-else-if="showFollow"
+            v-ripple
+            type="button"
+            class="relative mb-1 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold backdrop-blur transition disabled:opacity-60"
+            :class="followingThem ? 'border border-white/15 bg-navy-900/80 hover:border-rod/60 hover:text-krita' : 'bg-guld text-navy-950 hover:-translate-y-0.5'"
+            :aria-pressed="followingThem"
+            :aria-busy="followBusy"
+            :disabled="followBusy"
+            :title="followingThem ? 'Sluta följa' : undefined"
+            @click="tapFollow"
+          >
+            <svg v-if="followingThem" viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            {{ followingThem ? 'Följer' : 'Följ' }}<span class="sr-only"> {{ profile.displayName }}</span>
+          </button>
         </div>
         <p class="kicker mt-4 text-himmel">På läktaren</p>
         <h1 id="supporter-name" class="mt-1 break-words font-display text-4xl font-bold leading-none tracking-tight sm:text-5xl">{{ profile.displayName }}</h1>
         <p class="mt-1.5 text-krita-dim">@{{ profile.handle }}</p>
+        <!-- Can't follow yet: a way in, never a dead button. Or what went wrong. -->
+        <div v-if="followNote && !own" class="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm" :role="followNote === 'signin' || followNote === 'profile' ? 'status' : 'alert'">
+          <template v-if="followNote === 'signin'">
+            <p class="min-w-0 flex-1"><span class="font-semibold">Vill du följa {{ profile.displayName }}?</span> <span class="text-krita-dim">Logga in, så hittar du tillbaka hit från din egen läktarplats.</span></p>
+            <button class="rounded-full bg-guld px-4 py-1.5 text-xs font-bold text-navy-950" @click="accountOpen = true">Logga in</button>
+          </template>
+          <template v-else-if="followNote === 'profile'">
+            <p class="min-w-0 flex-1">Välj ditt läktarnamn, så kan du följa supportrar.</p>
+            <button class="rounded-full bg-guld px-4 py-1.5 text-xs font-bold text-navy-950" @click="accountOpen = true">Välj läktarnamn</button>
+          </template>
+          <p v-else class="min-w-0 flex-1 font-semibold text-rod">{{ followNote }}</p>
+          <button class="text-xs text-krita-dim hover:text-krita" aria-label="Stäng" @click="followNote = null">✕</button>
+        </div>
         <p v-if="profile.bio" class="mt-4 max-w-prose text-[1.05rem] leading-relaxed">{{ profile.bio }}</p>
         <p v-else-if="own" class="mt-4 text-sm text-krita-dim">
           Inget om dig än.
@@ -176,6 +234,38 @@ const postsLabel = computed(() => {
         </button>
       </div>
       <p v-if="preferences.error.value" class="mt-3 text-sm font-semibold text-rod" role="alert">{{ preferences.error.value }}</p>
+    </section>
+
+    <!-- Whom you follow: only for you, only public supporters, newest follow first. Nothing here is shown to anyone else. -->
+    <section v-if="own && follows.listStatus.value !== 'unavailable' && follows.listStatus.value !== 'idle'" class="card mt-5 p-5 sm:p-6" aria-labelledby="i-follow">
+      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 id="i-follow" class="font-display text-2xl font-bold">Du följer</h2>
+        <p class="text-xs text-krita-dim">Bara du ser vilka du följer.</p>
+      </div>
+      <ul v-if="follows.listStatus.value === 'loading' && !follows.list.value.length" class="mt-4 space-y-2" aria-busy="true" aria-label="Hämtar vilka du följer">
+        <li v-for="n in 2" :key="n" class="h-14 animate-pulse rounded-2xl bg-white/[0.03]" />
+      </ul>
+      <p v-else-if="follows.listStatus.value === 'error'" class="mt-4 text-sm text-krita-dim" role="alert">
+        Kunde inte hämta vilka du följer.
+        <button class="font-semibold text-himmel hover:underline" @click="follows.loadList()">Försök igen</button>
+      </p>
+      <ul v-else-if="follows.list.value.length" class="mt-3 divide-y divide-white/6">
+        <li v-for="p in follows.list.value" :key="p.id">
+          <NuxtLink :to="links.supporter(p.handle)" class="group flex items-center gap-3 py-2.5">
+            <Avatar :name="p.name" :design="p.avatar" size="md" />
+            <span class="min-w-0 flex-1">
+              <span class="block truncate font-semibold group-hover:text-himmel">{{ p.name }}</span>
+              <span class="block truncate text-sm text-krita-dim">@{{ p.handle }}</span>
+            </span>
+            <span class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel" aria-hidden="true">→</span>
+          </NuxtLink>
+        </li>
+      </ul>
+      <p v-else class="mt-3 text-sm leading-relaxed text-krita-dim">
+        Du följer ingen än. Tryck på ett namn i
+        <NuxtLink :to="links.section('snacket')" class="font-semibold text-himmel hover:underline">Snacket</NuxtLink>
+        och välj <span class="font-semibold text-krita">Följ</span>, så hittar du tillbaka till dem här.
+      </p>
     </section>
 
     <!-- The wall -->
