@@ -34,8 +34,10 @@ const draftText = computed(() => {
   <button
     type="button"
     v-ripple="'himmel'"
-    class="card relative flex w-full items-center gap-3 text-left transition hover:border-himmel/40"
-    :class="compact ? 'rounded-full! p-2 pr-2.5 sm:p-2.5' : 'p-4 sm:p-5'"
+    class="card group relative flex w-full items-center gap-3 text-left transition"
+    :class="compact
+      ? 'rounded-full! border-white/15 bg-navy-800/50 p-2 pr-2.5 hover:border-himmel/60 hover:bg-navy-800/80 focus-visible:border-himmel/60 focus-visible:bg-navy-800/80 sm:p-2.5'
+      : 'p-4 hover:border-himmel/40 sm:p-5'"
     aria-haspopup="dialog"
     @click="compose.openPost(browsing())"
   >
@@ -43,8 +45,8 @@ const draftText = computed(() => {
     <span class="min-w-0 flex-1">
       <span v-if="draftText" class="block text-xs font-semibold text-guld">Ditt utkast</span>
       <span v-if="draftText" class="block truncate text-krita">{{ draftText }}</span>
-      <span v-else class="block truncate text-krita-dim" :class="compact ? 'text-[0.95rem]' : 'text-base'">{{ prompt }}</span>
+      <span v-else class="block truncate" :class="compact ? 'text-[0.95rem] text-krita/85 transition-colors group-hover:text-krita' : 'text-base text-krita-dim'">{{ prompt }}</span>
     </span>
-    <span aria-hidden="true" class="shrink-0 rounded-full bg-himmel px-4 py-2 text-sm font-bold text-navy-950">{{ draftText ? 'Fortsätt' : 'Skriv' }}</span>
+    <span aria-hidden="true" class="shrink-0 rounded-full bg-himmel px-4 py-2 text-sm font-bold text-navy-950" :class="compact && 'transition group-hover:bg-krita group-focus-visible:bg-krita'">{{ draftText ? 'Fortsätt' : 'Skriv' }}</span>
   </button>
 </template>
