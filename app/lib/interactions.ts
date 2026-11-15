@@ -17,6 +17,15 @@ import { normalizePostBody, publishErrorMessage, validatePostBody } from './post
 
 export const REACTION_KEYS: ReactionKey[] = ['hjarta', 'eld', 'stjarna', 'tarar']
 
+/**
+ * The comments button's name for screen readers (it shows only "💬 3" on phones). Says what it does and the
+ * count, like the reactions ("Blått hjärta, 1"), and contains the words it shows on wider screens
+ * ("Kommentarer" / "Dölj"). Whether it's open is aria-expanded's job.
+ */
+export function commentsButtonLabel(count: number | null | undefined, open: boolean): string {
+  return `${open ? 'Dölj kommentarer' : 'Visa kommentarer'}, ${count ?? 'okänt antal'}`
+}
+
 export interface PostStats { reactions: Record<ReactionKey, number>, comments: number }
 
 export interface RealComment {
