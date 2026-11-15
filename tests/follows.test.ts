@@ -15,7 +15,7 @@ const LOTTA = '11111111-1111-4111-8111-111111111111'
 type R = { data?: unknown, error?: unknown }
 const done = (r: R) => ({ data: r.data ?? null, error: r.error ?? null })
 
-function fakeClient(o: { row?: R, follow?: R | (() => R | Promise<R>), unfollow?: R, list?: R } = {}) {
+function fakeClient(o: { row?: R, follow?: R | (() => R | Promise<R>), unfollow?: R, list?: R, counts?: R | (() => R) } = {}) {
   const calls: { op: string, args?: unknown }[] = []
   const client = {
     async rpc(fn: string, args?: Record<string, unknown>) {
@@ -23,6 +23,7 @@ function fakeClient(o: { row?: R, follow?: R | (() => R | Promise<R>), unfollow?
       if (fn === 'follow_supporter') return done(typeof o.follow === 'function' ? await o.follow() : o.follow ?? { data: true })
       if (fn === 'unfollow_supporter') return done(o.unfollow ?? { data: true })
       if (fn === 'followed_supporters') return done(o.list ?? { data: [] })
+      if (fn === 'supporter_follow_counts') return done(typeof o.counts === 'function' ? o.counts() : o.counts ?? { data: [] })
       throw new Error('unknown rpc')
     },
     from(table: string) {
@@ -122,7 +123,8 @@ describe('following and unfollowing', () => {
     expect(await tap).toEqual({ ok: true })
     expect(f.following.value[JARN]).toBe(true)
     expect(f.pending.value[JARN]).toBeUndefined()
-    expect(calls.filter(c => c.op.startsWith('rpc'))).toEqual([{ op: 'rpc:follow_supporter', args: { p_profile_id: JARN } }])
+    // One follow (then only a read of their counts, tested under "public follow counts")
+    expect(calls.filter(c => c.op.startsWith('rpc') && c.op !== 'rpc:supporter_follow_counts')).toEqual([{ op: 'rpc:follow_supporter', args: { p_profile_id: JARN } }])
   })
 
   it('tapping "Följer" unfollows, and they leave your list at once', async () => {
@@ -131,7 +133,7 @@ describe('following and unfollowing', () => {
     await f.loadList()
     expect(f.following.value[JARN]).toBe(true)
     expect(await f.toggle(JARN)).toEqual({ ok: true })
-    expect(calls.at(-1)).toEqual({ op: 'rpc:unfollow_supporter', args: { p_profile_id: JARN } })
+    expect(calls.filter(c => c.op !== 'rpc:supporter_follow_counts').at(-1)).toEqual({ op: 'rpc:unfollow_supporter', args: { p_profile_id: JARN } })
     expect(f.following.value[JARN]).toBe(false)
     expect(f.list.value).toEqual([])
   })
@@ -202,6 +204,76 @@ describe('your list, and whose it is', () => {
   })
 })
 
+describe('public follow counts', () => {
+  it('shows exactly what the database returned, even signed out', async () => {
+    const { client, calls } = fakeClient({ counts: { data: [{ followers: 45, following: 65 }] } })
+    const f = createFollows(client, fakeAuth({ status: 'signed-out', userId: null }))
+    await f.loadCounts(JARN)
+    expect(f.counts.value[JARN]).toEqual({ followers: 45, following: 65 })
+    expect(calls).toEqual([{ op: 'rpc:supporter_follow_counts', args: { p_profile_id: JARN } }])
+  })
+
+  it('no row (a private or missing supporter): nothing, not zeros', async () => {
+    const { client } = fakeClient({ counts: { data: [] } })
+    const f = createFollows(client, fakeAuth())
+    await f.loadCounts(MATTIAS)
+    expect(MATTIAS in f.counts.value).toBe(false)
+  })
+
+  it('a failed lookup or a malformed answer: nothing shown, and an earlier number isn\'t kept as if current', async () => {
+    let answer: R = { data: [{ followers: 3, following: 1 }] }
+    const { client } = fakeClient({ counts: () => answer })
+    const f = createFollows(client, fakeAuth())
+    await f.loadCounts(JARN)
+    expect(f.counts.value[JARN]).toEqual({ followers: 3, following: 1 })
+    answer = { error: { code: 'XX000' } }
+    await f.loadCounts(JARN)
+    expect(JARN in f.counts.value).toBe(false)
+    answer = { data: [{ followers: '3', following: -1 }] }
+    await f.loadCounts(JARN)
+    expect(JARN in f.counts.value).toBe(false)
+  })
+
+  it('a database without the function: hidden, and not asked again', async () => {
+    const { client, calls } = fakeClient({ counts: { error: { code: 'PGRST202' } } })
+    const f = createFollows(client, fakeAuth())
+    await f.loadCounts(JARN)
+    await f.loadCounts(LOTTA)
+    expect(f.counts.value).toEqual({})
+    expect(calls.filter(c => c.op === 'rpc:supporter_follow_counts')).toHaveLength(1)
+    // Following itself is unaffected
+    expect(f.status.value).not.toBe('unavailable')
+  })
+
+  it('after a follow or unfollow, their counts are asked for again (never nudged locally)', async () => {
+    let followers = 2
+    const { client, calls } = fakeClient({ counts: () => ({ data: [{ followers, following: 0 }] }), follow: () => (followers++, { data: true }) })
+    const f = createFollows(client, fakeAuth())
+    await f.loadCounts(JARN)
+    expect(await f.toggle(JARN)).toEqual({ ok: true })
+    await nextTick(); await Promise.resolve()
+    expect(calls.filter(c => c.op === 'rpc:supporter_follow_counts')).toHaveLength(2)
+    expect(f.counts.value[JARN]).toEqual({ followers: 3, following: 0 })
+  })
+
+  it('a refused follow doesn\'t ask again', async () => {
+    const { client, calls } = fakeClient({ follow: { error: { code: 'P0002' } } })
+    const f = createFollows(client, fakeAuth())
+    await f.toggle(JARN)
+    expect(calls.filter(c => c.op === 'rpc:supporter_follow_counts')).toHaveLength(0)
+  })
+
+  it('forgotten when someone else signs in (your own private place\'s counts were yours only)', async () => {
+    const auth = fakeAuth()
+    const { client } = fakeClient({ counts: { data: [{ followers: 0, following: 1 }] } })
+    const f = createFollows(client, auth)
+    await f.loadCounts(MATTIAS)
+    auth.userId.value = LOTTA
+    await nextTick()
+    expect(f.counts.value).toEqual({})
+  })
+})
+
 describe('the läktarplats', () => {
   type Prop = { type: number, name: string, value?: { content: string }, arg?: { content: string }, exp?: { content: string } }
   type Node = { type: number, tag?: string, props?: Prop[], children?: Node[], content?: string }
@@ -218,8 +290,49 @@ describe('the läktarplats', () => {
     expect(dir(button, 'aria-busy')).toBe('followBusy')
   })
 
-  it('"Du följer" is only on your own place', () => {
-    const section = all(ast).find(n => n.tag === 'section' && n.props?.some(p => p.name === 'aria-labelledby' && p.value?.content === 'i-follow'))!
-    expect(dir(section, 'if')).toMatch(/^own && /)
+  it('"Du följer" is a dialog on your own place only, no longer a section of the page', () => {
+    expect(all(ast).some(n => n.tag === 'section' && n.props?.some(p => p.name === 'aria-labelledby' && p.value?.content === 'i-follow'))).toBe(false)
+    const dialog = all(ast).filter(n => n.tag === 'FollowingDialog')
+    expect(dialog).toHaveLength(1)
+    expect(dir(dialog[0]!, 'if')).toBe('own')
+  })
+
+  it('only your own "Följer" opens it: Snack and Följare never, and nobody else\'s', () => {
+    const script = readFileSync('app/components/SupporterPlace.vue', 'utf8')
+    expect(script).toContain("{ key: 'following', label: 'Följer', value: c.following, opens: own.value }")
+    expect(script).toMatch(/else if \(own\.value && follows\.listStatus\.value === 'ready'/)
+    expect(script).not.toMatch(/key: '(snack|followers)'[^}]*opens/)
+    const button = all(ast).find(n => n.tag === 'button' && dir(n, 'click') === 'followingOpen = true')!
+    expect(dir(button, 'if')).toBe('s.opens')
+  })
+})
+
+describe('the "Du följer" dialog', () => {
+  type Prop = { type: number, name: string, value?: { content: string }, arg?: { content: string }, exp?: { content: string } }
+  type Node = { type: number, tag?: string, props?: Prop[], children?: Node[], content?: string }
+  const src = readFileSync('app/components/FollowingDialog.vue', 'utf8')
+  const ast = parse(src).descriptor.template!.ast as unknown as Node
+  const all = (n: Node): Node[] => [n, ...(n.children ?? []).flatMap(all)]
+  const text = (n: Node): string => n.type === 2 ? n.content ?? '' : (n.children ?? []).map(text).join('')
+  const attr = (n: Node, name: string) => n.props?.find(p => p.type === 6 && p.name === name)?.value?.content
+
+  it('is a native dialog titled "Du följer", with a close button', () => {
+    const dialog = all(ast).find(n => n.tag === 'dialog')!
+    expect(attr(dialog, 'aria-labelledby')).toBe('i-follow')
+    expect(text(all(ast).find(n => attr(n, 'id') === 'i-follow')!).trim()).toBe('Du följer')
+    expect(all(ast).some(n => n.tag === 'button' && attr(n, 'aria-label') === 'Stäng')).toBe(true)
+    // Escape closes a modal <dialog> natively; focus goes back to what opened it
+    expect(src).toContain('el.showModal()')
+    expect(src).toContain('opener?.focus(')
+  })
+
+  it('shows Following v1\'s own list, with its loading, error and empty states, and nothing new is fetched', () => {
+    expect(src).toContain('follows.list.value')
+    expect(src).toContain('void follows.loadList()')
+    expect(src).not.toMatch(/\.rpc\(|\.from\(/)
+    const t = text(ast)
+    expect(t).toContain('Kunde inte hämta vilka du följer.')
+    expect(t).toContain('Du följer ingen än.')
+    expect(all(ast).some(n => attr(n, 'aria-label') === 'Hämtar vilka du följer')).toBe(true)
   })
 })
