@@ -6,7 +6,7 @@ import { postAnchor } from './reveal'
  * The site is laid out by the app shell (Mission #17, see
  * modules/app-shell.ts). Every section is a page of its own on every screen
  * size (Issue #16): Hem at /, and /snacket, /stories, /lyssna. Supporters
- * are at /laktaren/<handle>. A Story or a post is its section's page with
+ * are at /laktaren/<handle>, and your own settings at /installningar. A Story or a post is its section's page with
  * the item's anchor (/stories#story-…, /snacket#post-…).
  *
  * Until Issue #16 phones had one long front page with in-page sections
@@ -17,6 +17,9 @@ import { postAnchor } from './reveal'
 export type SectionId = 'hem' | 'stories' | 'snacket' | 'lyssna'
 
 export const VIEWS = ['snacket', 'stories', 'lyssna'] as const
+
+/** Your own settings: a page of the shell, not one of the bottom nav's sections. */
+export const SETTINGS_PATH = '/installningar'
 
 /** Tailwind's lg: where the shell's sidebars begin. */
 export const DESKTOP_QUERY = '(min-width: 64rem)'
@@ -39,6 +42,8 @@ export function sectionLinks(rawPath: string) {
     post: (id: string) => `/snacket#${postAnchor(id)}`,
     /** A supporter's page (by their handle). */
     supporter: (handle: string) => `/laktaren/${handle}`,
+    /** Your own settings (Mina lag). */
+    settings: SETTINGS_PATH,
     /** Is this the section's own page? By address alone, so it renders the same everywhere. */
     here,
     /** Is that section on the page you're looking at? (Then scroll to it rather than go there.) */

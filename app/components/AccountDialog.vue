@@ -1,8 +1,10 @@
 <script setup lang="ts">
 /*
  * The supporter account, in one dialog: sign in with a code by e-mail, choose how you're
- * known on the stands, sign out. Native <dialog> like the others — a centred
- * card on desktop, a bottom sheet on phones.
+ * known on the stands, and once you have a profile the account menu (Min profil,
+ * Redigera profil, Inställningar, Logga ut). Not a settings form: settings are
+ * at /installningar. Native <dialog> like the others — a centred card on
+ * desktop, a bottom sheet on phones.
  */
 const auth = useAuth()
 const { status, profile, profileStatus } = auth
@@ -52,6 +54,10 @@ function onClick(e: MouseEvent) {
   if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) open.value = false
 }
 
+// The account menu's rows: content-width text in a full-width, fully rounded row, like the sidebar's pills.
+const menuItem = 'flex w-full items-center gap-3.5 rounded-full px-3 py-2.5 [--press:0.98] text-left text-[0.95rem] font-semibold transition-colors hover:bg-white/[0.06] hover:text-krita'
+const menuIcon = 'grid size-8 place-items-center rounded-full bg-white/[0.06]'
+
 async function signOut() {
   await auth.signOut()
   open.value = false
@@ -91,7 +97,7 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
 
       <!-- Signed in, no profile yet (or editing it) -->
       <template v-else-if="status === 'signed-in' && (profileStatus === 'missing' || editing)">
-        <h2 id="account-title" class="mt-1 font-display text-3xl font-bold leading-tight">{{ editing ? 'Ändra profil' : 'Välkommen in! 💙' }}</h2>
+        <h2 id="account-title" class="mt-1 font-display text-3xl font-bold leading-tight">{{ editing ? 'Redigera profil' : 'Välkommen in! 💙' }}</h2>
         <p v-if="!editing" class="mt-2 text-sm leading-relaxed text-krita-dim">Välj hur du syns på läktaren. Det är namnet du publicerar med i Snacket på stan, och det syns för alla när du har skrivit något.</p>
         <ProfileForm class="mt-5" :initial="editing ? profile : null" @saved="editing = false" @cancel="editing = false" />
         <button v-if="!editing" class="mt-4 text-xs font-semibold text-krita-dim underline decoration-white/20 underline-offset-2 hover:text-krita" @click="signOut">Logga ut</button>
@@ -107,14 +113,36 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
             <p class="truncate text-sm text-krita-dim">@{{ profile.handle }}</p>
           </div>
         </div>
-        <p class="mt-4 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm leading-relaxed text-krita-dim">
+        <!-- The account menu: actions only, each to what already exists (your place, the profile form, your settings, signing out) -->
+        <ul class="mt-5 space-y-1" aria-label="Kontomeny">
+          <li>
+            <NuxtLink :to="links.supporter(profile.handle)" v-ripple="'himmel'" :class="menuItem" @click="open = false">
+              <span :class="menuIcon" aria-hidden="true"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4" /></svg></span>
+              Min profil
+            </NuxtLink>
+          </li>
+          <li>
+            <button type="button" v-ripple="'himmel'" :class="menuItem" @click="editing = true">
+              <span :class="menuIcon" aria-hidden="true"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></svg></span>
+              Redigera profil
+            </button>
+          </li>
+          <li>
+            <NuxtLink :to="links.settings" v-ripple="'himmel'" :class="menuItem" @click="open = false">
+              <span :class="menuIcon" aria-hidden="true"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2.2" /><circle cx="9" cy="17" r="2.2" /></svg></span>
+              Inställningar
+            </NuxtLink>
+          </li>
+          <li class="mt-2 border-t border-white/8 pt-2">
+            <button type="button" v-ripple="'himmel'" :class="[menuItem, 'text-krita-dim']" @click="signOut">
+              <span :class="menuIcon" aria-hidden="true"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /><path d="M10 16l-4-4 4-4M6 12h10" /></svg></span>
+              Logga ut
+            </button>
+          </li>
+        </ul>
+        <p class="mt-5 text-xs leading-relaxed text-krita-dim">
           Du publicerar i Snacket på stan med den här profilen. Namn, handle, avatar och text om dig syns för alla när du har skrivit något – din e-postadress aldrig.
         </p>
-        <div class="mt-5 flex flex-wrap gap-2">
-          <NuxtLink :to="links.supporter(profile.handle)" class="rounded-full bg-guld px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="open = false">Din läktarplats</NuxtLink>
-          <button class="rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold transition hover:border-himmel hover:text-himmel" @click="editing = true">Ändra profil</button>
-          <button class="rounded-full px-5 py-2.5 text-sm font-bold text-krita-dim transition hover:text-krita" @click="signOut">Logga ut</button>
-        </div>
       </template>
 
       <!-- Signed in, profile still loading or failed -->

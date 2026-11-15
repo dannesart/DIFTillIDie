@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { SectionId } from '~/lib/sectionLinks'
 
-/* The bottom nav's glyphs (components/MobileNav.vue), for the shell's sidebar. */
-defineProps<{ id: SectionId }>()
+/* The bottom nav's glyphs (components/MobileNav.vue), for the shell's sidebar, plus its own two: your profile and your settings. */
+defineProps<{ id: SectionId | 'profil' | 'installningar' }>()
 </script>
 
 <template>
@@ -17,6 +17,14 @@ defineProps<{ id: SectionId }>()
   <!-- Snacket: a speech bubble -->
   <svg v-else-if="id === 'snacket'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
     <path d="M4 5h16v11H10l-5 4v-4H4z" /><circle cx="9" cy="10.5" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="10.5" r="1" fill="currentColor" stroke="none" /><circle cx="15" cy="10.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+  <!-- Profil: a person -->
+  <svg v-else-if="id === 'profil'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4" />
+  </svg>
+  <!-- Inställningar: sliders -->
+  <svg v-else-if="id === 'installningar'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2.2" /><circle cx="9" cy="17" r="2.2" />
   </svg>
   <!-- Lyssna: headphones -->
   <svg v-else viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
