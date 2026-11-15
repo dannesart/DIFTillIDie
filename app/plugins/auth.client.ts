@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { AUTH_STORAGE_KEY, createAuth } from '~/lib/auth'
+import { createFollows } from '~/lib/follows'
 import { createInteractions } from '~/lib/interactions'
 import { createPreferences } from '~/lib/preferences'
 import { createCommunity } from '~/lib/posts'
@@ -29,6 +30,7 @@ export default defineNuxtPlugin(() => {
   const community = createCommunity(client, auth)
   const interactions = createInteractions(client, auth, community)
   const preferences = createPreferences(client, auth)
+  const follows = createFollows(client, auth)
 
   // Back on the tab after a while (e.g. the other phone just posted): fetch again.
   document.addEventListener('visibilitychange', () => {
@@ -37,5 +39,5 @@ export default defineNuxtPlugin(() => {
   })
 
   // `supabase`: the same publishable-key client, for page-level stores (a supporter's wall).
-  return { provide: { auth, community, interactions, preferences, supabase: client } }
+  return { provide: { auth, community, interactions, preferences, follows, supabase: client } }
 })
