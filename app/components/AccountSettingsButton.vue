@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /*
- * Your account's settings: the account dialog (Ändra profil, Logga ut).
- * A quiet gear beside the sidebar's profile card, and on phones on your own
- * läktarplats (Issue #14). Never inside a link: going to your profile and
- * opening your settings are separate actions.
+ * The account menu (AccountDialog: Min profil, Redigera profil, Inställningar,
+ * Logga ut), on phones, from your own läktarplats. Desktop opens the same menu
+ * from the sidebar's profile card. Never inside a link: going to your profile
+ * and opening the menu are separate actions.
  */
 const open = useAccountDialog()
 </script>

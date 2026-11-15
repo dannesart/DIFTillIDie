@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { TEAM_INTERESTS } from '#shared/utils/profile'
 import type { FeedPost } from '~/composables/useSnacket'
 import type { CommunityPost } from '~/lib/posts'
 
@@ -11,8 +10,10 @@ import type { CommunityPost } from '~/lib/posts'
  * Everything is loaded in the browser, like the feed, so the cached HTML is
  * the same empty shell for everyone.
  *
- * The supporter themselves also sees "Mina lag", their private team
- * interests. Nobody else can read them, and nothing is hidden because of them.
+ * On your own place: the account menu (the gear, on phones; desktop has it
+ * in the sidebar's profile card) and "Du följer". Editing your profile and
+ * your settings ("Mina lag", now at /installningar) are in the account menu,
+ * not in the header.
  *
  * Used by the shell's view at /laktaren/<handle> (shell/views/Laktaren.vue),
  * which decides the surroundings and keeps one instance per supporter.
@@ -28,7 +29,6 @@ const auth = useAuth()
 const { userId, profileStatus } = auth
 const accountOpen = useAccountDialog()
 const editor = useProfileEditor()
-const preferences = usePreferences()
 const interactions = useInteractions()
 // Stories in the feeds right now: posts from before frozen Stories still link to theirs.
 useNews()
@@ -92,11 +92,6 @@ watch(posts, (list) => {
 })
 watch(userId, () => void interactions.loadMine(posts.value.map(p => p.id)))
 
-// Your teams: loaded only on your own page.
-watch([own, () => auth.profileStatus.value], ([mine, ps]) => {
-  if (mine && ps === 'ready' && preferences.status.value === 'idle') void preferences.load()
-}, { immediate: true })
-
 const postsLabel = computed(() => {
   const n = total.value ?? 0
   if (n === 0) return 'Inga inlägg än'
@@ -138,7 +133,7 @@ const postsLabel = computed(() => {
   <template v-else-if="profile">
     <!-- The supporter -->
     <section class="card relative overflow-hidden" aria-labelledby="supporter-name">
-      <!-- Phones: your settings (desktop has them beside the sidebar's profile card) -->
+      <!-- Phones: the account menu (desktop opens it from the sidebar's profile card) -->
       <AccountSettingsButton v-if="own" class="absolute right-3 top-3 z-10 backdrop-blur lg:hidden" />
       <div class="relative h-28 sm:h-36" aria-hidden="true">
         <div class="stripes absolute inset-0 [--stripe:18px]" />
@@ -150,10 +145,9 @@ const postsLabel = computed(() => {
       <div class="px-5 pb-6 sm:px-7">
         <div class="-mt-12 flex items-end justify-between gap-3 sm:-mt-14">
           <Avatar :name="profile.displayName" :design="profile.avatar" size="xl" class="ring-4! ring-navy-900!" />
-          <button v-if="own" class="mb-1 rounded-full border border-white/15 bg-navy-900/80 px-4 py-2 text-sm font-bold backdrop-blur transition hover:border-himmel hover:text-himmel" @click="editor.edit()">Ändra profil</button>
-          <!-- Follow (private): "Följ" until Supabase confirms, then "Följer"; tapping "Följer" stops following -->
+          <!-- Follow (private): "Följ" until Supabase confirms, then "Följer"; tapping "Följer" stops following. Never on your own place. -->
           <button
-            v-else-if="showFollow"
+            v-if="showFollow"
             v-ripple
             type="button"
             class="relative mb-1 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold backdrop-blur transition disabled:opacity-60"
@@ -196,44 +190,6 @@ const postsLabel = computed(() => {
           Din läktarplats syns för andra när du har skrivit ett inlägg eller en kommentar i Snacket. Tills dess ser bara du den.
         </p>
       </div>
-    </section>
-
-    <!-- Only for the supporter themselves -->
-    <section v-if="own" class="card mt-5 p-5 sm:p-6" aria-labelledby="my-teams">
-      <div class="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="my-teams" class="font-display text-2xl font-bold">Mina lag</h2>
-        <span class="text-xs font-semibold text-krita-dim">🔒 Bara för dig</span>
-      </div>
-      <p class="mt-1 text-sm leading-relaxed text-krita-dim">
-        Vilka Djurgården följer du? Ingen annan ser ditt val, och vi gömmer aldrig något i flödet för att du gjort det.
-      </p>
-      <p v-if="preferences.status.value === 'unavailable'" class="mt-4 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm text-krita-dim">
-        Mina lag går inte att använda här än – databasen har inte stöd för det ännu.
-      </p>
-      <p v-else-if="preferences.status.value === 'error'" class="mt-4 text-sm text-krita-dim" role="alert">
-        Kunde inte hämta dina lag.
-        <button class="font-semibold text-himmel hover:underline" @click="preferences.load()">Försök igen</button>
-      </p>
-      <div v-else class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" :aria-busy="preferences.status.value !== 'ready' || preferences.saving.value">
-        <button
-          v-for="t in TEAM_INTERESTS"
-          :key="t.key"
-          type="button"
-          :aria-pressed="preferences.teams.value.includes(t.key)"
-          :disabled="preferences.status.value !== 'ready' || preferences.saving.value"
-          class="group flex flex-col items-start rounded-2xl border px-4 py-3 text-left transition disabled:cursor-wait motion-safe:enabled:hover:-translate-y-0.5"
-          :class="preferences.teams.value.includes(t.key) ? 'border-himmel bg-himmel/12' : 'border-white/10 hover:border-white/25'"
-          @click="preferences.toggle(t.key)"
-        >
-          <span class="text-lg" aria-hidden="true">{{ t.sport === 'Fotboll' ? '⚽' : '🏒' }}</span>
-          <span class="mt-1 font-display text-lg font-bold leading-tight">{{ t.sport }}</span>
-          <span class="text-sm text-krita-dim">{{ t.team }}</span>
-          <span class="mt-2 text-xs font-bold" :class="preferences.teams.value.includes(t.key) ? 'text-himmel' : 'text-krita-dim'">
-            {{ preferences.teams.value.includes(t.key) ? '✓ Följer' : 'Följ' }}
-          </span>
-        </button>
-      </div>
-      <p v-if="preferences.error.value" class="mt-3 text-sm font-semibold text-rod" role="alert">{{ preferences.error.value }}</p>
     </section>
 
     <!-- Whom you follow: only for you, only public supporters, newest follow first. Nothing here is shown to anyone else. -->

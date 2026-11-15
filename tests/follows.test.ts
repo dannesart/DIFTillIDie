@@ -211,7 +211,8 @@ describe('the läktarplats', () => {
 
   it('the follow button: never on your own place, pressed when you follow, busy while it\'s being saved', () => {
     const button = all(ast).find(n => n.tag === 'button' && dir(n, 'click') === 'tapFollow')!
-    expect(dir(button, 'else-if')).toBe('showFollow')
+    expect(dir(button, 'if')).toBe('showFollow')
+    expect(readFileSync('app/components/SupporterPlace.vue', 'utf8')).toMatch(/showFollow = computed\(\(\) => !own\.value/)
     expect(dir(button, 'aria-pressed')).toBe('followingThem')
     expect(dir(button, 'disabled')).toBe('followBusy')
     expect(dir(button, 'aria-busy')).toBe('followBusy')
