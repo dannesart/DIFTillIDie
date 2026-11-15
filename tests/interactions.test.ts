@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { nextTick, ref } from 'vue'
+import { parse } from 'vue/compiler-sfc'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AuthStore } from '../app/lib/auth'
 import type { CommunityStore } from '../app/lib/posts'
-import { COMMENT_LIMIT, commentErrorMessage, createInteractions, reactErrorMessage, toRealComment } from '../app/lib/interactions'
+import { COMMENT_LIMIT, commentErrorMessage, commentsButtonLabel, createInteractions, reactErrorMessage, toRealComment } from '../app/lib/interactions'
 
 const MATTIAS = '55555555-5555-4555-8555-555555555555'
 const JARN = '44444444-4444-4444-8444-444444444444'
@@ -285,5 +287,32 @@ describe('helpers', () => {
     expect(commentErrorMessage({ code: '23514' })).toMatch(/Kommentaren måste vara 1–280/)
     expect(commentErrorMessage({ code: '42501' })).toMatch(/kan inte kommentera/)
     expect(commentErrorMessage({ code: '23503' })).toMatch(/finns inte längre/)
+  })
+})
+
+describe('the comments button (#16)', () => {
+  it('has a name that says what it does and how many comments there are', () => {
+    expect(commentsButtonLabel(3, false)).toBe('Visa kommentarer, 3')
+    expect(commentsButtonLabel(0, false)).toBe('Visa kommentarer, 0')
+    expect(commentsButtonLabel(3, true)).toBe('Dölj kommentarer, 3')
+    // Counts not loaded (or failed): say so, like the reactions do
+    expect(commentsButtonLabel(undefined, false)).toBe('Visa kommentarer, okänt antal')
+    expect(commentsButtonLabel(null, true)).toBe('Dölj kommentarer, okänt antal')
+  })
+
+  it('contains the words the button shows on wider screens (label in name)', () => {
+    expect(commentsButtonLabel(2, false).toLowerCase()).toContain('kommentarer')
+    expect(commentsButtonLabel(2, true)).toContain('Dölj')
+  })
+
+  it('is what every post\'s comments button uses, beside aria-expanded and its click', () => {
+    type Prop = { type: number, name: string, value?: { content: string }, rawName?: string, arg?: { content: string }, exp?: { content: string } }
+    type Node = { type: number, tag?: string, props?: Prop[], children?: Node[] }
+    const ast = parse(readFileSync('app/components/RealPostInteractions.vue', 'utf8')).descriptor.template!.ast as unknown as Node
+    const all = (n: Node): Node[] => [n, ...(n.children ?? []).flatMap(all)]
+    const bound = (n: Node, arg: string) => n.props?.find(p => p.type === 7 && p.arg?.content === arg)?.exp?.content
+    const button = all(ast).find(n => n.tag === 'button' && bound(n, 'aria-expanded') === 'open')!
+    expect(bound(button, 'aria-label')).toBe('commentsButtonLabel(s?.comments, open)')
+    expect(bound(button, 'click')).toBe('toggle')
   })
 })

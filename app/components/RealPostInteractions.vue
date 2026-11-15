@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ReactionKey } from '#shared/types/domain'
 import { REACTIONS } from '~/composables/useSnacket'
+import { commentsButtonLabel } from '~/lib/interactions'
 
 /*
  * Reactions and comments on a post, stored in Supabase. Counts are
@@ -90,7 +91,7 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
       <span :key="`${r.key}-${count(r.key)}`" :class="popped === r.key && 'animate-pop'" class="inline-block">{{ r.emoji }}</span>
       <span class="tabular-nums">{{ count(r.key) ?? (statsStatus === 'error' ? '?' : '–') }}</span>
     </button>
-    <button class="chip ml-auto border-transparent bg-white/[0.04] text-krita-dim hover:text-krita" :aria-expanded="open" @click="toggle">
+    <button class="chip ml-auto border-transparent bg-white/[0.04] text-krita-dim hover:text-krita" :aria-expanded="open" :aria-label="commentsButtonLabel(s?.comments, open)" @click="toggle">
       💬 <span class="tabular-nums">{{ s ? s.comments : '–' }}</span>
       <span class="hidden sm:inline">{{ open ? 'Dölj' : 'Kommentarer' }}</span>
     </button>
