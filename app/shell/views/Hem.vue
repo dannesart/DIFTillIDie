@@ -5,7 +5,7 @@ import { frozenLead } from '~/lib/posts'
 
 /*
  * The shell's home, on every screen size: an overview, not a feed. A small
- * hero, then what's being said on the läktare and what's happening in the
+ * hero, a quick way to write in Snacket (ComposeEntry), then what's being said on the läktare and what's happening in the
  * Stories, side by side as short previews of the real thing, each leading
  * into its own page. On desktop the next match and the podcasts are in the
  * rail, so they aren't repeated here; where there's no rail they follow.
@@ -72,6 +72,9 @@ const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
           Fotboll och hockey, snack från läktaren och poddar för långa kvällar.
         </p>
       </section>
+
+      <!-- Quick posting: Snacket's own entry, opening the one compose dialog (signed out, it invites you to log in) -->
+      <ComposeEntry compact prompt="Vad händer på läktaren?" class="mt-4" />
 
       <!-- The overview: two short lists side by side where there's room, stacked (and shorter) where there isn't -->
       <div class="mt-8 grid grid-cols-1 gap-6 @lg:grid-cols-2">
