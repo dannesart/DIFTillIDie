@@ -12,6 +12,8 @@ import type { AuthStore } from './auth'
  *
  * 'unavailable': a database without the follows migration (no such table or
  * function). Retrying can't help, so the page shows no follow controls at all.
+ *
+ * Counts (v1.1) are public numbers, never who: see loadCounts().
  */
 
 export type FollowsStatus = 'idle' | 'loading' | 'ready' | 'error' | 'unavailable'
@@ -32,6 +34,10 @@ export function followErrorMessage(e: unknown): string {
 
 interface FollowedRow { id: string, display_name: string, handle: string, avatar: string | null }
 
+/** A supporter's public follow counts, exactly as supporter_follow_counts() returned them. */
+export interface FollowCounts { followers: number, following: number }
+const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0
+
 export function createFollows(client: SupabaseClient | null, auth: AuthStore | null) {
   /** Whether the database has following at all ('unavailable' once it's known not to). */
   const status = ref<FollowsStatus>('idle')
@@ -42,6 +48,14 @@ export function createFollows(client: SupabaseClient | null, auth: AuthStore | n
   /** Your own list ("Du följer"): public supporters you follow, newest follow first. */
   const list = ref<PublicAuthor[]>([])
   const listStatus = ref<FollowsStatus>('idle')
+  /**
+   * Public follow counts by user id (#9 v1.1), only as Supabase returned them.
+   * Absent = not known (not asked yet, not public to you, or the lookup
+   * failed): then nothing is shown, never a guessed zero.
+   */
+  const counts = ref<Record<string, FollowCounts>>({})
+  /** A database without supporter_follow_counts() yet: stop asking. */
+  let countsMissing = false
   let request = 0
 
   const canFollow = () => !!client && !!auth && auth.status.value === 'signed-in' && auth.profileStatus.value === 'ready'
@@ -96,6 +110,8 @@ export function createFollows(client: SupabaseClient | null, auth: AuthStore | n
       const { error: e } = await client!.rpc(follow ? 'follow_supporter' : 'unfollow_supporter', { p_profile_id: profileId })
       if (e) throw e
       set(following, profileId, follow)
+      // Their follower count, as the database now says (never nudged up or down here).
+      void loadCounts(profileId)
       // Your list follows suit: gone at once, or there the next time it's shown.
       if (!follow) list.value = list.value.filter(p => p.id !== profileId)
       else if (listStatus.value === 'ready') listStatus.value = 'idle'
@@ -132,6 +148,28 @@ export function createFollows(client: SupabaseClient | null, auth: AuthStore | n
     }
   }
 
+  /**
+   * A supporter's public follow counts: Följare and Följer. Anyone may ask
+   * (signed out too); the database answers only for a public profile, or
+   * your own. No answer, or a failed one: the counts aren't shown.
+   */
+  async function loadCounts(profileId: string) {
+    if (!client || countsMissing) return
+    const mine = request
+    try {
+      const { data, error: e } = await client.rpc('supporter_follow_counts', { p_profile_id: profileId })
+      if (mine !== request) return
+      if (e) throw e
+      const row = (data as Partial<FollowCounts>[] | null)?.[0]
+      set(counts, profileId, row && isCount(row.followers) && isCount(row.following) ? { followers: row.followers, following: row.following } : undefined)
+    }
+    catch (e) {
+      if (mine !== request) return
+      if (followsMissing(e)) countsMissing = true
+      set(counts, profileId, undefined)
+    }
+  }
+
   // Follows belong to whoever is signed in: forget them when that changes.
   if (auth) {
     watch(auth.userId, () => {
@@ -139,6 +177,8 @@ export function createFollows(client: SupabaseClient | null, auth: AuthStore | n
       following.value = {}
       pending.value = {}
       list.value = []
+      // Your own private place's counts were yours only.
+      counts.value = {}
       if (status.value !== 'unavailable') {
         status.value = 'idle'
         listStatus.value = 'idle'
@@ -146,7 +186,7 @@ export function createFollows(client: SupabaseClient | null, auth: AuthStore | n
     })
   }
 
-  return { status, following, pending, list, listStatus, canFollow, check, toggle, loadList }
+  return { status, following, pending, list, listStatus, counts, canFollow, check, toggle, loadList, loadCounts }
 }
 
 export type FollowsStore = ReturnType<typeof createFollows>

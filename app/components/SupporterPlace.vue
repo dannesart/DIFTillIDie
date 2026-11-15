@@ -39,7 +39,8 @@ const own = computed(() => !!userId.value && userId.value === wall.id.value)
  * Following (#9), private: only you see whom you follow. "Följ" on someone
  * else's place, a friendly way in when you can't follow yet, and on your own
  * place a list of the public supporters you follow. Shown only once the
- * database is known to support it.
+ * database is known to support it. Since v1.1 the header also shows public
+ * follow counts (Följare, Följer): numbers only, never who.
  */
 const follows = useFollows()
 /** 'signin' / 'profile': why you can't follow yet; any other text: what went wrong. */
@@ -63,6 +64,19 @@ watch([() => wall.id.value, userId], ([id]) => {
 watch(own, (mine) => {
   if (mine) void follows.loadList()
 }, { immediate: true })
+// Their public counts (anyone may see them on a public place; on your own, always).
+watch([() => wall.id.value, userId], ([id]) => {
+  if (id) void follows.loadCounts(id)
+}, { immediate: true })
+
+/** The header's numbers, each only as the database gave it. */
+const stats = computed(() => {
+  const list: { key: string, label: string, value: number }[] = []
+  if (total.value !== null) list.push({ key: 'snack', label: 'Snack', value: total.value })
+  const c = wall.id.value ? follows.counts.value[wall.id.value] : undefined
+  if (c) list.push({ key: 'followers', label: 'Följare', value: c.followers }, { key: 'following', label: 'Följer', value: c.following })
+  return list
+})
 
 // An id, a former handle, or your own handle just changed: show the current address.
 watch(wall.canonical, (handle) => {
@@ -171,13 +185,13 @@ const postsLabel = computed(() => {
           </div>
           <!--
             Snack: their posts in Snacket, as counted by Supabase (the same count as the wall's).
-            No follower or following numbers: follows are private (Following v1), so there is
-            nothing that may be counted for others to see yet. Never a made-up number.
+            Följare / Följer: public counts from supporter_follow_counts(), never who. Each shows
+            only once the database has given it; never a made-up number or a guessed zero.
           -->
-          <dl v-if="total !== null" class="flex gap-2" aria-label="Siffror">
-            <div class="flex min-w-20 flex-col-reverse items-center rounded-2xl bg-white/[0.06] px-4 py-2">
-              <dt class="text-xs font-semibold text-krita-dim">Snack</dt>
-              <dd class="font-display text-2xl font-bold leading-tight tabular-nums">{{ total }}</dd>
+          <dl v-if="stats.length" class="flex flex-wrap gap-2" aria-label="Siffror">
+            <div v-for="s in stats" :key="s.key" class="flex min-w-20 flex-col-reverse items-center rounded-2xl bg-white/[0.06] px-4 py-2">
+              <dt class="text-xs font-semibold text-krita-dim">{{ s.label }}</dt>
+              <dd class="font-display text-2xl font-bold leading-tight tabular-nums">{{ s.value }}</dd>
             </div>
           </dl>
         </div>

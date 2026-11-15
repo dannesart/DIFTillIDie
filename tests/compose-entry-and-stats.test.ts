@@ -50,6 +50,7 @@ describe('Hem', () => {
 
 describe('the läktarplats header', () => {
   const place = template('app/components/SupporterPlace.vue')
+  const script = source('app/components/SupporterPlace.vue')
   const name = all(place).find(n => attr(n, 'id') === 'supporter-name')!
   const row = all(place).find(n => n.children?.some(c => c.children?.includes(name)))!
 
@@ -57,21 +58,24 @@ describe('the läktarplats header', () => {
     expect(attr(row, 'class')).toContain('flex-wrap')
     expect(attr(row, 'class')).toContain('justify-between')
     const stats = row.children!.find(c => c.tag === 'dl')!
-    expect(bound(stats, 'if')).toBe('total !== null')
+    expect(bound(stats, 'if')).toBe('stats.length')
+    expect(attr(stats, 'class')).toContain('flex-wrap')
   })
 
-  it('Snack is the real count from Supabase (the wall\'s total), never a made-up number', () => {
+  it('Snack, Följare and Följer, each only as the database gave it (never a made-up number or a guessed zero)', () => {
+    expect(script).toContain("if (total.value !== null) list.push({ key: 'snack', label: 'Snack', value: total.value })")
+    expect(script).toContain('const c = wall.id.value ? follows.counts.value[wall.id.value] : undefined')
+    expect(script).toContain("if (c) list.push({ key: 'followers', label: 'Följare', value: c.followers }, { key: 'following', label: 'Följer', value: c.following })")
     const stats = all(row).find(n => n.tag === 'dl')!
-    expect(all(stats).filter(n => n.tag === 'dt').map(n => text(n).trim())).toEqual(['Snack'])
-    const value = all(stats).find(n => n.tag === 'dd')!
-    expect(value.children!.map(c => (c as { content?: { content?: string } }).content?.content ?? c.content).join('').trim()).toBe('total')
+    const item = stats.children!.find(c => c.type === 1)!
+    expect(bound(item, 'for')).toBe('s in stats')
   })
 
-  it('has no follower or following numbers while follows are private, and no empty buttons for them', () => {
-    const header = all(place).find(n => attr(n, 'aria-labelledby') === 'supporter-name')!
-    expect(text(header)).not.toMatch(/Följare/)
-    expect(all(header).filter(n => n.tag === 'dt').map(n => text(n).trim())).not.toContain('Följer')
+  it('numbers only: no buttons or links among them (no follower lists)', () => {
+    const stats = all(row).find(n => n.tag === 'dl')!
+    expect(all(stats).some(n => ['button', 'a', 'NuxtLink'].includes(n.tag!))).toBe(false)
     // "Du följer" (yours, private) stays as it was
     expect(all(place).some(n => attr(n, 'aria-labelledby') === 'i-follow')).toBe(true)
   })
 })
+
