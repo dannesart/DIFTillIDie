@@ -1,27 +1,23 @@
 <script setup lang="ts">
 /*
  * The supporter account, in one dialog: sign in with a code by e-mail, choose how you're
- * known on the stands, and once you have a profile the account menu (Min profil,
- * Redigera profil, Inställningar, Logga ut). Not a settings form: settings are
- * at /installningar. Native <dialog> like the others — a centred card on
- * desktop, a bottom sheet on phones.
+ * known on the stands (a new supporter's first name and avatar), and once you have a
+ * profile the account menu (Min profil, Inställningar, Logga ut). Not a settings form:
+ * editing your profile and your settings are at /installningar. Native <dialog> like
+ * the others — a centred card on desktop, a bottom sheet on phones.
  */
 const auth = useAuth()
 const { status, profile, profileStatus } = auth
 const open = useAccountDialog()
-const editor = useProfileEditor()
 const links = useSectionLinks()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
-const editing = ref(false)
 let opener: HTMLElement | null = null
 
 watch(open, (isOpen) => {
   const el = dialog.value
   if (!el) return
   if (isOpen) {
-    editing.value = editor.editing.value
-    editor.editing.value = false
     opener = document.activeElement as HTMLElement | null
     if (!el.open) el.showModal()
     document.documentElement.classList.add('dialog-open')
@@ -34,8 +30,6 @@ watch(open, (isOpen) => {
 // Opened before this component mounted (e.g. from another page): show it right away.
 onMounted(() => {
   if (open.value && dialog.value && !dialog.value.open) {
-    editing.value = editor.editing.value
-    editor.editing.value = false
     dialog.value.showModal()
     document.documentElement.classList.add('dialog-open')
   }
@@ -95,12 +89,12 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
         </p>
       </template>
 
-      <!-- Signed in, no profile yet (or editing it) -->
-      <template v-else-if="status === 'signed-in' && (profileStatus === 'missing' || editing)">
-        <h2 id="account-title" class="mt-1 font-display text-3xl font-bold leading-tight">{{ editing ? 'Redigera profil' : 'Välkommen in! 💙' }}</h2>
-        <p v-if="!editing" class="mt-2 text-sm leading-relaxed text-krita-dim">Välj hur du syns på läktaren. Det är namnet du publicerar med i Snacket på stan, och det syns för alla när du har skrivit något.</p>
-        <ProfileForm class="mt-5" :initial="editing ? profile : null" @saved="editing = false" @cancel="editing = false" />
-        <button v-if="!editing" class="mt-4 text-xs font-semibold text-krita-dim underline decoration-white/20 underline-offset-2 hover:text-krita" @click="signOut">Logga ut</button>
+      <!-- Signed in, no profile yet: a new supporter chooses their name and avatar (editing one is at /installningar) -->
+      <template v-else-if="status === 'signed-in' && profileStatus === 'missing'">
+        <h2 id="account-title" class="mt-1 font-display text-3xl font-bold leading-tight">Välkommen in! 💙</h2>
+        <p class="mt-2 text-sm leading-relaxed text-krita-dim">Välj hur du syns på läktaren. Det är namnet du publicerar med i Snacket på stan, och det syns för alla när du har skrivit något.</p>
+        <ProfileForm class="mt-5" :initial="null" />
+        <button class="mt-4 text-xs font-semibold text-krita-dim underline decoration-white/20 underline-offset-2 hover:text-krita" @click="signOut">Logga ut</button>
       </template>
 
       <!-- Signed in, profile ready -->
@@ -120,12 +114,6 @@ onBeforeUnmount(() => document.documentElement.classList.remove('dialog-open'))
               <span :class="menuIcon" aria-hidden="true"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4" /></svg></span>
               Min profil
             </NuxtLink>
-          </li>
-          <li>
-            <button type="button" v-ripple="'himmel'" :class="menuItem" @click="editing = true">
-              <span :class="menuIcon" aria-hidden="true"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></svg></span>
-              Redigera profil
-            </button>
           </li>
           <li>
             <NuxtLink :to="links.settings" v-ripple="'himmel'" :class="menuItem" @click="open = false">

@@ -94,7 +94,7 @@ const accountLabel = computed(() => {
       </p>
       <!--
         Who you are here: last, at the foot. The whole card opens the account
-        menu (Min profil, Redigera profil, Inställningar, Logga ut); signed out
+        menu (Min profil, Inställningar, Logga ut); signed out
         or choosing a name, the same dialog lets you in. Your läktarplats is
         the "Profil" link above.
         Two elements, not one with changing insides: the server renders the

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /*
- * Shell view: your own settings, at /installningar. Only what really is a
- * setting today: "Mina lag" (components/MyTeams.vue), your private team
- * interests. Your name, handle, avatar and bio are your profile, edited in
- * the account menu (AccountDialog), not here.
+ * Shell view: your own settings, at /installningar: "Din profil"
+ * (components/MyProfile.vue: name, handle, avatar and bio, the one profile
+ * form, inline) and "Mina lag" (components/MyTeams.vue, your private team
+ * interests). Choosing your name the first time stays in the account dialog,
+ * so a new supporter's journey is unchanged.
  *
  * Everything personal is in the browser: the server (and its cache) only
  * ever renders the neutral "loading" state, like every other personal part.
@@ -24,13 +25,14 @@ useSeoMeta({
     <h1 class="mt-1 font-display text-4xl font-bold leading-none tracking-tight sm:text-5xl">Inställningar</h1>
 
     <!-- Signed in with a profile: your settings -->
-    <div v-if="status === 'signed-in' && profileStatus === 'ready'" class="mt-6">
+    <div v-if="status === 'signed-in' && profileStatus === 'ready'" class="mt-6 space-y-5">
+      <MyProfile />
       <MyTeams />
     </div>
 
-    <!-- Signed in, no name chosen yet: settings belong to a supporter profile -->
+    <!-- Signed in, no name chosen yet: that's the account dialog's onboarding, as before -->
     <section v-else-if="status === 'signed-in' && profileStatus === 'missing'" class="card mt-6 px-6 py-8">
-      <p class="text-krita-dim">Välj ditt läktarnamn först, så kan du välja vilka lag du följer.</p>
+      <p class="text-krita-dim">Välj ditt läktarnamn först, så kan du sköta din profil och välja vilka lag du följer.</p>
       <button class="mt-4 rounded-full bg-guld px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="accountOpen = true">Välj läktarnamn</button>
     </section>
 

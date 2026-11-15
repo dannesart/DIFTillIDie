@@ -29,7 +29,6 @@ const { status, profile, posts, total, more, loadingMore, moreError } = wall
 const auth = useAuth()
 const { userId, profileStatus } = auth
 const accountOpen = useAccountDialog()
-const editor = useProfileEditor()
 const interactions = useInteractions()
 // Stories in the feeds right now: posts from before frozen Stories still link to theirs.
 useNews()
@@ -238,7 +237,7 @@ const postsLabel = computed(() => {
         <p v-if="profile.bio" class="mt-4 max-w-prose text-[1.05rem] leading-relaxed">{{ profile.bio }}</p>
         <p v-else-if="own" class="mt-4 text-sm text-krita-dim">
           Inget om dig än.
-          <button class="font-semibold text-himmel underline-offset-2 hover:underline" @click="editor.edit()">Skriv några rader</button>
+          <NuxtLink :to="links.settings" class="font-semibold text-himmel underline-offset-2 hover:underline">Skriv några rader</NuxtLink>
         </p>
         <p v-if="own && total === 0" class="mt-4 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm leading-relaxed text-krita-dim">
           Din läktarplats syns för andra när du har skrivit ett inlägg eller en kommentar i Snacket. Tills dess ser bara du den.
