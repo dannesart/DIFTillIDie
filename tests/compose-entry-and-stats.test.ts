@@ -65,17 +65,21 @@ describe('the läktarplats header', () => {
   it('Snack, Följare and Följer, each only as the database gave it (never a made-up number or a guessed zero)', () => {
     expect(script).toContain("if (total.value !== null) list.push({ key: 'snack', label: 'Snack', value: total.value })")
     expect(script).toContain('const c = wall.id.value ? follows.counts.value[wall.id.value] : undefined')
-    expect(script).toContain("if (c) list.push({ key: 'followers', label: 'Följare', value: c.followers }, { key: 'following', label: 'Följer', value: c.following })")
+    expect(script).toContain("if (c) list.push({ key: 'followers', label: 'Följare', value: c.followers }, { key: 'following', label: 'Följer', value: c.following, opens: own.value })")
+    // Without counts, only your own place shows "Följer", as the length of your own list (the same people)
+    expect(script).toContain("list.push({ key: 'following', label: 'Följer', value: follows.list.value.length, opens: true })")
     const stats = all(row).find(n => n.tag === 'dl')!
     const item = stats.children!.find(c => c.type === 1)!
     expect(bound(item, 'for')).toBe('s in stats')
   })
 
-  it('numbers only: no buttons or links among them (no follower lists)', () => {
+  it('numbers, no links (no follower lists)', () => {
     const stats = all(row).find(n => n.tag === 'dl')!
-    expect(all(stats).some(n => ['button', 'a', 'NuxtLink'].includes(n.tag!))).toBe(false)
-    // "Du följer" (yours, private) stays as it was
-    expect(all(place).some(n => attr(n, 'aria-labelledby') === 'i-follow')).toBe(true)
+    expect(all(stats).some(n => ['a', 'NuxtLink'].includes(n.tag!))).toBe(false)
+    // One button at most: your own "Följer", which opens your private "Du följer"
+    const buttons = all(stats).filter(n => n.tag === 'button')
+    expect(buttons.map(b => bound(b, 'if'))).toEqual(['s.opens'])
+    expect(attr(buttons[0]!, 'aria-haspopup')).toBe('dialog')
   })
 })
 

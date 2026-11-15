@@ -11,7 +11,8 @@ import type { CommunityPost } from '~/lib/posts'
  * the same empty shell for everyone.
  *
  * On your own place: the account menu (the gear, on phones; desktop has it
- * in the sidebar's profile card) and "Du följer". Editing your profile and
+ * in the sidebar's profile card) and "Du följer" (a dialog, opened from
+ * your own "Följer" number: FollowingDialog). Editing your profile and
  * your settings ("Mina lag", now at /installningar) are in the account menu,
  * not in the header.
  *
@@ -69,12 +70,22 @@ watch([() => wall.id.value, userId], ([id]) => {
   if (id) void follows.loadCounts(id)
 }, { immediate: true })
 
-/** The header's numbers, each only as the database gave it. */
+/**
+ * The header's numbers, each only as the database gave it. On your own place
+ * "Följer" opens "Du följer" (FollowingDialog); everywhere else, and Snack
+ * and Följare always, they're just numbers.
+ */
+const followingOpen = ref(false)
 const stats = computed(() => {
-  const list: { key: string, label: string, value: number }[] = []
+  const list: { key: string, label: string, value: number, opens?: boolean }[] = []
   if (total.value !== null) list.push({ key: 'snack', label: 'Snack', value: total.value })
   const c = wall.id.value ? follows.counts.value[wall.id.value] : undefined
-  if (c) list.push({ key: 'followers', label: 'Följare', value: c.followers }, { key: 'following', label: 'Följer', value: c.following })
+  if (c) list.push({ key: 'followers', label: 'Följare', value: c.followers }, { key: 'following', label: 'Följer', value: c.following, opens: own.value })
+  // Your own place without counts (not deployed, or the lookup failed): "Du följer" must stay
+  // reachable, so "Följer" is the length of your own list, which counts the very same people.
+  else if (own.value && follows.listStatus.value === 'ready' && follows.list.value.length < 200) {
+    list.push({ key: 'following', label: 'Följer', value: follows.list.value.length, opens: true })
+  }
   return list
 })
 
@@ -189,9 +200,25 @@ const postsLabel = computed(() => {
             only once the database has given it; never a made-up number or a guessed zero.
           -->
           <dl v-if="stats.length" class="flex flex-wrap gap-2" aria-label="Siffror">
-            <div v-for="s in stats" :key="s.key" class="flex min-w-20 flex-col-reverse items-center rounded-2xl bg-white/[0.06] px-4 py-2">
+            <div
+              v-for="s in stats"
+              :key="s.key"
+              class="relative flex min-w-20 flex-col-reverse items-center rounded-2xl bg-white/[0.06] px-4 py-2"
+              :class="s.opens && 'ring-1 ring-white/12 transition-colors focus-within:ring-guld hover:bg-white/[0.1] hover:ring-himmel/50'"
+            >
               <dt class="text-xs font-semibold text-krita-dim">{{ s.label }}</dt>
-              <dd class="font-display text-2xl font-bold leading-tight tabular-nums">{{ s.value }}</dd>
+              <dd class="font-display text-2xl font-bold leading-tight tabular-nums">
+                <!-- Your own "Följer" opens "Du följer"; the button's area covers the whole box (after:inset-0) -->
+                <button
+                  v-if="s.opens"
+                  type="button"
+                  class="after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none"
+                  aria-haspopup="dialog"
+                  :aria-label="`Följer ${s.value}: visa vilka du följer`"
+                  @click="followingOpen = true"
+                >{{ s.value }}</button>
+                <template v-else>{{ s.value }}</template>
+              </dd>
             </div>
           </dl>
         </div>
@@ -219,37 +246,8 @@ const postsLabel = computed(() => {
       </div>
     </section>
 
-    <!-- Whom you follow: only for you, only public supporters, newest follow first. Nothing here is shown to anyone else. -->
-    <section v-if="own && follows.listStatus.value !== 'unavailable' && follows.listStatus.value !== 'idle'" class="card mt-5 p-5 sm:p-6" aria-labelledby="i-follow">
-      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id="i-follow" class="font-display text-2xl font-bold">Du följer</h2>
-        <p class="text-xs text-krita-dim">Bara du ser vilka du följer.</p>
-      </div>
-      <ul v-if="follows.listStatus.value === 'loading' && !follows.list.value.length" class="mt-4 space-y-2" aria-busy="true" aria-label="Hämtar vilka du följer">
-        <li v-for="n in 2" :key="n" class="h-14 animate-pulse rounded-2xl bg-white/[0.03]" />
-      </ul>
-      <p v-else-if="follows.listStatus.value === 'error'" class="mt-4 text-sm text-krita-dim" role="alert">
-        Kunde inte hämta vilka du följer.
-        <button class="font-semibold text-himmel hover:underline" @click="follows.loadList()">Försök igen</button>
-      </p>
-      <ul v-else-if="follows.list.value.length" class="mt-3 divide-y divide-white/6">
-        <li v-for="p in follows.list.value" :key="p.id">
-          <NuxtLink :to="links.supporter(p.handle)" class="group flex items-center gap-3 py-2.5">
-            <Avatar :name="p.name" :design="p.avatar" size="md" />
-            <span class="min-w-0 flex-1">
-              <span class="block truncate font-semibold group-hover:text-himmel">{{ p.name }}</span>
-              <span class="block truncate text-sm text-krita-dim">@{{ p.handle }}</span>
-            </span>
-            <span class="text-krita-dim transition group-hover:translate-x-1 group-hover:text-himmel" aria-hidden="true">→</span>
-          </NuxtLink>
-        </li>
-      </ul>
-      <p v-else class="mt-3 text-sm leading-relaxed text-krita-dim">
-        Du följer ingen än. Tryck på ett namn i
-        <NuxtLink :to="links.section('snacket')" class="font-semibold text-himmel hover:underline">Snacket</NuxtLink>
-        och välj <span class="font-semibold text-krita">Följ</span>, så hittar du tillbaka till dem här.
-      </p>
-    </section>
+    <!-- "Du följer": yours only, opened from your own "Följer" -->
+    <FollowingDialog v-if="own" v-model:open="followingOpen" />
 
     <!-- The wall -->
     <section class="mt-8" aria-labelledby="wall-title">

@@ -290,8 +290,49 @@ describe('the läktarplats', () => {
     expect(dir(button, 'aria-busy')).toBe('followBusy')
   })
 
-  it('"Du följer" is only on your own place', () => {
-    const section = all(ast).find(n => n.tag === 'section' && n.props?.some(p => p.name === 'aria-labelledby' && p.value?.content === 'i-follow'))!
-    expect(dir(section, 'if')).toMatch(/^own && /)
+  it('"Du följer" is a dialog on your own place only, no longer a section of the page', () => {
+    expect(all(ast).some(n => n.tag === 'section' && n.props?.some(p => p.name === 'aria-labelledby' && p.value?.content === 'i-follow'))).toBe(false)
+    const dialog = all(ast).filter(n => n.tag === 'FollowingDialog')
+    expect(dialog).toHaveLength(1)
+    expect(dir(dialog[0]!, 'if')).toBe('own')
+  })
+
+  it('only your own "Följer" opens it: Snack and Följare never, and nobody else\'s', () => {
+    const script = readFileSync('app/components/SupporterPlace.vue', 'utf8')
+    expect(script).toContain("{ key: 'following', label: 'Följer', value: c.following, opens: own.value }")
+    expect(script).toMatch(/else if \(own\.value && follows\.listStatus\.value === 'ready'/)
+    expect(script).not.toMatch(/key: '(snack|followers)'[^}]*opens/)
+    const button = all(ast).find(n => n.tag === 'button' && dir(n, 'click') === 'followingOpen = true')!
+    expect(dir(button, 'if')).toBe('s.opens')
+  })
+})
+
+describe('the "Du följer" dialog', () => {
+  type Prop = { type: number, name: string, value?: { content: string }, arg?: { content: string }, exp?: { content: string } }
+  type Node = { type: number, tag?: string, props?: Prop[], children?: Node[], content?: string }
+  const src = readFileSync('app/components/FollowingDialog.vue', 'utf8')
+  const ast = parse(src).descriptor.template!.ast as unknown as Node
+  const all = (n: Node): Node[] => [n, ...(n.children ?? []).flatMap(all)]
+  const text = (n: Node): string => n.type === 2 ? n.content ?? '' : (n.children ?? []).map(text).join('')
+  const attr = (n: Node, name: string) => n.props?.find(p => p.type === 6 && p.name === name)?.value?.content
+
+  it('is a native dialog titled "Du följer", with a close button', () => {
+    const dialog = all(ast).find(n => n.tag === 'dialog')!
+    expect(attr(dialog, 'aria-labelledby')).toBe('i-follow')
+    expect(text(all(ast).find(n => attr(n, 'id') === 'i-follow')!).trim()).toBe('Du följer')
+    expect(all(ast).some(n => n.tag === 'button' && attr(n, 'aria-label') === 'Stäng')).toBe(true)
+    // Escape closes a modal <dialog> natively; focus goes back to what opened it
+    expect(src).toContain('el.showModal()')
+    expect(src).toContain('opener?.focus(')
+  })
+
+  it('shows Following v1\'s own list, with its loading, error and empty states, and nothing new is fetched', () => {
+    expect(src).toContain('follows.list.value')
+    expect(src).toContain('void follows.loadList()')
+    expect(src).not.toMatch(/\.rpc\(|\.from\(/)
+    const t = text(ast)
+    expect(t).toContain('Kunde inte hämta vilka du följer.')
+    expect(t).toContain('Du följer ingen än.')
+    expect(all(ast).some(n => attr(n, 'aria-label') === 'Hämtar vilka du följer')).toBe(true)
   })
 })
