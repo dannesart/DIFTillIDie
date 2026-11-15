@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FeedSort } from '~/lib/feedSort'
 import { createFeedSort, engagement } from '~/lib/feedSort'
-import { draftAttachment, newsLoad, postDraftPreview, resolveAttachment } from '~/lib/postDraft'
+import { newsLoad } from '~/lib/postDraft'
 import { postAnchor } from '~/lib/reveal'
 import { draftsToRecover } from '~/lib/storyDrafts'
 
@@ -47,14 +47,6 @@ const tags = computed(() => {
 const compose = useCompose()
 // A post started here begins from what you're browsing: the sport, the Story whose posts these are.
 const browsing = () => ({ sport: sport.value === 'alla' ? undefined : sport.value, story: filterStory.value })
-/** The draft in progress (text, or only an attached Story), shown in the entry so it's clear nothing was lost. */
-const draftText = computed(() => {
-  if (identity.value.kind === 'guest') return null
-  const d = compose.post.value
-  // The Story's headline now, or, when it can't be confirmed, the one the supporter chose
-  const s = resolveAttachment(draftAttachment(d), stories.value, newsLoad(newsStatus.value))
-  return postDraftPreview(d, s.kind === 'attached' || s.kind === 'confirm' ? leadOf(s.story).headline : d.headline)
-})
 
 /** Story drafts no Story leads to any more (Issue #25): found here, so none is ever out of reach. */
 const toRecover = computed(() => (identity.value.kind === 'guest' ? [] : draftsToRecover(compose.storyDrafts.value, stories.value, newsLoad(newsStatus.value))))
@@ -90,20 +82,7 @@ function mention(handle: string) {
       <div class="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div class="min-w-0">
           <!-- Compact: the composer itself opens in a dialog, with the draft as it was left -->
-          <button
-            type="button"
-            class="card flex w-full items-center gap-3 p-4 text-left transition hover:border-himmel/40 sm:p-5"
-            aria-haspopup="dialog"
-            @click="compose.openPost(browsing())"
-          >
-            <Avatar :name="me?.name ?? 'Du'" :design="me?.avatar" />
-            <span class="min-w-0 flex-1">
-              <span v-if="draftText" class="block text-xs font-semibold text-guld">Ditt utkast</span>
-              <span v-if="draftText" class="block truncate text-krita">{{ draftText }}</span>
-              <span v-else class="block text-base text-krita-dim">Vad snackas det om på stan?</span>
-            </span>
-            <span aria-hidden="true" class="shrink-0 rounded-full bg-himmel px-4 py-2 text-sm font-bold text-navy-950">{{ draftText ? 'Fortsätt' : 'Skriv' }}</span>
-          </button>
+          <ComposeEntry :story="filterStory" />
           <!-- Story drafts whose Story is gone, changed or unconfirmed: a separate list, never the draft above -->
           <button
             v-if="toRecover.length"

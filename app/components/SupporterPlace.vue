@@ -162,9 +162,25 @@ const postsLabel = computed(() => {
             {{ followingThem ? 'Följer' : 'Följ' }}<span class="sr-only"> {{ profile.displayName }}</span>
           </button>
         </div>
-        <p class="kicker mt-4 text-himmel">På läktaren</p>
-        <h1 id="supporter-name" class="mt-1 break-words font-display text-4xl font-bold leading-none tracking-tight sm:text-5xl">{{ profile.displayName }}</h1>
-        <p class="mt-1.5 text-krita-dim">@{{ profile.handle }}</p>
+        <!-- Who, and beside it (beneath on a narrow screen) the supporter's numbers: only real ones -->
+        <div class="mt-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+          <div class="min-w-0 max-w-full">
+            <p class="kicker text-himmel">På läktaren</p>
+            <h1 id="supporter-name" class="mt-1 break-words font-display text-4xl font-bold leading-none tracking-tight sm:text-5xl">{{ profile.displayName }}</h1>
+            <p class="mt-1.5 text-krita-dim">@{{ profile.handle }}</p>
+          </div>
+          <!--
+            Snack: their posts in Snacket, as counted by Supabase (the same count as the wall's).
+            No follower or following numbers: follows are private (Following v1), so there is
+            nothing that may be counted for others to see yet. Never a made-up number.
+          -->
+          <dl v-if="total !== null" class="flex gap-2" aria-label="Siffror">
+            <div class="flex min-w-20 flex-col-reverse items-center rounded-2xl bg-white/[0.06] px-4 py-2">
+              <dt class="text-xs font-semibold text-krita-dim">Snack</dt>
+              <dd class="font-display text-2xl font-bold leading-tight tabular-nums">{{ total }}</dd>
+            </div>
+          </dl>
+        </div>
         <!-- Can't follow yet: a way in, never a dead button. Or what went wrong. -->
         <div v-if="followNote && !own" class="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm" :role="followNote === 'signin' || followNote === 'profile' ? 'status' : 'alert'">
           <template v-if="followNote === 'signin'">
@@ -182,9 +198,6 @@ const postsLabel = computed(() => {
         <p v-else-if="own" class="mt-4 text-sm text-krita-dim">
           Inget om dig än.
           <button class="font-semibold text-himmel underline-offset-2 hover:underline" @click="editor.edit()">Skriv några rader</button>
-        </p>
-        <p class="mt-5 inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3.5 py-1.5 text-sm font-semibold">
-          <span aria-hidden="true">💬</span>{{ postsLabel }}
         </p>
         <p v-if="own && total === 0" class="mt-4 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm leading-relaxed text-krita-dim">
           Din läktarplats syns för andra när du har skrivit ett inlägg eller en kommentar i Snacket. Tills dess ser bara du den.
