@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FeedSort } from '~/lib/feedSort'
-import { createFeedSort, engagement } from '~/lib/feedSort'
+import { createFeedSort, engagement, queryForSort, sortFromQuery } from '~/lib/feedSort'
+import { FOLLOWING_CAP } from '~/lib/followingFeed'
 import { newsLoad } from '~/lib/postDraft'
 import { postAnchor } from '~/lib/reveal'
 import { draftsToRecover } from '~/lib/storyDrafts'
@@ -8,15 +9,18 @@ import { draftsToRecover } from '~/lib/storyDrafts'
 /*
  * Snacket på stan: posts, reactions and comments by signed-in supporters,
  * stored in Supabase and readable by everyone. Nyast by default; Hetast
- * ranks the loaded posts by their real reactions and comments (lib/feedSort).
+ * ranks the loaded posts by their real reactions and comments (lib/feedSort);
+ * Följer is the supporters you follow, newest first, asked of the database
+ * page by page (lib/followingFeed), never picked out of the posts loaded here.
  * Hashtags and filters come only from these posts. Writing happens in the
  * compose dialog (ComposeDialog), opened from the entry at the top or an @mention.
  */
-const { feed, all, community, filter, sort, sport, me, identity } = useSnacket()
-const { stats, statsStatus, statsLoadedAt } = useInteractions()
+const { feed, followingFeed, all, community, filter, sort, sport, me, identity } = useSnacket()
+const interactions = useInteractions()
+const { stats, statsStatus, statsLoadedAt } = interactions
 const { status: feedStatus, stale, refreshing } = community
 const { stories, status: newsStatus } = useNews()
-const { status } = useAuth()
+const { status, userId } = useAuth()
 const accountOpen = useAccountDialog()
 const canSignIn = computed(() => status.value !== 'unavailable')
 
@@ -27,11 +31,79 @@ const loading = computed(() => feedStatus.value === 'idle' || feedStatus.value =
 const sorts: { value: FeedSort, label: string, hint: string }[] = [
   { value: 'hetast', label: 'Hetast', hint: 'Mest reaktioner och kommentarer, svalnar med tiden' },
   { value: 'nyast', label: 'Nyast', hint: 'Senaste först' },
+  { value: 'foljer', label: 'Följer', hint: 'Supportrar du följer, senaste först' },
 ]
+/*
+ * The tab is in the address (?sort=hetast|foljer; Nyast is plain /snacket),
+ * so a refresh, a shared link and back/forward all show the same tab. `sort`
+ * stays the one state; the address only mirrors it:
+ *  - arriving with a valid ?sort: that tab;
+ *  - arriving without one (e.g. from the menu): the tab you had, and the
+ *    address is brought in line (an unknown ?sort falls back to Nyast);
+ *  - picking a tab: a new history entry, without a reload;
+ *  - back/forward: the tab the address names.
+ * Only in the browser, once mounted: /snacket is cached at the CDN whatever
+ * its query, so the server always renders Nyast and never bakes a ?sort in.
+ */
+const route = useRoute()
+const router = useRouter()
+const inAddress = () => sortFromQuery(route.query.sort) ?? 'nyast'
+const agrees = (s: FeedSort) => (route.query.sort === undefined ? s === 'nyast' : !Array.isArray(route.query.sort) && sortFromQuery(route.query.sort) === s)
+onMounted(async () => {
+  const want = sortFromQuery(route.query.sort) ?? (route.query.sort === undefined ? sort.value : 'nyast')
+  if (!agrees(want)) await router.replace({ query: queryForSort(route.query, want), hash: route.hash })
+  sort.value = want
+})
+watch(sort, (s) => {
+  if (!agrees(s)) void router.push({ query: queryForSort(route.query, s) })
+})
+watch(() => route.query.sort, () => {
+  if (inAddress() !== sort.value) sort.value = inAddress()
+})
+
+const sortIndex = computed(() => Math.max(0, sorts.findIndex(m => m.value === sort.value)))
 // Filters first (feed), then the order.
 const feedSort = createFeedSort({ sort, posts: all, stats, statsStatus, statsLoadedAt })
 const sortState = feedSort.state
-const shown = computed(() => feedSort.apply(feed.value))
+
+/*
+ * Följer (#9): only the supporters you follow. Loaded when you pick it, for
+ * the sport you're on, and again whenever you come back to Snacket, so a
+ * follow or unfollow made elsewhere is in it.
+ */
+const following = useFollowingFeed()
+const follows = useFollows()
+const onFollowing = computed(() => sort.value === 'foljer')
+const loadFollowing = () => void following.load(sport.value === 'alla' ? undefined : sport.value)
+onMounted(() => onFollowing.value && loadFollowing())
+watch([onFollowing, sport, userId], ([on]) => on && loadFollowing())
+// Stopped following someone (on this page or another): their posts leave at once.
+watch(follows.following, (now) => {
+  for (const [id, yes] of Object.entries(now)) if (!yes) following.drop(id)
+})
+// Real reactions and comment counts for Följer's posts (the newest 50 have theirs already).
+watch(following.posts, (list) => {
+  const ids = list.map(p => p.id)
+  void interactions.loadStats(ids)
+  void interactions.loadMine(ids)
+})
+
+const shown = computed(() => (onFollowing.value ? followingFeed(following.posts.value) : feedSort.apply(feed.value)))
+
+/** What the feed shows: Hetast and Nyast as before; Följer only for a supporter with a profile. */
+const view = computed(() => {
+  if (feedStatus.value === 'unavailable') return 'unavailable'
+  if (!onFollowing.value) return loading.value ? 'loading' : feedStatus.value === 'error' ? 'error' : 'list'
+  const who = identity.value.kind
+  if (who === 'guest') return 'guest'
+  if (who === 'needs-profile') return 'needs-profile'
+  const s = following.status.value
+  if (s === 'unavailable') return 'following-unavailable'
+  if (who === 'pending' || s === 'idle' || s === 'loading') return 'loading'
+  return s === 'error' ? 'error' : 'list'
+})
+const retry = () => (onFollowing.value ? loadFollowing() : void community.refresh())
+const fetching = computed(() => (onFollowing.value ? following.status.value === 'loading' : refreshing.value))
 const anyEngagement = computed(() => all.value.some(p => engagement(stats.value[p.id]) > 0))
 
 const tags = computed(() => {
@@ -68,12 +140,12 @@ function mention(handle: string) {
           <h2 class="section-title mt-3">Snacket <span class="italic font-normal text-himmel">på stan</span></h2>
         </div>
         <button
-          v-if="feedStatus === 'ready' || stale"
+          v-if="onFollowing ? view === 'list' : feedStatus === 'ready' || stale"
           class="text-sm font-semibold text-krita-dim hover:text-krita disabled:opacity-50"
-          :disabled="refreshing"
-          @click="community.refresh()"
+          :disabled="fetching"
+          @click="retry()"
         >
-          {{ refreshing ? 'Hämtar…' : 'Hämta nya inlägg' }}
+          {{ fetching ? 'Hämtar…' : 'Hämta nya inlägg' }}
         </button>
       </div>
 
@@ -106,11 +178,11 @@ function mention(handle: string) {
                 <span class="sr-only">Rensa filter</span>
               </button>
             </div>
-            <div v-if="all.length" class="relative ml-auto grid grid-cols-2 rounded-full border border-white/10 bg-navy-900 p-1" role="tablist" aria-label="Sortera snacket">
+            <div v-if="all.length" class="relative ml-auto grid grid-cols-3 rounded-full border border-white/10 bg-navy-900 p-1" role="tablist" aria-label="Sortera snacket">
               <span
                 aria-hidden="true"
-                class="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-krita transition-transform duration-500 ease-spring"
-                :class="sort === 'nyast' && 'translate-x-full'"
+                class="absolute inset-y-1 left-1 w-[calc((100%-0.5rem)/3)] rounded-full bg-krita transition-transform duration-500 ease-spring"
+                :style="{ transform: `translateX(${sortIndex * 100}%)` }"
               />
               <button
                 v-for="m in sorts"
@@ -135,20 +207,42 @@ function mention(handle: string) {
             <template v-else>Bland de {{ all.length }} senaste inläggen: reaktioner och kommentarer, nyare väger tyngre.</template>
           </p>
 
-          <section id="snacket-feed" class="scroll-below-header mt-6" :aria-label="sortState === 'ranked' ? 'Inlägg, hetast först' : 'Inlägg, nyast först'" :aria-busy="loading || refreshing">
-            <p v-if="feedStatus === 'unavailable'" class="card p-5 text-sm text-krita-dim">Snacket är inte påslaget här.</p>
+          <section
+            id="snacket-feed"
+            class="scroll-below-header mt-6"
+            :aria-label="onFollowing ? 'Inlägg från supportrar du följer, nyast först' : sortState === 'ranked' ? 'Inlägg, hetast först' : 'Inlägg, nyast först'"
+            :aria-busy="view === 'loading' || fetching"
+          >
+            <p v-if="view === 'unavailable'" class="card p-5 text-sm text-krita-dim">Snacket är inte påslaget här.</p>
+
+            <!-- Följer, signed out: what it is, and the way in -->
+            <div v-else-if="view === 'guest'" class="card p-6 text-center">
+              <p class="font-semibold">Här samlas snacket från supportrarna du följer.</p>
+              <p v-if="canSignIn" class="mt-1 text-sm text-krita-dim">Logga in för att följa supportrar och se deras inlägg här.</p>
+              <p v-else class="mt-1 text-sm text-krita-dim">Att följa supportrar är inte påslaget här.</p>
+              <button v-if="canSignIn" class="mt-4 rounded-full bg-guld px-4 py-2 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="accountOpen = true">Logga in</button>
+            </div>
+
+            <!-- Följer, signed in without a name yet: the usual way to choose one -->
+            <div v-else-if="view === 'needs-profile'" class="card p-6 text-center">
+              <p class="font-semibold">Välj ditt läktarnamn först.</p>
+              <p class="mt-1 text-sm text-krita-dim">Med ett läktarnamn kan du följa supportrar och se deras inlägg här.</p>
+              <button class="mt-4 rounded-full bg-guld px-4 py-2 text-sm font-bold text-navy-950 transition hover:-translate-y-0.5" @click="accountOpen = true">Välj läktarnamn</button>
+            </div>
+
+            <p v-else-if="view === 'following-unavailable'" class="card p-5 text-sm text-krita-dim">Att följa supportrar är inte påslaget här.</p>
 
             <template v-else>
-              <p v-if="stale" class="mb-3 text-xs font-semibold text-guld" role="status">Kunde inte hämta nya inlägg just nu – visar de senast hämtade.</p>
+              <p v-if="stale && !onFollowing" class="mb-3 text-xs font-semibold text-guld" role="status">Kunde inte hämta nya inlägg just nu – visar de senast hämtade.</p>
 
               <!-- Loading: placeholders, never invented content -->
-              <ul v-if="loading" class="space-y-4" aria-label="Hämtar inlägg">
+              <ul v-if="view === 'loading'" class="space-y-4" aria-label="Hämtar inlägg">
                 <li v-for="n in 3" :key="n" class="card h-32 animate-pulse bg-white/[0.03]" />
               </ul>
 
-              <div v-else-if="feedStatus === 'error'" class="card p-5 text-sm" role="alert">
-                <p>Kunde inte hämta snacket just nu.</p>
-                <button class="mt-2 font-semibold text-himmel hover:underline" @click="community.refresh()">Försök igen</button>
+              <div v-else-if="view === 'error'" class="card p-5 text-sm" role="alert">
+                <p>{{ onFollowing ? 'Kunde inte hämta inläggen från dem du följer just nu.' : 'Kunde inte hämta snacket just nu.' }}</p>
+                <button class="mt-2 font-semibold text-himmel hover:underline" @click="retry()">Försök igen</button>
               </div>
 
               <template v-else>
@@ -166,7 +260,19 @@ function mention(handle: string) {
                   </li>
                 </TransitionGroup>
                 <div v-if="!shown.length" class="card p-6 text-center">
-                  <template v-if="all.length">
+                  <!-- Följer: nobody yet, or nothing from them yet (never someone else's posts instead) -->
+                  <template v-if="onFollowing && !following.followed.value">
+                    <p class="font-semibold">Du följer ingen än.</p>
+                    <p class="mt-1 text-sm text-krita-dim">Hitta supportrar i Snacket: tryck på ett namn och välj Följ på deras läktarplats.</p>
+                    <button class="mt-4 rounded-full border border-white/15 px-4 py-2 text-sm font-bold transition hover:border-himmel hover:text-himmel" @click="sort = 'nyast'">Visa Nyast</button>
+                  </template>
+                  <template v-else-if="onFollowing && !following.posts.value.length">
+                    <p class="font-semibold">Inget nytt från dem du följer.</p>
+                    <p class="mt-1 text-sm text-krita-dim">
+                      {{ sport === 'alla' ? 'De har inte skrivit något i Snacket än.' : `De har inte skrivit något om ${sport} än.` }}
+                    </p>
+                  </template>
+                  <template v-else-if="all.length || onFollowing">
                     <p class="font-semibold">Tyst på stan just här.</p>
                     <p class="mt-1 text-sm text-krita-dim">Inga inlägg om det här än.</p>
                   </template>
@@ -175,6 +281,21 @@ function mention(handle: string) {
                     <p class="mt-1 text-sm text-krita-dim">Inga inlägg än. Bli den första Djurgårdaren som skriver här!</p>
                   </template>
                 </div>
+                <!-- Följer pages on, like a läktarplats -->
+                <div v-if="onFollowing && (following.more.value || following.moreError.value)" class="mt-6 text-center">
+                  <button
+                    v-if="following.more.value"
+                    class="rounded-full border border-white/15 px-6 py-3 text-sm font-bold transition hover:border-himmel hover:text-himmel disabled:opacity-50"
+                    :disabled="following.loadingMore.value"
+                    @click="following.loadMore()"
+                  >
+                    {{ following.loadingMore.value ? 'Hämtar…' : 'Visa fler' }}
+                  </button>
+                  <p v-if="following.moreError.value" class="mt-2 text-sm text-krita-dim" role="alert">Kunde inte hämta fler. Försök igen.</p>
+                </div>
+                <p v-if="onFollowing && following.capped.value" class="mt-4 text-center text-xs text-krita-dim">
+                  Visar inlägg från de {{ FOLLOWING_CAP }} supportrar du senast började följa.
+                </p>
               </template>
             </template>
           </section>
