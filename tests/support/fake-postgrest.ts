@@ -53,7 +53,11 @@ export function matches(row: Row, expr: string): boolean {
 
 export interface FakeRequest { table: string, params: [string, string][] }
 
-export function fakePostgrest(tables: Record<string, () => Row[]>, opts: { fail?: (table: string, req: FakeRequest) => unknown } = {}) {
+/**
+ * `insert`: a POST (insert … returning) — returns the stored row (as the
+ * select would show it), or throws/returns null for nothing stored.
+ */
+export function fakePostgrest(tables: Record<string, () => Row[]>, opts: { fail?: (table: string, req: FakeRequest) => unknown, insert?: (table: string, values: Row) => Row | null } = {}) {
   const requests: FakeRequest[] = []
   const fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input))
@@ -63,6 +67,12 @@ export function fakePostgrest(tables: Record<string, () => Row[]>, opts: { fail?
     const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
     const failure = opts.fail?.(table, req)
     if (failure) return json(failure, 400)
+    const accept = new Headers(init?.headers).get('accept') ?? ''
+    if ((init?.method ?? 'GET') === 'POST') {
+      const row = opts.insert?.(table, JSON.parse(String(init?.body)) as Row)
+      if (!row) return json({ code: '42501', message: 'not allowed' }, 403)
+      return json(accept.includes('vnd.pgrst.object') ? row : [row], 201)
+    }
     const source = tables[table]
     if (!source) throw new Error(`unexpected read of ${table}`)
     let rows = source()
@@ -82,7 +92,6 @@ export function fakePostgrest(tables: Record<string, () => Row[]>, opts: { fail?
       })
     }
     rows = rows.slice(0, Number(url.searchParams.get('limit') ?? Infinity))
-    const accept = new Headers(init?.headers).get('accept') ?? ''
     if (accept.includes('vnd.pgrst.object')) return rows.length === 1 ? json(rows[0]) : json({ code: 'PGRST116', message: 'not one row' }, 406)
     return json(rows)
   }

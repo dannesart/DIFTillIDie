@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'vue/compiler-sfc'
+import { ref } from 'vue'
+import type { AuthStore } from '../app/lib/auth'
+import { COMMENT_LIMIT, createInteractions } from '../app/lib/interactions'
+import type { Row } from './support/fake-postgrest'
+import { fakePostgrest } from './support/fake-postgrest'
 
 /*
  * The post's own page (/snacket/inlagg/<id>) is the home of its conversation:
@@ -21,6 +26,83 @@ const text = (n: Node): string => {
   if (n.type === 5) return (n.content as { content: string }).content
   return (n.children ?? []).map(text).join('')
 }
+
+describe('your new comment, in its place', () => {
+  const ME = '00000000-0000-4000-8000-000000000001'
+  const POST = '10000000-0000-4000-8000-000000000001'
+  const me = { id: ME, display_name: 'Mattias', handle: 'mattias', avatar: null }
+  const auth = { userId: ref(ME), status: ref('signed-in'), profileStatus: ref('ready'), profile: ref(null) } as unknown as AuthStore
+  const iso = (i: number) => new Date(Date.UTC(2026, 10, 1) + i * 60_000).toISOString().replace('Z', '+00:00')
+  function thread(n: number) {
+    const rows: Row[] = Array.from({ length: n }, (_, i) => ({ id: `20000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, post_id: POST, author_id: ME, body: `K${i + 1}`, created_at: iso(i), author: me }))
+    const db = fakePostgrest({ post_comments: () => rows }, {
+      insert: (_t, v) => {
+        const row = { id: `20000000-0000-4000-8000-${String(9000 + rows.length).padStart(12, '0')}`, post_id: v.post_id, author_id: ME, body: v.body, created_at: iso(10_000), author: me }
+        rows.push(row)
+        return row
+      },
+    })
+    return { rows, ix: createInteractions(db.client, auth, null) }
+  }
+
+  it('a short thread: it goes last, at once, and the count goes up', async () => {
+    const { ix } = thread(3)
+    await ix.loadComments(POST)
+    const r = await ix.addComment(POST, 'Ny!')
+    expect(r.ok).toBe(true)
+    const t = ix.threads.value[POST]!
+    expect(t.list.map(c => c.body)).toEqual(['K1', 'K2', 'K3', 'Ny!'])
+    expect(r.ok && t.list.at(-1)!.id === r.id).toBe(true)
+    expect(ix.stats.value[POST]!.comments).toBe(1)
+  })
+
+  it('a long thread: never put right after the first page; reading on brings it, last, once', async () => {
+    const { ix } = thread(COMMENT_LIMIT + 50)
+    await ix.loadComments(POST)
+    const r = await ix.addComment(POST, 'Ny i en lång tråd')
+    expect(r.ok).toBe(true)
+    // Not shown out of its place
+    expect(ix.threads.value[POST]!.list).toHaveLength(COMMENT_LIMIT)
+    expect(ix.threads.value[POST]!.list.some(c => c.body === 'Ny i en lång tråd')).toBe(false)
+    while (ix.threads.value[POST]!.more) await ix.loadMoreComments(POST)
+    const list = ix.threads.value[POST]!.list
+    expect(list).toHaveLength(COMMENT_LIMIT + 51)
+    expect(list.at(-1)!.body).toBe('Ny i en lång tråd')
+    expect(list.filter(c => c.body === 'Ny i en lång tråd')).toHaveLength(1)
+  })
+
+  it('a failed publish: nothing added, the count unchanged, the reason given', async () => {
+    const rows: Row[] = []
+    const { client } = fakePostgrest({ post_comments: () => rows }, { insert: () => null })
+    const ix = createInteractions(client, auth, null)
+    await ix.loadComments(POST)
+    const r = await ix.addComment(POST, 'Hej')
+    expect(r.ok).toBe(false)
+    expect(ix.threads.value[POST]!.list).toHaveLength(0)
+    expect(ix.stats.value[POST]).toBeUndefined()
+  })
+
+  it('the page shows it only after Supabase confirms it, reading on to it; the draft stays on failure', () => {
+    const s = src('app/components/RealPostInteractions.vue')
+    expect(s).toContain("if (!r.ok) return void (sendError.value = r.message) // the text stays\n  draft.value = ''\n  if (!props.conversation) return\n  if (await readOnTo(r.id)) await show(r.id)\n  else published.value = r.id")
+    // The link and the new comment share the same way of being shown
+    expect(s).toContain('await readOnTo(id)\n  if (props.focusComment !== id) return')
+    expect(s).toContain('Din kommentar är publicerad, sist i tråden.')
+    // Nothing else scrolls to comments: only a link (focus) and your own send
+    expect(s.match(/await show\(/g)).toHaveLength(2)
+  })
+})
+
+describe('the post page', () => {
+  it('is a little wider (max-w-4xl), as before on phones', () => {
+    const view = src('app/shell/views/Inlagg.vue')
+    expect(view).toContain('class="mx-auto max-w-4xl px-4 pb-24 pt-4 sm:px-6 lg:pt-10"')
+  })
+
+  it('gets Snacket’s room: the rail waits for a wider screen there, as on Snacket itself', () => {
+    expect(src('app/composables/useWall.ts')).toContain("links.value.here('snacket') || links.value.here('stories') || route.path.startsWith('/snacket/inlagg/')")
+  })
+})
 
 describe('Hem: På läktaren nu', () => {
   const hem = ast('app/shell/views/Hem.vue')

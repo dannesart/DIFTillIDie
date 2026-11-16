@@ -58,19 +58,20 @@ async function tap(key: ReactionKey) {
 }
 
 
-/** At most this many further pages are read looking for a linked comment (COMMENT_LIMIT each). */
+/** At most this many further pages are read looking for a comment (COMMENT_LIMIT each). */
 const FOCUS_PAGES = 25
 const highlighted = ref<string | null>(null)
 let unhighlight: ReturnType<typeof setTimeout> | undefined
-async function focus(id: string) {
-  await loadComments(props.postId)
-  const has = () => !!threads.value[props.postId]?.list.some(c => c.id === id)
-  for (let n = 0; !has() && threads.value[props.postId]?.more && n < FOCUS_PAGES; n++) {
+const loaded = (id: string) => !!threads.value[props.postId]?.list.some(c => c.id === id)
+/** Read the thread on, page by page, until `id` is in it (or there's nothing more, or it fails). */
+async function readOnTo(id: string) {
+  for (let n = 0; !loaded(id) && threads.value[props.postId]?.more && n < FOCUS_PAGES; n++) {
     if (!(await loadMoreComments(props.postId))) break
   }
-  if (props.focusComment !== id) return // another link meanwhile
-  const thread = threads.value[props.postId]
-  if (!has()) return emit('focused', thread?.status === 'error' || thread?.more ? 'error' : 'not-found')
+  return loaded(id)
+}
+/** Scroll to a comment that's in the list, focus it and outline it for a moment. */
+async function show(id: string) {
   await nextTick()
   const el = document.getElementById(commentAnchor(id))
   el?.scrollIntoView({ block: 'center' })
@@ -78,6 +79,15 @@ async function focus(id: string) {
   highlighted.value = id
   clearTimeout(unhighlight)
   unhighlight = setTimeout(() => (highlighted.value = null), 2600)
+}
+/** A link to a comment: from the start of the thread, read on to it. */
+async function focus(id: string) {
+  await loadComments(props.postId)
+  await readOnTo(id)
+  if (props.focusComment !== id) return // another link meanwhile
+  const thread = threads.value[props.postId]
+  if (!loaded(id)) return emit('focused', thread?.status === 'error' || thread?.more ? 'error' : 'not-found')
+  await show(id)
   emit('focused', 'shown')
 }
 // The conversation: its comments at once (a linked comment is looked for page by page, see focus()).
@@ -102,11 +112,22 @@ watch(owner, (_next, prev) => {
   invite.value = false
 })
 
+/**
+ * Your comment, just published: where it is now, last in the thread. With
+ * later comments not loaded yet, the thread is read on to it first (it's
+ * never shown out of its place). If that can't be done, `published` says it
+ * was published and links to it.
+ */
+const published = ref<string | null>(null)
 async function send() {
   if (!draft.value.trim() || sending.value[props.postId]) return
+  published.value = null
   const r = await addComment(props.postId, draft.value)
-  if (r.ok) draft.value = ''
-  else sendError.value = r.message // the text stays
+  if (!r.ok) return void (sendError.value = r.message) // the text stays
+  draft.value = ''
+  if (!props.conversation) return
+  if (await readOnTo(r.id)) await show(r.id)
+  else published.value = r.id
 }
 
 const confirming = ref<string | null>(null)
@@ -189,6 +210,11 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
       <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Logga in</button> för att kommentera.
     </p>
     <p v-if="sendError" class="text-xs font-semibold text-rod" role="alert">{{ sendError }}</p>
+    <!-- Published, but the thread couldn't be read on to it just now: say so, and where it is -->
+    <p v-else-if="published" class="text-xs text-krita-dim" role="status">
+      Din kommentar är publicerad, sist i tråden.
+      <NuxtLink :to="links.postPage(postId, published)" class="font-semibold text-himmel hover:underline">Visa den</NuxtLink>
+    </p>
 
     <p v-if="!thread || thread.status === 'loading'" class="text-sm text-krita-dim" aria-live="polite">Hämtar kommentarer…</p>
     <p v-else-if="thread.status === 'error'" class="text-sm text-krita-dim" role="alert">

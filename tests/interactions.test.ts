@@ -227,7 +227,7 @@ describe('comments', () => {
     })
     const i = createInteractions(client, fakeAuth(), null)
     i.stats.value = { [P1]: { reactions: { hjarta: 0, eld: 0, stjarna: 0, tarar: 0 }, comments: 0 } }
-    expect(await i.addComment(P1, 'Snyggt!')).toEqual({ ok: true })
+    expect(await i.addComment(P1, 'Snyggt!')).toEqual({ ok: true, id: 'c-new' })
     const selects = calls.filter(c => c.op === 'insertComment.select').map(c => String(c.args))
     expect(selects.map(s => s.includes('avatar'))).toEqual([true, false])
     // The same post and body both times; never an author.

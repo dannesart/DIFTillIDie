@@ -64,7 +64,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-4 pb-24 pt-4 sm:px-6 lg:pt-10">
+  <div class="mx-auto max-w-4xl px-4 pb-24 pt-4 sm:px-6 lg:pt-10">
     <NuxtLink :to="links.section('snacket')" class="text-sm font-semibold text-krita-dim hover:text-krita">
       <span aria-hidden="true">←</span> Snacket på stan
     </NuxtLink>
