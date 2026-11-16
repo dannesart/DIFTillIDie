@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /*
- * The account menu (AccountDialog: Min profil, Redigera profil, Inställningar,
- * Logga ut), on phones, from your own läktarplats. Desktop opens the same menu
+ * The account menu (AccountDialog: Min profil, Inställningar, Logga ut), on
+ * phones, from your own läktarplats. Desktop opens the same menu
  * from the sidebar's profile card. Never inside a link: going to your profile
  * and opening the menu are separate actions.
  */

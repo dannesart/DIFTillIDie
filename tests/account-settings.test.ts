@@ -75,20 +75,27 @@ describe('the account menu', () => {
   const dialog = template('app/components/AccountDialog.vue')
   const menu = find(dialog, 'ul').find(u => attr(u.node, 'aria-label') === 'Kontomeny')!.node
 
-  it('offers Min profil, Redigera profil, Inställningar and Logga ut, in that order', () => {
-    expect(find(menu, 'li').map(li => text(li.node).trim())).toEqual(['Min profil', 'Redigera profil', 'Inställningar', 'Logga ut'])
+  it('offers Min profil, Inställningar and Logga ut, in that order (editing your profile is in Inställningar)', () => {
+    expect(find(menu, 'li').map(li => text(li.node).trim())).toEqual(['Min profil', 'Inställningar', 'Logga ut'])
   })
 
-  it('reuses what exists: your place, the one profile form, the settings page, signing out', () => {
+  it('reuses what exists: your place, the settings page, signing out', () => {
     const items = find(menu, 'li').map(li => li.node.children!.find(c => c.type === 1)!)
     expect(bound(items[0]!, 'to')).toBe('links.supporter(profile.handle)')
-    expect(items[1]!.props?.find(p => p.arg?.content === 'click')?.exp?.content).toBe('editing = true')
-    expect(bound(items[2]!, 'to')).toBe('links.settings')
-    expect(items[3]!.props?.find(p => p.arg?.content === 'click')?.exp?.content).toBe('signOut')
+    expect(bound(items[1]!, 'to')).toBe('links.settings')
+    expect(items[2]!.props?.find(p => p.arg?.content === 'click')?.exp?.content).toBe('signOut')
   })
 
-  it('is no settings form: no team choices in it', () => {
-    expect(source('app/components/AccountDialog.vue')).not.toMatch(/MyTeams|TEAM_INTERESTS|usePreferences/)
+  it('is no settings form: no team choices and no profile editing in it', () => {
+    const src = source('app/components/AccountDialog.vue')
+    expect(src).not.toMatch(/MyTeams|TEAM_INTERESTS|usePreferences|useProfileEditor|editing\.value|editing = |const editing/)
+  })
+
+  it('keeps a new supporter\'s journey: without a profile, the one form, to create one', () => {
+    const forms = find(dialog, 'ProfileForm')
+    expect(forms).toHaveLength(1)
+    expect(condition(forms[0]!.ancestors.at(-1)!)).toBe("status === 'signed-in' && profileStatus === 'missing'")
+    expect(bound(forms[0]!.node, 'initial')).toBe('null')
   })
 })
 
@@ -98,6 +105,11 @@ describe('your läktarplats', () => {
   it('has no "Ändra profil" (nor "Konto") button in its header', () => {
     expect(find(place, 'button').map(b => text(b.node).trim())).not.toContain('Ändra profil')
     expect(find(place, 'button').map(b => text(b.node).trim())).not.toContain('Konto')
+  })
+
+  it('its empty-bio prompt leads to the settings page (no profile dialog any more)', () => {
+    const link = find(place, 'NuxtLink').find(l => text(l.node).trim() === 'Skriv några rader')!
+    expect(bound(link.node, 'to')).toBe('links.settings')
   })
 
   it('no longer holds "Mina lag" (moved to /installningar)', () => {
@@ -135,12 +147,34 @@ describe('the settings page', () => {
     expect(source('modules/app-shell.ts')).toContain("{ name: 'installningar', path: 'installningar', file: view('Installningar') }")
   })
 
-  it('shows "Mina lag" only when signed in with a profile; otherwise a way in, never personal data', () => {
+  it('shows "Din profil" above "Mina lag", only when signed in with a profile; otherwise a way in, never personal data', () => {
     const [teams] = find(page, 'MyTeams')
+    const [mine] = find(page, 'MyProfile')
     expect(teams).toBeDefined()
+    expect(mine).toBeDefined()
     const wrapper = teams!.ancestors.at(-1)!
+    expect(mine!.ancestors.at(-1)).toBe(wrapper)
+    expect(wrapper.children!.filter(c => c.type === 1).map(c => c.tag)).toEqual(['MyProfile', 'MyTeams'])
     expect(condition(wrapper)).toBe("status === 'signed-in' && profileStatus === 'ready'")
     expect(text(page)).toContain('Logga in för att se dina inställningar.')
+  })
+
+  it('"Din profil" is the one profile form, inline, with the saved profile', () => {
+    const card = template('app/components/MyProfile.vue')
+    const [form] = find(card, 'ProfileForm')
+    expect(bound(form!.node, 'initial')).toBe('profile')
+    expect(form!.node.props?.some(p => p.name === 'inline')).toBe(true)
+    expect(bound(form!.node, 'key')).toBe('version')
+    expect(source('app/components/MyProfile.vue')).not.toMatch(/saveProfile|\.rpc\(|\.from\(/)
+  })
+
+  it('the inline form: "Spara ändringar" only once something changed, "Ångra ändringar" puts the saved values back', () => {
+    const form = source('app/components/ProfileForm.vue')
+    expect(form).toContain(':disabled="saving || (inline && !dirty)"')
+    expect(form).toContain('v-if="inline && dirty && !saving"')
+    expect(form).toContain('@click="reset"')
+    // The bio counter counts as it's saved (whitespace collapsed), like cleanBio
+    expect(form).toContain("bio.value.replace(/\\s+/g, ' ').trim()")
   })
 
   it('"Mina lag" keeps its data and behaviour: the same store, toggles and private note', () => {

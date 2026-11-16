@@ -6,9 +6,14 @@ import type { ProfileErrors } from '~/lib/auth'
 /*
  * Choose how you're known on the stands: display name, unique handle, and
  * (optional) an avatar design and a few words about yourself. The one form
- * for creating and editing a profile, wherever it's opened from.
+ * for creating and editing a profile: creating in the account dialog (a new
+ * supporter), editing on the settings page.
+ *
+ * `inline` (the settings page): no "Avbryt" that closes anything. Instead
+ * "Ångra ändringar" puts the saved values back, and "Spara ändringar" is
+ * only active once something has changed.
  */
-const props = defineProps<{ initial?: { displayName: string, handle: string, bio?: string | null, avatar?: AvatarKey | null } | null }>()
+const props = defineProps<{ initial?: { displayName: string, handle: string, bio?: string | null, avatar?: AvatarKey | null } | null, inline?: boolean }>()
 const emit = defineEmits<{ saved: [], cancel: [] }>()
 const auth = useAuth()
 
@@ -17,9 +22,27 @@ const handle = ref(props.initial?.handle ?? '')
 const handleTouched = ref(!!props.initial)
 const avatar = ref<AvatarKey | null>(props.initial?.avatar ?? null)
 const bio = ref(props.initial?.bio ?? '')
-const bioLeft = computed(() => BIO_MAX - [...bio.value.replace(/s+/g, ' ').trim()].length)
+// Counted as it's saved: whitespace collapsed and trimmed (cleanBio).
+const bioLeft = computed(() => BIO_MAX - [...bio.value.replace(/\s+/g, ' ').trim()].length)
 const errors = ref<ProfileErrors>({})
 const saving = ref(false)
+
+/** Anything different from what's saved (bio compared as it would be saved). */
+const tidyBio = (b: string | null | undefined) => (b ?? '').replace(/\s+/g, ' ').trim()
+const dirty = computed(() => !props.initial
+  || displayName.value !== props.initial.displayName
+  || handle.value !== props.initial.handle
+  || avatar.value !== (props.initial.avatar ?? null)
+  || tidyBio(bio.value) !== tidyBio(props.initial.bio))
+
+/** Back to what's saved: the inline form's "Ångra ändringar". */
+function reset() {
+  displayName.value = props.initial?.displayName ?? ''
+  handle.value = props.initial?.handle ?? ''
+  avatar.value = props.initial?.avatar ?? null
+  bio.value = props.initial?.bio ?? ''
+  errors.value = {}
+}
 
 // Suggest a handle from the name until the supporter edits it themselves.
 watch(displayName, (name) => {
@@ -122,10 +145,11 @@ async function submit() {
     <p v-if="errors.form" class="rounded-2xl bg-rod/10 px-4 py-3 text-sm text-rod" role="alert">{{ errors.form }}</p>
 
     <div class="flex flex-wrap items-center gap-2 pt-1">
-      <button type="submit" class="rounded-full bg-guld px-6 py-3 text-sm font-bold text-navy-950 transition enabled:hover:-translate-y-0.5 disabled:opacity-50" :disabled="saving">
+      <button type="submit" class="rounded-full bg-guld px-6 py-3 text-sm font-bold text-navy-950 transition enabled:hover:-translate-y-0.5 disabled:opacity-50" :disabled="saving || (inline && !dirty)">
         {{ saving ? 'Sparar…' : initial ? 'Spara ändringar' : 'Spara profil' }}
       </button>
-      <button v-if="initial" type="button" class="rounded-full px-4 py-3 text-sm font-semibold text-krita-dim hover:text-krita" @click="emit('cancel')">Avbryt</button>
+      <button v-if="inline && dirty && !saving" type="button" class="rounded-full px-4 py-3 text-sm font-semibold text-krita-dim hover:text-krita" @click="reset">Ångra ändringar</button>
+      <button v-else-if="initial && !inline" type="button" class="rounded-full px-4 py-3 text-sm font-semibold text-krita-dim hover:text-krita" @click="emit('cancel')">Avbryt</button>
     </div>
   </form>
 </template>
