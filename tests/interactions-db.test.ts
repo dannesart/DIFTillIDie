@@ -244,6 +244,8 @@ describe('grants', () => {
       order by table_name, privilege_type, column_name`)
     expect(cols.rows).toEqual([
       { table_name: 'post_comments', privilege_type: 'INSERT', column_name: 'body' },
+      // The comment it answers (20261116120000_comment_replies.sql)
+      { table_name: 'post_comments', privilege_type: 'INSERT', column_name: 'parent_comment_id' },
       { table_name: 'post_comments', privilege_type: 'INSERT', column_name: 'post_id' },
       { table_name: 'post_reactions', privilege_type: 'INSERT', column_name: 'post_id' },
       { table_name: 'post_reactions', privilege_type: 'INSERT', column_name: 'reaction' },

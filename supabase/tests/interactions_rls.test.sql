@@ -35,7 +35,7 @@ select is(
   0, 'anon has no access to reaction rows at all');
 select is(
   (select array_agg(column_name::text order by column_name) from information_schema.column_privileges where table_schema = 'public' and table_name = 'post_comments' and grantee = 'authenticated' and privilege_type = 'INSERT'),
-  array['body', 'post_id'], 'comments: authenticated may only write post_id and body');
+  array['body', 'parent_comment_id', 'post_id'], 'comments: authenticated may only write post_id, body and the comment answered (comment_replies)');
 select is(
   (select array_agg(column_name::text order by column_name) from information_schema.column_privileges where table_schema = 'public' and table_name = 'post_reactions' and grantee = 'authenticated' and privilege_type = 'INSERT'),
   array['post_id', 'reaction'], 'reactions: authenticated may only write post_id and reaction');
