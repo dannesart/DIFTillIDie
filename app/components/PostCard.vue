@@ -11,10 +11,12 @@ import { frozenLead } from '~/lib/posts'
  * On a supporter's own wall: `onWall` (no link to the page you're on, and
  * no reply button, since there's no composer there).
  * `noMentions` alone: links, but no reply button (a preview without a composer).
- * Its time links to the post's own page (/snacket/inlagg/<id>); `focusComment`
- * opens its comments at that one (see RealPostInteractions).
+ * Its time and its comment count link to the post's own page
+ * (/snacket/inlagg/<id>), the home of its conversation: there (`conversation`)
+ * the comments are shown, and `focusComment` brings one into view (see
+ * RealPostInteractions).
  */
-const props = defineProps<{ post: FeedPost, onWall?: boolean, noMentions?: boolean, focusComment?: string | null }>()
+const props = defineProps<{ post: FeedPost, onWall?: boolean, noMentions?: boolean, conversation?: boolean, focusComment?: string | null }>()
 const emit = defineEmits<{ mention: [handle: string], removed: [id: string], focused: [result: 'shown' | 'not-found' | 'error'] }>()
 
 const { filter, community } = useSnacket()
@@ -174,6 +176,6 @@ async function remove() {
       Inlägget handlade om en Story som inte längre finns i nyhetsflödena. Den sparades inte när inlägget skrevs.
     </p>
 
-    <RealPostInteractions :post-id="post.id" :focus-comment="focusComment" @focused="r => emit('focused', r)" />
+    <RealPostInteractions :post-id="post.id" :conversation="conversation" :focus-comment="focusComment" @focused="r => emit('focused', r)" />
   </article>
 </template>

@@ -5,7 +5,7 @@ import { parse } from 'vue/compiler-sfc'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AuthStore } from '../app/lib/auth'
 import type { CommunityStore } from '../app/lib/posts'
-import { COMMENT_LIMIT, commentErrorMessage, commentsButtonLabel, createInteractions, reactErrorMessage, toRealComment } from '../app/lib/interactions'
+import { COMMENT_LIMIT, commentErrorMessage, commentsLinkLabel, createInteractions, reactErrorMessage, toRealComment } from '../app/lib/interactions'
 
 const MATTIAS = '55555555-5555-4555-8555-555555555555'
 const JARN = '44444444-4444-4444-8444-444444444444'
@@ -290,29 +290,27 @@ describe('helpers', () => {
   })
 })
 
-describe('the comments button (#16)', () => {
+describe('the comments link (#16, then the post page as the conversation\'s home)', () => {
   it('has a name that says what it does and how many comments there are', () => {
-    expect(commentsButtonLabel(3, false)).toBe('Visa kommentarer, 3')
-    expect(commentsButtonLabel(0, false)).toBe('Visa kommentarer, 0')
-    expect(commentsButtonLabel(3, true)).toBe('Dölj kommentarer, 3')
+    expect(commentsLinkLabel(3)).toBe('Visa kommentarer, 3')
+    expect(commentsLinkLabel(0)).toBe('Visa kommentarer, 0')
     // Counts not loaded (or failed): say so, like the reactions do
-    expect(commentsButtonLabel(undefined, false)).toBe('Visa kommentarer, okänt antal')
-    expect(commentsButtonLabel(null, true)).toBe('Dölj kommentarer, okänt antal')
+    expect(commentsLinkLabel(undefined)).toBe('Visa kommentarer, okänt antal')
+    expect(commentsLinkLabel(null)).toBe('Visa kommentarer, okänt antal')
   })
 
-  it('contains the words the button shows on wider screens (label in name)', () => {
-    expect(commentsButtonLabel(2, false).toLowerCase()).toContain('kommentarer')
-    expect(commentsButtonLabel(2, true)).toContain('Dölj')
+  it('contains the word it shows on wider screens (label in name)', () => {
+    expect(commentsLinkLabel(2).toLowerCase()).toContain('kommentarer')
   })
 
-  it('is what every post\'s comments button uses, beside aria-expanded and its click', () => {
+  it('outside the post page it is a link to the post page, named by that label; nothing expands in place', () => {
     type Prop = { type: number, name: string, value?: { content: string }, rawName?: string, arg?: { content: string }, exp?: { content: string } }
     type Node = { type: number, tag?: string, props?: Prop[], children?: Node[] }
     const ast = parse(readFileSync('app/components/RealPostInteractions.vue', 'utf8')).descriptor.template!.ast as unknown as Node
     const all = (n: Node): Node[] => [n, ...(n.children ?? []).flatMap(all)]
     const bound = (n: Node, arg: string) => n.props?.find(p => p.type === 7 && p.arg?.content === arg)?.exp?.content
-    const button = all(ast).find(n => n.tag === 'button' && bound(n, 'aria-expanded') === 'open')!
-    expect(bound(button, 'aria-label')).toBe('commentsButtonLabel(s?.comments, open)')
-    expect(bound(button, 'click')).toBe('toggle')
+    const link = all(ast).find(n => n.tag === 'NuxtLink' && bound(n, 'aria-label') === 'commentsLinkLabel(s?.comments)')!
+    expect(bound(link, 'to')).toBe('links.postPage(postId)')
+    expect(all(ast).some(n => bound(n, 'aria-expanded'))).toBe(false)
   })
 })

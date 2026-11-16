@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import type { ReactionKey } from '#shared/types/domain'
 import { REACTIONS } from '~/composables/useSnacket'
-import { commentsButtonLabel } from '~/lib/interactions'
+import { commentsLinkLabel } from '~/lib/interactions'
 import { commentAnchor } from '~/lib/reveal'
 
 /*
  * Reactions and comments on a post, stored in Supabase. Counts are
  * everyone's, your highlight is yours, and nothing changes until Supabase
  * has confirmed it.
+ *
+ * The conversation lives on the post's own page (/snacket/inlagg/<id>,
+ * `conversation`): there the comments are always shown, with the comment
+ * box. Everywhere else (Snacket, a läktarplats) the comment count is a link
+ * to that page; the reactions work right where the post is.
  */
 const props = defineProps<{
   postId: string
+  /** On the post's own page: the comments, always shown. Elsewhere, a link to them. */
+  conversation?: boolean
   /**
    * A comment to bring into view (a link to it: #comment-<id>), known to be
    * on this post. The thread opens and is read on, page by page, until it's
@@ -50,18 +57,12 @@ async function tap(key: ReactionKey) {
   else popped.value = adding ? key : null
 }
 
-const open = ref(false)
-function toggle() {
-  open.value = !open.value
-  if (open.value) void loadComments(props.postId)
-}
 
 /** At most this many further pages are read looking for a linked comment (COMMENT_LIMIT each). */
 const FOCUS_PAGES = 25
 const highlighted = ref<string | null>(null)
 let unhighlight: ReturnType<typeof setTimeout> | undefined
 async function focus(id: string) {
-  open.value = true
   await loadComments(props.postId)
   const has = () => !!threads.value[props.postId]?.list.some(c => c.id === id)
   for (let n = 0; !has() && threads.value[props.postId]?.more && n < FOCUS_PAGES; n++) {
@@ -79,7 +80,12 @@ async function focus(id: string) {
   unhighlight = setTimeout(() => (highlighted.value = null), 2600)
   emit('focused', 'shown')
 }
-onMounted(() => props.focusComment && void focus(props.focusComment))
+// The conversation: its comments at once (a linked comment is looked for page by page, see focus()).
+onMounted(() => {
+  if (!props.conversation) return
+  if (props.focusComment) void focus(props.focusComment)
+  else void loadComments(props.postId)
+})
 watch(() => props.focusComment, (id) => {
   // Pointed elsewhere (or nowhere): the last one isn't the one any more.
   highlighted.value = null
@@ -133,10 +139,16 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
       <span :key="`${r.key}-${count(r.key)}`" :class="popped === r.key && 'animate-pop'" class="inline-block">{{ r.emoji }}</span>
       <span class="tabular-nums">{{ count(r.key) ?? (statsStatus === 'error' ? '?' : '–') }}</span>
     </button>
-    <button class="chip ml-auto border-transparent bg-white/[0.04] text-krita-dim hover:text-krita" :aria-expanded="open" :aria-label="commentsButtonLabel(s?.comments, open)" @click="toggle">
+    <!-- On the post's page, the comments are right below: the count is just that -->
+    <span v-if="conversation" class="chip ml-auto border-transparent text-krita-dim">
       💬 <span class="tabular-nums">{{ s ? s.comments : '–' }}</span>
-      <span class="hidden sm:inline">{{ open ? 'Dölj' : 'Kommentarer' }}</span>
-    </button>
+      <span class="hidden sm:inline">Kommentarer</span>
+    </span>
+    <!-- Elsewhere, the way to the conversation: its own page -->
+    <NuxtLink v-else :to="links.postPage(postId)" class="chip ml-auto border-transparent bg-white/[0.04] text-krita-dim hover:text-krita" :aria-label="commentsLinkLabel(s?.comments)">
+      💬 <span class="tabular-nums">{{ s ? s.comments : '–' }}</span>
+      <span class="hidden sm:inline">Kommentarer</span>
+    </NuxtLink>
   </footer>
 
   <p v-if="reactError" class="mt-2 text-xs font-semibold text-rod" role="alert">{{ reactError }}</p>
@@ -154,7 +166,7 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
     <button class="text-xs text-krita-dim hover:text-krita" aria-label="Stäng" @click="invite = false">✕</button>
   </div>
 
-  <div v-if="open" class="mt-4 space-y-3 border-t border-white/8 pt-4">
+  <section v-if="conversation" class="mt-4 space-y-3 border-t border-white/8 pt-4" aria-label="Kommentarer">
     <p v-if="!thread || thread.status === 'loading'" class="text-sm text-krita-dim" aria-live="polite">Hämtar kommentarer…</p>
     <p v-else-if="thread.status === 'error'" class="text-sm text-krita-dim" role="alert">
       Kunde inte hämta kommentarerna.
@@ -230,5 +242,5 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
       <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Logga in</button> för att kommentera.
     </p>
     <p v-if="sendError" class="text-xs font-semibold text-rod" role="alert">{{ sendError }}</p>
-  </div>
+  </section>
 </template>

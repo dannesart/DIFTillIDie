@@ -7,7 +7,8 @@ import { commentFromHash, createSinglePost } from '~/lib/singlePost'
  * Shell view: one Snacket post on a page of its own, /snacket/inlagg/<id>
  * (and #comment-<id> for one of its comments). Read straight from Supabase
  * by its id, so a link works for any post, not only those among Snacket's
- * newest. The same post card, reactions and comments as in the feed.
+ * newest. The home of its conversation: the same post card as in the feed,
+ * with its comments always shown (and the comment box).
  * Loaded in the browser only, like the feed: the cached HTML is the same
  * empty page for everyone. The shell keys views by path, so another post is
  * always a fresh instance.
@@ -101,6 +102,7 @@ useSeoMeta({
         </p>
         <PostCard
           :post="feedPost"
+          conversation
           :focus-comment="focus"
           @mention="mention"
           @removed="single.removed()"
