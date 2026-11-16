@@ -22,15 +22,18 @@ insert into auth.users (id, email) values
   ('84848484-8484-4484-8484-848484848484', 'replytest-nils@example.test');
 
 -- ── Structure ────────────────────────────────────────────────────────────
+-- information_schema text is collation "C"; pgTAP compares rows with the
+-- expected array (default collation) and refuses mixed collations, hence
+-- the explicit collate "default" here and below.
 select results_eq(
-  $$ select column_name::text || ':' || data_type::text || ':' || is_nullable::text from information_schema.columns where table_schema = 'public' and table_name = 'post_comments' and column_name in ('parent_comment_id', 'is_reply') order by 1 $$,
+  $$ select (column_name::text || ':' || data_type::text || ':' || is_nullable::text) collate "default" from information_schema.columns where table_schema = 'public' and table_name = 'post_comments' and column_name in ('parent_comment_id', 'is_reply') order by 1 $$,
   array['is_reply:boolean:NO', 'parent_comment_id:uuid:YES'], 'post_comments has parent_comment_id (nullable) and is_reply (not null)');
 select ok(
   (select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.post_comments'::regclass and conname = 'post_comments_parent_fkey')
     like 'FOREIGN KEY (parent_comment_id, post_id) REFERENCES %post_comments(id, post_id) ON DELETE SET NULL (parent_comment_id)',
   'the parent is a comment on the same post; deleting it clears only parent_comment_id');
 select results_eq(
-  $$ select column_name::text from information_schema.column_privileges where table_schema = 'public' and table_name = 'post_comments' and grantee = 'authenticated' and privilege_type = 'INSERT' order by 1 $$,
+  $$ select column_name::text collate "default" from information_schema.column_privileges where table_schema = 'public' and table_name = 'post_comments' and grantee = 'authenticated' and privilege_type = 'INSERT' order by 1 $$,
   array['body', 'parent_comment_id', 'post_id'], 'authenticated may only write post_id, body and parent_comment_id');
 select is_empty(
   $$ select 1 from information_schema.column_privileges where table_schema = 'public' and table_name = 'post_comments' and grantee in ('anon', 'authenticated') and privilege_type = 'UPDATE' $$,
