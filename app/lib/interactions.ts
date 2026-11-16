@@ -18,12 +18,12 @@ import { normalizePostBody, publishErrorMessage, validatePostBody } from './post
 export const REACTION_KEYS: ReactionKey[] = ['hjarta', 'eld', 'stjarna', 'tarar']
 
 /**
- * The comments button's name for screen readers (it shows only "💬 3" on phones). Says what it does and the
- * count, like the reactions ("Blått hjärta, 1"), and contains the words it shows on wider screens
- * ("Kommentarer" / "Dölj"). Whether it's open is aria-expanded's job.
+ * The name of the link to a post's comments (its own page), for screen readers: it shows only "💬 3" on
+ * phones. Says what it does and the count, like the reactions ("Blått hjärta, 1"), and contains the word
+ * it shows on wider screens ("Kommentarer").
  */
-export function commentsButtonLabel(count: number | null | undefined, open: boolean): string {
-  return `${open ? 'Dölj kommentarer' : 'Visa kommentarer'}, ${count ?? 'okänt antal'}`
+export function commentsLinkLabel(count: number | null | undefined): string {
+  return `Visa kommentarer, ${count ?? 'okänt antal'}`
 }
 
 export interface PostStats { reactions: Record<ReactionKey, number>, comments: number }
@@ -225,8 +225,13 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
     }
   }
 
-  /** Comment as the signed-in supporter. Shown only once Supabase confirms it. */
-  async function addComment(postId: string, input: string): Promise<{ ok: true } | { ok: false, message: string }> {
+  /**
+   * Comment as the signed-in supporter. Shown only once Supabase confirms it,
+   * and only in its place: the newest comment goes last. While later comments
+   * aren't loaded yet (`more`), it isn't put after the ones that are; the next
+   * pages bring it, in order. `id`: the comment, as published.
+   */
+  async function addComment(postId: string, input: string): Promise<{ ok: true, id: string } | { ok: false, message: string }> {
     if (!canInteract()) return { ok: false, message: 'Logga in och välj ditt läktarnamn för att kommentera.' }
     if (sending.value[postId]) return { ok: false, message: 'Skickar redan…' }
     const body = normalizePostBody(input)
@@ -245,10 +250,10 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
       const c = toRealComment(data as unknown as CommentRow)
       if (!c) throw new Error('no author')
       const t = threads.value[postId] ?? { status: 'ready' as const, list: [], more: false }
-      threads.value = { ...threads.value, [postId]: { ...t, status: 'ready', list: [...t.list.filter(x => x.id !== c.id), c] } }
+      if (!t.more) threads.value = { ...threads.value, [postId]: { ...t, status: 'ready', list: [...t.list.filter(x => x.id !== c.id), c] } }
       const s = stats.value[postId] ?? emptyStats()
       stats.value = { ...stats.value, [postId]: { ...s, comments: s.comments + 1 } }
-      return { ok: true }
+      return { ok: true, id: c.id }
     }
     catch (e) {
       return { ok: false, message: commentErrorMessage(e as DataError) }

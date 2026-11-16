@@ -95,9 +95,10 @@ const sportLabel = { fotboll: 'Fotboll', hockey: 'Hockey' } as const
               <div class="min-w-0 flex-1">
                 <p class="flex items-baseline gap-2 text-sm">
                   <NuxtLink :to="links.supporter(post.author.handle)" class="truncate font-semibold hover:text-himmel">{{ post.author.name }}</NuxtLink>
-                  <span class="shrink-0 text-xs text-krita-dim"><TimeAgo :at="post.createdAt" /></span>
+                  <NuxtLink :to="links.postPage(post.id)" class="shrink-0 text-xs text-krita-dim hover:text-krita" tabindex="-1"><TimeAgo :at="post.createdAt" /></NuxtLink>
                 </p>
-                <NuxtLink :to="links.view('snacket')" class="mt-0.5 line-clamp-2 text-sm leading-snug text-krita/90 hover:text-krita">{{ post.body }}</NuxtLink>
+                <!-- The post itself, on its own page (with its comments) -->
+                <NuxtLink :to="links.postPage(post.id)" class="mt-0.5 line-clamp-2 text-sm leading-snug text-krita/90 hover:text-krita">{{ post.body }}</NuxtLink>
                 <p v-if="aboutStory(post)" class="mt-1 flex items-center gap-1.5 text-xs text-krita-dim">
                   <span aria-hidden="true" class="h-3 w-1 shrink-0 rounded-full" style="background: repeating-linear-gradient(180deg, var(--color-himmel) 0 3px, var(--color-navy-700) 3px 6px)" />
                   <span class="truncate">Om: {{ aboutStory(post) }}</span>

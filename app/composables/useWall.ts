@@ -23,11 +23,13 @@ export const supporterPath = (handle: string) => `/laktaren/${handle}`
  * Snacket and Stories bring their own side columns, so on their pages the
  * shell's rail (next match, episodes, the docked mini-player) waits for a
  * wider screen: 2xl instead of xl. The floating mini-player is the fallback
- * below that, so exactly one of them is on screen.
+ * below that, so exactly one of them is on screen. A post's own page
+ * (/snacket/inlagg/<id>) is Snacket's too, and gets the same room.
  */
 export function useRailLate() {
   const links = useSectionLinks()
-  return computed(() => links.value.here('snacket') || links.value.here('stories'))
+  const route = useRoute()
+  return computed(() => links.value.here('snacket') || links.value.here('stories') || route.path.startsWith('/snacket/inlagg/'))
 }
 
 /** Section and supporter addresses for the page you're on (see lib/sectionLinks). */

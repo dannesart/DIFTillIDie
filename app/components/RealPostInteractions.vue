@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import type { ReactionKey } from '#shared/types/domain'
 import { REACTIONS } from '~/composables/useSnacket'
-import { commentsButtonLabel } from '~/lib/interactions'
+import { commentsLinkLabel } from '~/lib/interactions'
 import { commentAnchor } from '~/lib/reveal'
 
 /*
  * Reactions and comments on a post, stored in Supabase. Counts are
  * everyone's, your highlight is yours, and nothing changes until Supabase
  * has confirmed it.
+ *
+ * The conversation lives on the post's own page (/snacket/inlagg/<id>,
+ * `conversation`): there the comments are always shown, with the comment
+ * box. Everywhere else (Snacket, a läktarplats) the comment count is a link
+ * to that page; the reactions work right where the post is.
  */
 const props = defineProps<{
   postId: string
+  /** On the post's own page: the comments, always shown. Elsewhere, a link to them. */
+  conversation?: boolean
   /**
    * A comment to bring into view (a link to it: #comment-<id>), known to be
    * on this post. The thread opens and is read on, page by page, until it's
@@ -50,26 +57,21 @@ async function tap(key: ReactionKey) {
   else popped.value = adding ? key : null
 }
 
-const open = ref(false)
-function toggle() {
-  open.value = !open.value
-  if (open.value) void loadComments(props.postId)
-}
 
-/** At most this many further pages are read looking for a linked comment (COMMENT_LIMIT each). */
+/** At most this many further pages are read looking for a comment (COMMENT_LIMIT each). */
 const FOCUS_PAGES = 25
 const highlighted = ref<string | null>(null)
 let unhighlight: ReturnType<typeof setTimeout> | undefined
-async function focus(id: string) {
-  open.value = true
-  await loadComments(props.postId)
-  const has = () => !!threads.value[props.postId]?.list.some(c => c.id === id)
-  for (let n = 0; !has() && threads.value[props.postId]?.more && n < FOCUS_PAGES; n++) {
+const loaded = (id: string) => !!threads.value[props.postId]?.list.some(c => c.id === id)
+/** Read the thread on, page by page, until `id` is in it (or there's nothing more, or it fails). */
+async function readOnTo(id: string) {
+  for (let n = 0; !loaded(id) && threads.value[props.postId]?.more && n < FOCUS_PAGES; n++) {
     if (!(await loadMoreComments(props.postId))) break
   }
-  if (props.focusComment !== id) return // another link meanwhile
-  const thread = threads.value[props.postId]
-  if (!has()) return emit('focused', thread?.status === 'error' || thread?.more ? 'error' : 'not-found')
+  return loaded(id)
+}
+/** Scroll to a comment that's in the list, focus it and outline it for a moment. */
+async function show(id: string) {
   await nextTick()
   const el = document.getElementById(commentAnchor(id))
   el?.scrollIntoView({ block: 'center' })
@@ -77,9 +79,23 @@ async function focus(id: string) {
   highlighted.value = id
   clearTimeout(unhighlight)
   unhighlight = setTimeout(() => (highlighted.value = null), 2600)
+}
+/** A link to a comment: from the start of the thread, read on to it. */
+async function focus(id: string) {
+  await loadComments(props.postId)
+  await readOnTo(id)
+  if (props.focusComment !== id) return // another link meanwhile
+  const thread = threads.value[props.postId]
+  if (!loaded(id)) return emit('focused', thread?.status === 'error' || thread?.more ? 'error' : 'not-found')
+  await show(id)
   emit('focused', 'shown')
 }
-onMounted(() => props.focusComment && void focus(props.focusComment))
+// The conversation: its comments at once (a linked comment is looked for page by page, see focus()).
+onMounted(() => {
+  if (!props.conversation) return
+  if (props.focusComment) void focus(props.focusComment)
+  else void loadComments(props.postId)
+})
 watch(() => props.focusComment, (id) => {
   // Pointed elsewhere (or nowhere): the last one isn't the one any more.
   highlighted.value = null
@@ -96,11 +112,22 @@ watch(owner, (_next, prev) => {
   invite.value = false
 })
 
+/**
+ * Your comment, just published: where it is now, last in the thread. With
+ * later comments not loaded yet, the thread is read on to it first (it's
+ * never shown out of its place). If that can't be done, `published` says it
+ * was published and links to it.
+ */
+const published = ref<string | null>(null)
 async function send() {
   if (!draft.value.trim() || sending.value[props.postId]) return
+  published.value = null
   const r = await addComment(props.postId, draft.value)
-  if (r.ok) draft.value = ''
-  else sendError.value = r.message // the text stays
+  if (!r.ok) return void (sendError.value = r.message) // the text stays
+  draft.value = ''
+  if (!props.conversation) return
+  if (await readOnTo(r.id)) await show(r.id)
+  else published.value = r.id
 }
 
 const confirming = ref<string | null>(null)
@@ -133,10 +160,16 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
       <span :key="`${r.key}-${count(r.key)}`" :class="popped === r.key && 'animate-pop'" class="inline-block">{{ r.emoji }}</span>
       <span class="tabular-nums">{{ count(r.key) ?? (statsStatus === 'error' ? '?' : '–') }}</span>
     </button>
-    <button class="chip ml-auto border-transparent bg-white/[0.04] text-krita-dim hover:text-krita" :aria-expanded="open" :aria-label="commentsButtonLabel(s?.comments, open)" @click="toggle">
+    <!-- On the post's page, the comments are right below: the count is just that -->
+    <span v-if="conversation" class="chip ml-auto border-transparent text-krita-dim">
       💬 <span class="tabular-nums">{{ s ? s.comments : '–' }}</span>
-      <span class="hidden sm:inline">{{ open ? 'Dölj' : 'Kommentarer' }}</span>
-    </button>
+      <span class="hidden sm:inline">Kommentarer</span>
+    </span>
+    <!-- Elsewhere, the way to the conversation: its own page -->
+    <NuxtLink v-else :to="links.postPage(postId)" class="chip ml-auto border-transparent bg-white/[0.04] text-krita-dim hover:text-krita" :aria-label="commentsLinkLabel(s?.comments)">
+      💬 <span class="tabular-nums">{{ s ? s.comments : '–' }}</span>
+      <span class="hidden sm:inline">Kommentarer</span>
+    </NuxtLink>
   </footer>
 
   <p v-if="reactError" class="mt-2 text-xs font-semibold text-rod" role="alert">{{ reactError }}</p>
@@ -154,7 +187,35 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
     <button class="text-xs text-krita-dim hover:text-krita" aria-label="Stäng" @click="invite = false">✕</button>
   </div>
 
-  <div v-if="open" class="mt-4 space-y-3 border-t border-white/8 pt-4">
+  <section v-if="conversation" class="mt-4 space-y-3 border-t border-white/8 pt-4" aria-label="Kommentarer">
+    <!-- First the way to join in (or the way in), then the comments, oldest first -->
+    <form v-if="canInteract" class="flex gap-2" @submit.prevent="send">
+      <input
+        v-model="draft"
+        maxlength="400"
+        placeholder="Skriv en kommentar…"
+        aria-label="Skriv en kommentar"
+        :readonly="!!sending[postId]"
+        class="min-w-0 flex-1 rounded-full border bg-navy-950 px-4 py-2 text-sm outline-none focus:border-himmel"
+        :class="sendError ? 'border-rod' : 'border-white/12'"
+      >
+      <button class="rounded-full bg-krita px-4 text-sm font-bold text-navy-950 disabled:opacity-40" :disabled="!draft.trim() || !!sending[postId]">
+        {{ sending[postId] ? 'Skickar…' : 'Skicka' }}
+      </button>
+    </form>
+    <p v-else-if="identity.kind === 'needs-profile'" class="text-sm text-krita-dim">
+      <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Välj ditt läktarnamn</button> för att kommentera.
+    </p>
+    <p v-else-if="identity.kind === 'guest'" class="text-sm text-krita-dim">
+      <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Logga in</button> för att kommentera.
+    </p>
+    <p v-if="sendError" class="text-xs font-semibold text-rod" role="alert">{{ sendError }}</p>
+    <!-- Published, but the thread couldn't be read on to it just now: say so, and where it is -->
+    <p v-else-if="published" class="text-xs text-krita-dim" role="status">
+      Din kommentar är publicerad, sist i tråden.
+      <NuxtLink :to="links.postPage(postId, published)" class="font-semibold text-himmel hover:underline">Visa den</NuxtLink>
+    </p>
+
     <p v-if="!thread || thread.status === 'loading'" class="text-sm text-krita-dim" aria-live="polite">Hämtar kommentarer…</p>
     <p v-else-if="thread.status === 'error'" class="text-sm text-krita-dim" role="alert">
       Kunde inte hämta kommentarerna.
@@ -208,27 +269,5 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
         {{ thread.loadingMore ? 'Hämtar…' : 'Visa fler kommentarer' }}
       </button>
     </template>
-
-    <form v-if="canInteract" class="flex gap-2" @submit.prevent="send">
-      <input
-        v-model="draft"
-        maxlength="400"
-        placeholder="Skriv en kommentar…"
-        aria-label="Skriv en kommentar"
-        :readonly="!!sending[postId]"
-        class="min-w-0 flex-1 rounded-full border bg-navy-950 px-4 py-2 text-sm outline-none focus:border-himmel"
-        :class="sendError ? 'border-rod' : 'border-white/12'"
-      >
-      <button class="rounded-full bg-krita px-4 text-sm font-bold text-navy-950 disabled:opacity-40" :disabled="!draft.trim() || !!sending[postId]">
-        {{ sending[postId] ? 'Skickar…' : 'Skicka' }}
-      </button>
-    </form>
-    <p v-else-if="identity.kind === 'needs-profile'" class="text-sm text-krita-dim">
-      <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Välj ditt läktarnamn</button> för att kommentera.
-    </p>
-    <p v-else-if="identity.kind === 'guest'" class="text-sm text-krita-dim">
-      <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Logga in</button> för att kommentera.
-    </p>
-    <p v-if="sendError" class="text-xs font-semibold text-rod" role="alert">{{ sendError }}</p>
-  </div>
+  </section>
 </template>
