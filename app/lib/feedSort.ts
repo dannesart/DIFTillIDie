@@ -18,7 +18,8 @@ import type { PostStats } from './interactions'
  * comments.
  */
 
-export type FeedSort = 'nyast' | 'hetast'
+/** 'foljer': only the supporters you follow, newest first, from the database (lib/followingFeed). */
+export type FeedSort = 'nyast' | 'hetast' | 'foljer'
 
 export const HOT_WEIGHTS = { reaction: 1, comment: 2 } as const
 
@@ -85,7 +86,7 @@ export function createFeedSort(opts: {
   watch([opts.sort, opts.statsStatus, opts.statsLoadedAt], snapshot, { immediate: true, flush: 'sync' })
 
   const state = computed<SortState>(() => {
-    if (opts.sort.value === 'nyast') return 'newest'
+    if (opts.sort.value !== 'hetast') return 'newest'
     if (order.value) return 'ranked'
     return opts.statsStatus.value === 'error' ? 'unavailable' : 'waiting'
   })

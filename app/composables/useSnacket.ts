@@ -76,16 +76,20 @@ export function useSnacket() {
   /** All real posts, newest first, exactly as Supabase returned them. */
   const all = computed<FeedPost[]>(() => community.posts.value.map(p => toFeedPost(p, auth.userId.value)))
 
-  /** Real posts through the sport, #tag and Story filters, newest first. (Hetast is applied on top, where the feed is shown.) */
-  const feed = computed(() => {
+  /** `list` through the sport, #tag and Story filters, in its own order. */
+  function narrow(list: FeedPost[]) {
     const { tag, storyId } = filter.value
-    const about = storyId ? new Set(postsForStoryFilter(news.value?.stories ?? [], all.value, storyId)) : undefined
-    return all.value.filter(p =>
+    const about = storyId ? new Set(postsForStoryFilter(news.value?.stories ?? [], list, storyId)) : undefined
+    return list.filter(p =>
       matches(p.sport)
       && (!about || about.has(p))
       && (!tag || p.body.toLowerCase().includes(`#${tag.toLowerCase()}`)),
     )
-  })
+  }
+  /** Real posts through the filters, newest first. (Hetast is applied on top, where the feed is shown.) */
+  const feed = computed(() => narrow(all.value))
+  /** Följer's posts (from the database, by the people you follow) as feed posts, through the same filters. */
+  const followingFeed = (posts: CommunityPost[]) => narrow(posts.map(p => toFeedPost(p, auth.userId.value)))
 
   /**
    * Real posts about a Story, newest first: the posts storyOfPost resolves to it (by a frozen Story's lead
@@ -121,5 +125,5 @@ export function useSnacket() {
     return r
   }
 
-  return { all, feed, community, filter, sort, sport, me, identity, owner, load, publish, countForStory, postsForStory }
+  return { all, feed, followingFeed, community, filter, sort, sport, me, identity, owner, load, publish, countForStory, postsForStory }
 }
