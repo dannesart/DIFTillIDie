@@ -23,7 +23,7 @@ insert into auth.users (id, email) values
 
 -- ── Structure ────────────────────────────────────────────────────────────
 select results_eq(
-  $$ select column_name || ':' || data_type || ':' || is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'post_comments' and column_name in ('parent_comment_id', 'is_reply') order by 1 $$,
+  $$ select column_name::text || ':' || data_type::text || ':' || is_nullable::text from information_schema.columns where table_schema = 'public' and table_name = 'post_comments' and column_name in ('parent_comment_id', 'is_reply') order by 1 $$,
   array['is_reply:boolean:NO', 'parent_comment_id:uuid:YES'], 'post_comments has parent_comment_id (nullable) and is_reply (not null)');
 select ok(
   (select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.post_comments'::regclass and conname = 'post_comments_parent_fkey')
