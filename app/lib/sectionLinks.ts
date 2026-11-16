@@ -1,4 +1,4 @@
-import { postAnchor } from './reveal'
+import { commentAnchor, postAnchor } from './reveal'
 
 /*
  * Where the site's sections and supporters' pages live.
@@ -7,7 +7,8 @@ import { postAnchor } from './reveal'
  * modules/app-shell.ts). Every section is a page of its own on every screen
  * size (Issue #16): Hem at /, and /snacket, /stories, /lyssna. Supporters
  * are at /laktaren/<handle>, and your own settings at /installningar. A Story or a post is its section's page with
- * the item's anchor (/stories#story-…, /snacket#post-…).
+ * the item's anchor (/stories#story-…, /snacket#post-…). A post also has a page of its own,
+ * /snacket/inlagg/<id>, which works for any post (and #comment-<id> for one of its comments).
  *
  * Until Issue #16 phones had one long front page with in-page sections
  * (/#snacket). Those addresses are still out there (shared links, bookmarks,
@@ -38,8 +39,10 @@ export function sectionLinks(rawPath: string) {
     section: view,
     /** A Story, on the Stories page. */
     story: (id: string) => `/stories#${id}`,
-    /** A post, in Snacket. */
+    /** A post, in Snacket's feed (only while it's among the posts loaded there). */
     post: (id: string) => `/snacket#${postAnchor(id)}`,
+    /** A post on a page of its own, whatever Snacket has loaded; with a comment, that comment. */
+    postPage: (id: string, commentId?: string) => `/snacket/inlagg/${id}${commentId ? `#${commentAnchor(commentId)}` : ''}`,
     /** A supporter's page (by their handle). */
     supporter: (handle: string) => `/laktaren/${handle}`,
     /** Your own settings (Mina lag). */

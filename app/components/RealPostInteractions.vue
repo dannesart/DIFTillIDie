@@ -2,16 +2,27 @@
 import type { ReactionKey } from '#shared/types/domain'
 import { REACTIONS } from '~/composables/useSnacket'
 import { commentsButtonLabel } from '~/lib/interactions'
+import { commentAnchor } from '~/lib/reveal'
 
 /*
  * Reactions and comments on a post, stored in Supabase. Counts are
  * everyone's, your highlight is yours, and nothing changes until Supabase
  * has confirmed it.
  */
-const props = defineProps<{ postId: string }>()
+const props = defineProps<{
+  postId: string
+  /**
+   * A comment to bring into view (a link to it: #comment-<id>), known to be
+   * on this post. The thread opens and is read on, page by page, until it's
+   * there; then it's scrolled to and briefly highlighted. Not found after all
+   * (deleted meanwhile): `focused` says so, and nothing else is pointed at.
+   */
+  focusComment?: string | null
+}>()
+const emit = defineEmits<{ focused: [result: 'shown' | 'not-found' | 'error'] }>()
 
 const { identity, owner } = useSnacket()
-const { stats, statsStatus, mine, pending, threads, sending, react, loadComments, addComment, removeComment } = useInteractions()
+const { stats, statsStatus, mine, pending, threads, sending, react, loadComments, loadMoreComments, addComment, removeComment } = useInteractions()
 const accountOpen = useAccountDialog()
 const { userId } = useAuth()
 const links = useSectionLinks()
@@ -44,6 +55,37 @@ function toggle() {
   open.value = !open.value
   if (open.value) void loadComments(props.postId)
 }
+
+/** At most this many further pages are read looking for a linked comment (COMMENT_LIMIT each). */
+const FOCUS_PAGES = 25
+const highlighted = ref<string | null>(null)
+let unhighlight: ReturnType<typeof setTimeout> | undefined
+async function focus(id: string) {
+  open.value = true
+  await loadComments(props.postId)
+  const has = () => !!threads.value[props.postId]?.list.some(c => c.id === id)
+  for (let n = 0; !has() && threads.value[props.postId]?.more && n < FOCUS_PAGES; n++) {
+    if (!(await loadMoreComments(props.postId))) break
+  }
+  if (props.focusComment !== id) return // another link meanwhile
+  const thread = threads.value[props.postId]
+  if (!has()) return emit('focused', thread?.status === 'error' || thread?.more ? 'error' : 'not-found')
+  await nextTick()
+  const el = document.getElementById(commentAnchor(id))
+  el?.scrollIntoView({ block: 'center' })
+  el?.focus({ preventScroll: true })
+  highlighted.value = id
+  clearTimeout(unhighlight)
+  unhighlight = setTimeout(() => (highlighted.value = null), 2600)
+  emit('focused', 'shown')
+}
+onMounted(() => props.focusComment && void focus(props.focusComment))
+watch(() => props.focusComment, (id) => {
+  // Pointed elsewhere (or nowhere): the last one isn't the one any more.
+  highlighted.value = null
+  if (id) void focus(id)
+})
+onBeforeUnmount(() => clearTimeout(unhighlight))
 
 const draft = ref('')
 const sendError = ref<string | null>(null)
@@ -122,14 +164,22 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
       <p v-if="!thread.list.length" class="text-sm text-krita-dim">Inga kommentarer än.</p>
       <!-- Capped thread: say so rather than imply the list is complete -->
       <p v-if="thread.more" class="text-xs text-krita-dim">Visar de {{ thread.list.length }} äldsta av {{ s ? s.comments : 'fler' }} kommentarer.</p>
-      <div v-for="c in thread.list" :key="c.id" class="flex gap-2.5">
+      <!-- A comment's own anchor (#comment-<id>), for links to it; focusable only from a link -->
+      <div
+        v-for="c in thread.list"
+        :id="commentAnchor(c.id)"
+        :key="c.id"
+        tabindex="-1"
+        class="scroll-below-header flex gap-2.5 rounded-2xl outline-none transition-shadow duration-700"
+        :class="highlighted === c.id && 'shadow-[0_0_0_2px_var(--color-guld)]'"
+      >
         <NuxtLink :to="links.supporter(c.author.handle)" class="shrink-0 self-start rounded-full transition hover:scale-105" tabindex="-1" :aria-label="`${c.author.name} på läktaren`">
           <Avatar :name="c.author.name" :design="c.author.avatar" size="sm" />
         </NuxtLink>
         <div class="min-w-0 flex-1 rounded-2xl rounded-tl-sm bg-white/[0.04] px-3.5 py-2.5">
           <p class="flex flex-wrap items-baseline gap-x-1.5 text-xs">
             <NuxtLink :to="links.supporter(c.author.handle)" class="font-semibold underline-offset-2 hover:text-himmel hover:underline">{{ c.author.name }}</NuxtLink>
-            <span class="text-krita-dim">@{{ c.author.handle }} · <TimeAgo :at="c.createdAt" /></span>
+            <span class="text-krita-dim">@{{ c.author.handle }} · <NuxtLink :to="links.postPage(postId, c.id)" class="underline-offset-2 hover:text-krita hover:underline" title="Länk till kommentaren"><TimeAgo :at="c.createdAt" /></NuxtLink></span>
             <template v-if="c.author.id === userId">
               <span v-if="confirming === c.id" class="ml-auto flex gap-2">
                 <button class="font-bold text-rod hover:underline disabled:opacity-50" :disabled="removing" @click="remove(c.id)">{{ removing ? 'Tar bort…' : 'Ja, ta bort' }}</button>
@@ -148,6 +198,15 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
           <p v-if="confirming === c.id && removeError" class="mt-1 text-xs font-semibold text-rod" role="alert">{{ removeError }}</p>
         </div>
       </div>
+      <!-- The rest of a capped thread, a page at a time -->
+      <button
+        v-if="thread.more"
+        class="text-sm font-semibold text-himmel hover:underline disabled:opacity-50"
+        :disabled="thread.loadingMore"
+        @click="loadMoreComments(postId)"
+      >
+        {{ thread.loadingMore ? 'Hämtar…' : 'Visa fler kommentarer' }}
+      </button>
     </template>
 
     <form v-if="canInteract" class="flex gap-2" @submit.prevent="send">

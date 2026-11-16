@@ -11,6 +11,7 @@ import type { NuxtPage } from 'nuxt/schema'
  *   /                    Home: Hem's overview, on every screen size
  *   /snacket, /stories,  a section's own page, on every screen size (Issue #16)
  *   /lyssna
+ *   /snacket/inlagg/<id> one Snacket post (#comment-<id>: one of its comments)
  *   /laktaren/<handle>   a supporter's place on the stands
  *   /installningar       your own settings (Mina lag)
  */
@@ -29,6 +30,7 @@ export default defineNuxtModule({
         children: [
           { name: 'index', path: '', file: view('Home') },
           ...VIEWS.map((id): NuxtPage => ({ name: id, path: id, file: view(id[0]!.toUpperCase() + id.slice(1)) })),
+          { name: 'snacket-inlagg', path: 'snacket/inlagg/:postId()', file: view('Inlagg') },
           { name: 'laktaren-handle', path: 'laktaren/:handle()', file: view('Laktaren') },
           { name: 'installningar', path: 'installningar', file: view('Installningar') },
         ],

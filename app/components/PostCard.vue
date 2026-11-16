@@ -11,9 +11,11 @@ import { frozenLead } from '~/lib/posts'
  * On a supporter's own wall: `onWall` (no link to the page you're on, and
  * no reply button, since there's no composer there).
  * `noMentions` alone: links, but no reply button (a preview without a composer).
+ * Its time links to the post's own page (/snacket/inlagg/<id>); `focusComment`
+ * opens its comments at that one (see RealPostInteractions).
  */
-const props = defineProps<{ post: FeedPost, onWall?: boolean, noMentions?: boolean }>()
-const emit = defineEmits<{ mention: [handle: string], removed: [id: string] }>()
+const props = defineProps<{ post: FeedPost, onWall?: boolean, noMentions?: boolean, focusComment?: string | null }>()
+const emit = defineEmits<{ mention: [handle: string], removed: [id: string], focused: [result: 'shown' | 'not-found' | 'error'] }>()
 
 const { filter, community } = useSnacket()
 const { show } = useStorySpotlight()
@@ -88,7 +90,7 @@ async function remove() {
             <button v-else class="text-sm text-krita-dim hover:text-himmel" :title="`Nämn @${post.author.handle}`" @click="emit('mention', post.author.handle)">@{{ post.author.handle }}</button>
           </p>
           <p class="text-xs text-krita-dim">
-            <TimeAgo :at="post.createdAt" />
+            <NuxtLink :to="links.postPage(post.id)" class="underline-offset-2 hover:text-krita hover:underline" title="Länk till inlägget"><TimeAgo :at="post.createdAt" /></NuxtLink>
             <span v-if="post.sport" class="capitalize"> · {{ post.sport }}</span>
           </p>
         </div>
@@ -172,6 +174,6 @@ async function remove() {
       Inlägget handlade om en Story som inte längre finns i nyhetsflödena. Den sparades inte när inlägget skrevs.
     </p>
 
-    <RealPostInteractions :post-id="post.id" />
+    <RealPostInteractions :post-id="post.id" :focus-comment="focusComment" @focused="r => emit('focused', r)" />
   </article>
 </template>
