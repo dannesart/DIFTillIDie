@@ -167,6 +167,29 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
   </div>
 
   <section v-if="conversation" class="mt-4 space-y-3 border-t border-white/8 pt-4" aria-label="Kommentarer">
+    <!-- First the way to join in (or the way in), then the comments, oldest first -->
+    <form v-if="canInteract" class="flex gap-2" @submit.prevent="send">
+      <input
+        v-model="draft"
+        maxlength="400"
+        placeholder="Skriv en kommentar…"
+        aria-label="Skriv en kommentar"
+        :readonly="!!sending[postId]"
+        class="min-w-0 flex-1 rounded-full border bg-navy-950 px-4 py-2 text-sm outline-none focus:border-himmel"
+        :class="sendError ? 'border-rod' : 'border-white/12'"
+      >
+      <button class="rounded-full bg-krita px-4 text-sm font-bold text-navy-950 disabled:opacity-40" :disabled="!draft.trim() || !!sending[postId]">
+        {{ sending[postId] ? 'Skickar…' : 'Skicka' }}
+      </button>
+    </form>
+    <p v-else-if="identity.kind === 'needs-profile'" class="text-sm text-krita-dim">
+      <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Välj ditt läktarnamn</button> för att kommentera.
+    </p>
+    <p v-else-if="identity.kind === 'guest'" class="text-sm text-krita-dim">
+      <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Logga in</button> för att kommentera.
+    </p>
+    <p v-if="sendError" class="text-xs font-semibold text-rod" role="alert">{{ sendError }}</p>
+
     <p v-if="!thread || thread.status === 'loading'" class="text-sm text-krita-dim" aria-live="polite">Hämtar kommentarer…</p>
     <p v-else-if="thread.status === 'error'" class="text-sm text-krita-dim" role="alert">
       Kunde inte hämta kommentarerna.
@@ -220,27 +243,5 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
         {{ thread.loadingMore ? 'Hämtar…' : 'Visa fler kommentarer' }}
       </button>
     </template>
-
-    <form v-if="canInteract" class="flex gap-2" @submit.prevent="send">
-      <input
-        v-model="draft"
-        maxlength="400"
-        placeholder="Skriv en kommentar…"
-        aria-label="Skriv en kommentar"
-        :readonly="!!sending[postId]"
-        class="min-w-0 flex-1 rounded-full border bg-navy-950 px-4 py-2 text-sm outline-none focus:border-himmel"
-        :class="sendError ? 'border-rod' : 'border-white/12'"
-      >
-      <button class="rounded-full bg-krita px-4 text-sm font-bold text-navy-950 disabled:opacity-40" :disabled="!draft.trim() || !!sending[postId]">
-        {{ sending[postId] ? 'Skickar…' : 'Skicka' }}
-      </button>
-    </form>
-    <p v-else-if="identity.kind === 'needs-profile'" class="text-sm text-krita-dim">
-      <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Välj ditt läktarnamn</button> för att kommentera.
-    </p>
-    <p v-else-if="identity.kind === 'guest'" class="text-sm text-krita-dim">
-      <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Logga in</button> för att kommentera.
-    </p>
-    <p v-if="sendError" class="text-xs font-semibold text-rod" role="alert">{{ sendError }}</p>
   </section>
 </template>

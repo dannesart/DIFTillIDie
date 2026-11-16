@@ -59,6 +59,25 @@ describe('the comments', () => {
     expect(script).toMatch(/onMounted\(\(\) => \{\n {2}if \(!props\.conversation\) return\n {2}if \(props\.focusComment\) void focus\(props\.focusComment\)\n {2}else void loadComments\(props\.postId\)/)
   })
 
+  it('the comment box (or the way in) comes first, then the comments, oldest first, then "Visa fler"', () => {
+    const section = all(thread).find(n => n.tag === 'section' && cond(n) === 'conversation')!
+    const order = all(section)
+    const at = (find: (n: Node) => boolean) => order.findIndex(find)
+    const form = at(n => n.tag === 'form')
+    const needsProfile = at(n => cond(n) === "identity.kind === 'needs-profile'")
+    const guest = at(n => cond(n) === "identity.kind === 'guest'")
+    const sendError = at(n => cond(n) === 'sendError')
+    const comments = at(n => n.props?.some(p => p.name === 'for' && p.exp?.content === 'c in thread.list') ?? false)
+    const more = at(n => n.tag === 'button' && cond(n) === 'thread.more')
+    const loading = at(n => cond(n) === "!thread || thread.status === 'loading'")
+    for (const [name, i] of Object.entries({ form, needsProfile, guest, sendError, comments, more, loading })) expect(i, name).toBeGreaterThan(-1)
+    expect(Math.max(form, needsProfile, guest, sendError)).toBeLessThan(Math.min(loading, comments))
+    expect(comments).toBeLessThan(more)
+    // Still one form, the same submit
+    expect(order.filter(n => n.tag === 'form')).toHaveLength(1)
+    expect(order[form]!.props?.find(p => p.arg?.content === 'submit')?.exp?.content).toBe('send')
+  })
+
   it('elsewhere, the count is a link to the post page; the reactions stay where the post is', () => {
     const link = all(thread).find(n => n.tag === 'NuxtLink' && bound(n, 'to') === 'links.postPage(postId)')!
     expect(has(link, 'else')).toBe(true)
