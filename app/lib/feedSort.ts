@@ -21,6 +21,23 @@ import type { PostStats } from './interactions'
 /** 'foljer': only the supporters you follow, newest first, from the database (lib/followingFeed). */
 export type FeedSort = 'nyast' | 'hetast' | 'foljer'
 
+const SORTS: readonly FeedSort[] = ['hetast', 'nyast', 'foljer']
+
+/** The sort an address names (?sort=…), or null when it names none (or something unknown). */
+export function sortFromQuery(value: unknown): FeedSort | null {
+  const v = Array.isArray(value) ? value[0] : value
+  return SORTS.includes(v as FeedSort) ? v as FeedSort : null
+}
+
+/**
+ * The address's query for a sort: Nyast is the plain address (no ?sort),
+ * the others say so. Every other parameter is kept as it was.
+ */
+export function queryForSort<Q extends Record<string, unknown>>(query: Q, sort: FeedSort): Q {
+  const { sort: _, ...rest } = query
+  return (sort === 'nyast' ? rest : { ...rest, sort }) as unknown as Q
+}
+
 export const HOT_WEIGHTS = { reaction: 1, comment: 2 } as const
 
 interface Ranked { id: string, createdAt: string }

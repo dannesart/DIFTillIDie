@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FeedSort } from '~/lib/feedSort'
-import { createFeedSort, engagement } from '~/lib/feedSort'
+import { createFeedSort, engagement, queryForSort, sortFromQuery } from '~/lib/feedSort'
 import { FOLLOWING_CAP } from '~/lib/followingFeed'
 import { newsLoad } from '~/lib/postDraft'
 import { postAnchor } from '~/lib/reveal'
@@ -33,6 +33,34 @@ const sorts: { value: FeedSort, label: string, hint: string }[] = [
   { value: 'nyast', label: 'Nyast', hint: 'Senaste först' },
   { value: 'foljer', label: 'Följer', hint: 'Supportrar du följer, senaste först' },
 ]
+/*
+ * The tab is in the address (?sort=hetast|foljer; Nyast is plain /snacket),
+ * so a refresh, a shared link and back/forward all show the same tab. `sort`
+ * stays the one state; the address only mirrors it:
+ *  - arriving with a valid ?sort: that tab;
+ *  - arriving without one (e.g. from the menu): the tab you had, and the
+ *    address is brought in line (an unknown ?sort falls back to Nyast);
+ *  - picking a tab: a new history entry, without a reload;
+ *  - back/forward: the tab the address names.
+ * Only in the browser, once mounted: /snacket is cached at the CDN whatever
+ * its query, so the server always renders Nyast and never bakes a ?sort in.
+ */
+const route = useRoute()
+const router = useRouter()
+const inAddress = () => sortFromQuery(route.query.sort) ?? 'nyast'
+const agrees = (s: FeedSort) => (route.query.sort === undefined ? s === 'nyast' : !Array.isArray(route.query.sort) && sortFromQuery(route.query.sort) === s)
+onMounted(async () => {
+  const want = sortFromQuery(route.query.sort) ?? (route.query.sort === undefined ? sort.value : 'nyast')
+  if (!agrees(want)) await router.replace({ query: queryForSort(route.query, want), hash: route.hash })
+  sort.value = want
+})
+watch(sort, (s) => {
+  if (!agrees(s)) void router.push({ query: queryForSort(route.query, s) })
+})
+watch(() => route.query.sort, () => {
+  if (inAddress() !== sort.value) sort.value = inAddress()
+})
+
 const sortIndex = computed(() => Math.max(0, sorts.findIndex(m => m.value === sort.value)))
 // Filters first (feed), then the order.
 const feedSort = createFeedSort({ sort, posts: all, stats, statsStatus, statsLoadedAt })
