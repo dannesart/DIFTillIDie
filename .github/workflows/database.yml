@@ -52,6 +52,7 @@ jobs:
           eval "$(supabase status -o env)"
           set +a
           MATCHTIPSET_STACK=local npx vitest run tests/matchtipset-stack.test.ts
+          COMMENT_REPLIES_STACK=local npx vitest run tests/comment-replies-stack.test.ts
 
       - name: Stop the stack
         if: always()
