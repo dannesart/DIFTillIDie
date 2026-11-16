@@ -41,8 +41,12 @@ export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 /** At most this many comments are fetched per thread, oldest first. */
 export const COMMENT_LIMIT = 200
 
-/** `more`: the thread hit COMMENT_LIMIT, so older-first, later comments are not shown. */
-interface CommentThread { status: LoadStatus, list: RealComment[], more: boolean }
+interface CommentCursor { createdAt: string, id: string }
+/**
+ * `more`: the last page hit COMMENT_LIMIT, so later comments are not shown yet
+ * (loadMoreComments fetches them, after `cursor`, the last row read).
+ */
+interface CommentThread { status: LoadStatus, list: RealComment[], more: boolean, cursor?: CommentCursor, loadingMore?: boolean }
 
 const COMMENT_COLUMNS = 'id, post_id, body, created_at, author:profiles!post_comments_author_id_fkey(id, display_name, handle, avatar)'
 /** A database without the supporter-profiles migration yet (42703: no avatar column): read what it has. */
@@ -163,24 +167,61 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
     }
   }
 
+  /** One page of a thread, oldest first, after `after` (keyset: created_at, then id). */
+  async function commentPage(postId: string, after?: CommentCursor) {
+    const list = (cols: string) => {
+      let q = client!.from('post_comments').select(cols).eq('post_id', postId)
+      // Quoted: timestamps contain dots, colons and '+'.
+      if (after) q = q.or(`created_at.gt."${after.createdAt}",and(created_at.eq."${after.createdAt}",id.gt.${after.id})`)
+      return q.order('created_at', { ascending: true }).order('id', { ascending: true }).limit(COMMENT_LIMIT)
+    }
+    let { data, error: e } = await list(COMMENT_COLUMNS)
+    if (missingColumn(e)) ({ data, error: e } = await list(COMMENT_COLUMNS_BEFORE_DESIGN))
+    if (e) throw e
+    const rows = data as unknown as CommentRow[]
+    const last = rows.at(-1)
+    return {
+      list: rows.map(toRealComment).filter((c): c is RealComment => !!c),
+      more: rows.length >= COMMENT_LIMIT,
+      // From the rows themselves: a row skipped for want of a visible author still moves the page on.
+      cursor: last ? { createdAt: last.created_at, id: last.id } : after,
+    }
+  }
+
   async function loadComments(postId: string) {
     if (!client) return
     const prev = threads.value[postId]
-    threads.value = { ...threads.value, [postId]: { status: prev?.list.length ? 'ready' : 'loading', list: prev?.list ?? [], more: prev?.more ?? false } }
+    threads.value = { ...threads.value, [postId]: { ...(prev ?? { list: [], more: false }), status: prev?.list.length ? 'ready' : 'loading' } }
     try {
-      const list = (cols: string) => client.from('post_comments').select(cols)
-        .eq('post_id', postId).order('created_at', { ascending: true }).order('id', { ascending: true }).limit(COMMENT_LIMIT)
-      let { data, error: e } = await list(COMMENT_COLUMNS)
-      if (missingColumn(e)) ({ data, error: e } = await list(COMMENT_COLUMNS_BEFORE_DESIGN))
-      if (e) throw e
-      const rows = data as unknown as CommentRow[]
-      const comments = rows.map(toRealComment).filter((c): c is RealComment => !!c)
+      const first = await commentPage(postId)
       // The total stays post_stats()'s: this list is a capped page (and skips
       // rows without a visible author), so its length is not a count.
-      threads.value = { ...threads.value, [postId]: { status: 'ready', list: comments, more: rows.length >= COMMENT_LIMIT } }
+      threads.value = { ...threads.value, [postId]: { status: 'ready', list: first.list, more: first.more, cursor: first.cursor } }
     }
     catch {
-      threads.value = { ...threads.value, [postId]: { status: prev?.list.length ? 'ready' : 'error', list: prev?.list ?? [], more: prev?.more ?? false } }
+      threads.value = { ...threads.value, [postId]: { ...(prev ?? { list: [], more: false }), status: prev?.list.length ? 'ready' : 'error' } }
+    }
+  }
+
+  /**
+   * The next COMMENT_LIMIT comments of a capped thread, after the last one
+   * shown (oldest first). False when it couldn't: what's shown stays.
+   */
+  async function loadMoreComments(postId: string): Promise<boolean> {
+    const t = threads.value[postId]
+    if (!client || !t || t.status !== 'ready' || !t.more || t.loadingMore) return false
+    threads.value = { ...threads.value, [postId]: { ...t, loadingMore: true } }
+    try {
+      const next = await commentPage(postId, t.cursor)
+      const now = threads.value[postId] ?? t
+      const seen = new Set(now.list.map(c => c.id))
+      threads.value = { ...threads.value, [postId]: { ...now, list: [...now.list, ...next.list.filter(c => !seen.has(c.id))], more: next.more, cursor: next.cursor, loadingMore: false } }
+      return true
+    }
+    catch {
+      const now = threads.value[postId] ?? t
+      threads.value = { ...threads.value, [postId]: { ...now, loadingMore: false } }
+      return false
     }
   }
 
@@ -204,7 +245,7 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
       const c = toRealComment(data as unknown as CommentRow)
       if (!c) throw new Error('no author')
       const t = threads.value[postId] ?? { status: 'ready' as const, list: [], more: false }
-      threads.value = { ...threads.value, [postId]: { status: 'ready', list: [...t.list.filter(x => x.id !== c.id), c], more: t.more } }
+      threads.value = { ...threads.value, [postId]: { ...t, status: 'ready', list: [...t.list.filter(x => x.id !== c.id), c] } }
       const s = stats.value[postId] ?? emptyStats()
       stats.value = { ...stats.value, [postId]: { ...s, comments: s.comments + 1 } }
       return { ok: true }
@@ -266,7 +307,7 @@ export function createInteractions(client: SupabaseClient | null, auth: AuthStor
     })
   }
 
-  return { stats, statsStatus, statsLoadedAt, mine, pending, threads, sending, loadStats, loadMine, react, loadComments, addComment, removeComment }
+  return { stats, statsStatus, statsLoadedAt, mine, pending, threads, sending, loadStats, loadMine, react, loadComments, loadMoreComments, addComment, removeComment }
 }
 
 export type InteractionsStore = ReturnType<typeof createInteractions>

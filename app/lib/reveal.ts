@@ -15,6 +15,7 @@ import { nextTick } from 'vue'
  */
 
 export const postAnchor = (id: string) => `post-${id}`
+export const commentAnchor = (id: string) => `comment-${id}`
 export const FEED_ID = 'snacket-feed'
 
 export async function revealPost(id: string, deps: { tick?: () => Promise<void>, doc?: Pick<Document, 'getElementById'> } = {}) {

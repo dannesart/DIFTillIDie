@@ -41,6 +41,8 @@ export default defineNuxtConfig({
     '/lyssna': { isr: 300 },
     // A supporter's page: the same public shell for everyone; the profile and wall load in the browser.
     '/laktaren/**': { isr: 300 },
+    // One post: the same public shell for everyone; the post and its comments load in the browser.
+    '/snacket/inlagg/**': { isr: 300 },
     '/api/news': { isr: 600 },
     '/api/podcast': { isr: 600 },
     '/api/fixtures': { isr: 900 },
