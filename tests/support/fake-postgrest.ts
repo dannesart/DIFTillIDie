@@ -51,7 +51,7 @@ export function matches(row: Row, expr: string): boolean {
   }
 }
 
-export interface FakeRequest { table: string, params: [string, string][] }
+export interface FakeRequest { table: string, params: [string, string][], method: string, body?: Row }
 
 /**
  * `insert`: a POST (insert … returning) — returns the stored row (as the
@@ -62,14 +62,15 @@ export function fakePostgrest(tables: Record<string, () => Row[]>, opts: { fail?
   const fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input))
     const table = url.pathname.replace('/rest/v1/', '')
-    const req = { table, params: [...url.searchParams.entries()] }
+    const method = init?.method ?? 'GET'
+    const req: FakeRequest = { table, params: [...url.searchParams.entries()], method, body: method === 'POST' ? JSON.parse(String(init?.body)) as Row : undefined }
     requests.push(req)
     const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
     const failure = opts.fail?.(table, req)
     if (failure) return json(failure, 400)
     const accept = new Headers(init?.headers).get('accept') ?? ''
-    if ((init?.method ?? 'GET') === 'POST') {
-      const row = opts.insert?.(table, JSON.parse(String(init?.body)) as Row)
+    if (method === 'POST') {
+      const row = opts.insert?.(table, req.body!)
       if (!row) return json({ code: '42501', message: 'not allowed' }, 403)
       return json(accept.includes('vnd.pgrst.object') ? row : [row], 201)
     }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ReactionKey } from '#shared/types/domain'
 import { REACTIONS } from '~/composables/useSnacket'
+import type { RealComment, ReplyTarget } from '~/lib/interactions'
 import { commentsLinkLabel } from '~/lib/interactions'
 import { commentAnchor } from '~/lib/reveal'
 
@@ -33,6 +34,7 @@ const { stats, statsStatus, mine, pending, threads, sending, react, loadComments
 const accountOpen = useAccountDialog()
 const { userId } = useAuth()
 const links = useSectionLinks()
+const route = useRoute()
 
 const s = computed(() => stats.value[props.postId])
 const busy = computed(() => !!pending.value[props.postId])
@@ -80,10 +82,16 @@ async function show(id: string) {
   clearTimeout(unhighlight)
   unhighlight = setTimeout(() => (highlighted.value = null), 2600)
 }
-/** A link to a comment: from the start of the thread, read on to it. */
-async function focus(id: string) {
-  await loadComments(props.postId)
-  await readOnTo(id)
+/**
+ * A link to a comment: from the start of the thread, read on to it. Opening
+ * the page (`fresh`) always reads the thread anew; a link within the page to
+ * a comment already shown just goes there, keeping what's loaded.
+ */
+async function focus(id: string, fresh = false) {
+  if (fresh || !loaded(id)) {
+    await loadComments(props.postId)
+    await readOnTo(id)
+  }
   if (props.focusComment !== id) return // another link meanwhile
   const thread = threads.value[props.postId]
   if (!loaded(id)) return emit('focused', thread?.status === 'error' || thread?.more ? 'error' : 'not-found')
@@ -93,9 +101,19 @@ async function focus(id: string) {
 // The conversation: its comments at once (a linked comment is looked for page by page, see focus()).
 onMounted(() => {
   if (!props.conversation) return
-  if (props.focusComment) void focus(props.focusComment)
+  if (props.focusComment) void focus(props.focusComment, true)
   else void loadComments(props.postId)
 })
+/**
+ * A link to a comment on this page ("Svar till …", a comment's time). A new
+ * address goes the usual way (focusComment). The same address again doesn't
+ * move the router, so the comment is brought back into view from here.
+ */
+function toComment(id: string) {
+  if (route.hash.toLowerCase() !== `#${commentAnchor(id)}`.toLowerCase()) return
+  if (loaded(id)) void show(id)
+  else if (props.focusComment === id) void focus(id)
+}
 watch(() => props.focusComment, (id) => {
   // Pointed elsewhere (or nowhere): the last one isn't the one any more.
   highlighted.value = null
@@ -106,11 +124,35 @@ onBeforeUnmount(() => clearTimeout(unhighlight))
 const draft = ref('')
 const sendError = ref<string | null>(null)
 watch(draft, () => (sendError.value = null))
-// A half-typed comment belongs to whoever typed it.
+// A half-typed comment (and what it answers) belongs to whoever typed it.
 watch(owner, (_next, prev) => {
-  if (prev) draft.value = ''
+  if (prev) {
+    draft.value = ''
+    replyTo.value = null
+  }
   invite.value = false
 })
+
+/**
+ * The comment you're answering, chosen with "Svara" (the same comment box,
+ * just with what it answers above it). Choosing another or cancelling keeps
+ * your text. Signed out, or without a läktarnamn: the usual way in.
+ */
+const replyTo = ref<ReplyTarget | null>(null)
+const composerInput = ref<HTMLInputElement | null>(null)
+async function reply(c: RealComment) {
+  if (!canInteract.value) return void (accountOpen.value = true)
+  replyTo.value = { id: c.id, handle: c.author.handle }
+  sendError.value = null
+  await nextTick()
+  composerInput.value?.scrollIntoView({ block: 'center' })
+  composerInput.value?.focus({ preventScroll: true })
+}
+function cancelReply() {
+  replyTo.value = null
+  sendError.value = null
+  composerInput.value?.focus({ preventScroll: true })
+}
 
 /**
  * Your comment, just published: where it is now, last in the thread. With
@@ -122,9 +164,10 @@ const published = ref<string | null>(null)
 async function send() {
   if (!draft.value.trim() || sending.value[props.postId]) return
   published.value = null
-  const r = await addComment(props.postId, draft.value)
-  if (!r.ok) return void (sendError.value = r.message) // the text stays
+  const r = await addComment(props.postId, draft.value, replyTo.value?.id)
+  if (!r.ok) return void (sendError.value = r.message) // the text, and what it answers, stay
   draft.value = ''
+  replyTo.value = null
   if (!props.conversation) return
   if (await readOnTo(r.id)) await show(r.id)
   else published.value = r.id
@@ -138,8 +181,9 @@ async function remove(commentId: string) {
   removeError.value = null
   const r = await removeComment(props.postId, commentId)
   removing.value = false
-  if (r.ok) confirming.value = null
-  else removeError.value = r.message
+  if (!r.ok) return void (removeError.value = r.message)
+  confirming.value = null
+  if (replyTo.value?.id === commentId) replyTo.value = null // nothing left to answer
 }
 
 const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
@@ -189,20 +233,28 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
 
   <section v-if="conversation" class="mt-4 space-y-3 border-t border-white/8 pt-4" aria-label="Kommentarer">
     <!-- First the way to join in (or the way in), then the comments, oldest first -->
-    <form v-if="canInteract" class="flex gap-2" @submit.prevent="send">
-      <input
-        v-model="draft"
-        maxlength="400"
-        placeholder="Skriv en kommentar…"
-        aria-label="Skriv en kommentar"
-        :readonly="!!sending[postId]"
-        class="min-w-0 flex-1 rounded-full border bg-navy-950 px-4 py-2 text-sm outline-none focus:border-himmel"
-        :class="sendError ? 'border-rod' : 'border-white/12'"
-      >
-      <button class="rounded-full bg-krita px-4 text-sm font-bold text-navy-950 disabled:opacity-40" :disabled="!draft.trim() || !!sending[postId]">
-        {{ sending[postId] ? 'Skickar…' : 'Skicka' }}
-      </button>
-    </form>
+    <div v-if="canInteract" class="space-y-1.5">
+      <!-- Answering a comment: which one, and the way back to an ordinary comment -->
+      <p v-if="replyTo" class="text-xs text-krita-dim" role="status">
+        Svarar <span class="font-semibold text-krita">@{{ replyTo.handle }}</span> ·
+        <button type="button" class="font-semibold text-himmel hover:underline" @click="cancelReply">Avbryt</button>
+      </p>
+      <form class="flex gap-2" @submit.prevent="send">
+        <input
+          ref="composerInput"
+          v-model="draft"
+          maxlength="400"
+          :placeholder="replyTo ? 'Skriv ditt svar…' : 'Skriv en kommentar…'"
+          aria-label="Skriv en kommentar"
+          :readonly="!!sending[postId]"
+          class="scroll-below-header min-w-0 flex-1 rounded-full border bg-navy-950 px-4 py-2 text-sm outline-none focus:border-himmel"
+          :class="sendError ? 'border-rod' : 'border-white/12'"
+        >
+        <button class="rounded-full bg-krita px-4 text-sm font-bold text-navy-950 disabled:opacity-40" :disabled="!draft.trim() || !!sending[postId]">
+          {{ sending[postId] ? 'Skickar…' : 'Skicka' }}
+        </button>
+      </form>
+    </div>
     <p v-else-if="identity.kind === 'needs-profile'" class="text-sm text-krita-dim">
       <button class="font-semibold text-himmel hover:underline" @click="accountOpen = true">Välj ditt läktarnamn</button> för att kommentera.
     </p>
@@ -240,7 +292,8 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
         <div class="min-w-0 flex-1 rounded-2xl rounded-tl-sm bg-white/[0.04] px-3.5 py-2.5">
           <p class="flex flex-wrap items-baseline gap-x-1.5 text-xs">
             <NuxtLink :to="links.supporter(c.author.handle)" class="font-semibold underline-offset-2 hover:text-himmel hover:underline">{{ c.author.name }}</NuxtLink>
-            <span class="text-krita-dim">@{{ c.author.handle }} · <NuxtLink :to="links.postPage(postId, c.id)" class="underline-offset-2 hover:text-krita hover:underline" title="Länk till kommentaren"><TimeAgo :at="c.createdAt" /></NuxtLink></span>
+            <span class="text-krita-dim">@{{ c.author.handle }} · <NuxtLink :to="links.postPage(postId, c.id)" class="underline-offset-2 hover:text-krita hover:underline" title="Länk till kommentaren" @click="toComment(c.id)"><TimeAgo :at="c.createdAt" /></NuxtLink> ·</span>
+            <button type="button" class="text-krita-dim underline-offset-2 hover:text-krita hover:underline" :aria-label="`Svara @${c.author.handle}`" @click="reply(c)">Svara</button>
             <template v-if="c.author.id === userId">
               <span v-if="confirming === c.id" class="ml-auto flex gap-2">
                 <button class="font-bold text-rod hover:underline disabled:opacity-50" :disabled="removing" @click="remove(c.id)">{{ removing ? 'Tar bort…' : 'Ja, ta bort' }}</button>
@@ -248,6 +301,18 @@ const count = (key: ReactionKey) => (s.value ? s.value.reactions[key] : null)
               </span>
               <button v-else class="ml-auto text-krita-dim hover:text-rod" @click="confirming = c.id; removeError = null">Ta bort</button>
             </template>
+          </p>
+          <!-- A reply: what it answers (as stored, never read from the text), at the same indentation as every comment -->
+          <p v-if="c.isReply" class="mt-0.5 text-xs text-krita-dim">
+            <NuxtLink
+              v-if="c.replyTo"
+              :to="links.postPage(postId, c.replyTo.id)"
+              class="underline-offset-2 hover:text-himmel hover:underline"
+              @click="toComment(c.replyTo.id)"
+            >
+              <span aria-hidden="true">↳ </span>Svar till {{ c.replyTo.handle ? `@${c.replyTo.handle}` : 'en kommentar' }}
+            </NuxtLink>
+            <template v-else>Svar till en borttagen kommentar</template>
           </p>
           <p class="mt-0.5 whitespace-pre-line text-sm leading-relaxed">
             <template v-for="(t, i) in tokenize(c.body)" :key="i">

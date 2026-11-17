@@ -84,12 +84,13 @@ describe('your new comment, in its place', () => {
 
   it('the page shows it only after Supabase confirms it, reading on to it; the draft stays on failure', () => {
     const s = src('app/components/RealPostInteractions.vue')
-    expect(s).toContain("if (!r.ok) return void (sendError.value = r.message) // the text stays\n  draft.value = ''\n  if (!props.conversation) return\n  if (await readOnTo(r.id)) await show(r.id)\n  else published.value = r.id")
+    expect(s).toContain("if (!r.ok) return void (sendError.value = r.message) // the text, and what it answers, stay\n  draft.value = ''\n  replyTo.value = null\n  if (!props.conversation) return\n  if (await readOnTo(r.id)) await show(r.id)\n  else published.value = r.id")
     // The link and the new comment share the same way of being shown
-    expect(s).toContain('await readOnTo(id)\n  if (props.focusComment !== id) return')
+    expect(s).toContain('    await readOnTo(id)\n  }\n  if (props.focusComment !== id) return')
     expect(s).toContain('Din kommentar är publicerad, sist i tråden.')
-    // Nothing else scrolls to comments: only a link (focus) and your own send
+    // Nothing else scrolls to comments: only a link (focus), the same link clicked again (toComment) and your own send
     expect(s.match(/await show\(/g)).toHaveLength(2)
+    expect(s).toContain('if (loaded(id)) void show(id)')
   })
 })
 
@@ -138,7 +139,7 @@ describe('the comments', () => {
     // The thread, the comment box and the sign-in invitation all live inside it
     expect(all(section).some(n => n.tag === 'form')).toBe(true)
     expect(text(section)).toContain('för att kommentera.')
-    expect(script).toMatch(/onMounted\(\(\) => \{\n {2}if \(!props\.conversation\) return\n {2}if \(props\.focusComment\) void focus\(props\.focusComment\)\n {2}else void loadComments\(props\.postId\)/)
+    expect(script).toMatch(/onMounted\(\(\) => \{\n {2}if \(!props\.conversation\) return\n {2}if \(props\.focusComment\) void focus\(props\.focusComment, true\)\n {2}else void loadComments\(props\.postId\)/)
   })
 
   it('the comment box (or the way in) comes first, then the comments, oldest first, then "Visa fler"', () => {
